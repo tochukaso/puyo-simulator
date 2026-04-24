@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useGameStore } from '../../store';
+import { useGestures } from '../../hooks/useGestures';
 import { ROWS, COLS, SPAWN_COL, VISIBLE_ROW_START } from '../../../game/constants';
 import { PUYO_COLORS, BG_COLOR, GRID_COLOR, DANGER_COLOR } from './colors';
 import type { Field } from '../../../game/types';
@@ -9,6 +10,8 @@ export function Board() {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [cell, setCell] = useState(32);
   const game = useGameStore((s) => s.game);
+
+  useGestures(wrapperRef);
 
   useLayoutEffect(() => {
     const ro = new ResizeObserver((entries) => {

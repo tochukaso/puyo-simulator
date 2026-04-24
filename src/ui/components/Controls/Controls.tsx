@@ -13,7 +13,11 @@ export function Controls() {
       </button>
       <button
         className="px-3 py-1 bg-blue-600 rounded hover:bg-blue-500"
-        onClick={() => dispatch({ type: 'hardDrop' })}
+        onClick={() => {
+          const { game, commit } = useGameStore.getState();
+          if (!game.current) return;
+          commit({ axisCol: game.current.axisCol, rotation: game.current.rotation });
+        }}
       >
         ↓ 確定
       </button>

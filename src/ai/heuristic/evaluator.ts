@@ -100,12 +100,12 @@ export interface Weights {
 }
 
 // 建設(将来の連鎖の種を仕込む) を「目先の発火」より強く評価するようバランス調整。
-// chainPotential の重みを上げ、小さな即発火より伸びしろを優先する。
+// chainPotential をさらに重視、連結ボーナスも強めて「2〜3連の土台」作りを促進。
 export const DEFAULT_WEIGHTS: Weights = {
-  chainPotential: 3.0,
+  chainPotential: 5.0,
   heightBalance: 0.5,
   danger: 5.0,
-  connection: 0.3,
+  connection: 0.5,
 };
 
 export function evaluateField(field: Field, w: Weights): number {

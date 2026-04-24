@@ -3,10 +3,11 @@ import type { GameState, Move } from '../../game/types';
 import { DEFAULT_WEIGHTS, type EvalBreakdown, type Weights } from './evaluator';
 import { beamSearch, BIG_CHAIN_THRESHOLD } from './search';
 
-// 3手先まで読む。NEXT と NEXT-NEXT は既知、3手目の現行は seeded RNG で確定。
-const SEARCH_DEPTH = 3;
+// 4手先まで読む。NEXT と NEXT-NEXT は既知、それ以降は seeded RNG で確定的。
+// 4手あれば「3連鎖の骨組み+発火」のような計画が見える。
+const SEARCH_DEPTH = 4;
 // Beam 幅。各 depth で上位 N ノードだけ展開して計算量を抑える。
-const BEAM_WIDTH = 8;
+const BEAM_WIDTH = 10;
 
 export class HeuristicAI implements PuyoAI {
   readonly name = 'heuristic';

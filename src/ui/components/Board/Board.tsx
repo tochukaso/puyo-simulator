@@ -1,15 +1,19 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useGameStore } from '../../store';
 import { useGestures } from '../../hooks/useGestures';
+import { useAiSuggestion } from '../../hooks/useAiSuggestion';
 import { ROWS, COLS, SPAWN_COL, VISIBLE_ROW_START } from '../../../game/constants';
 import { PUYO_COLORS, BG_COLOR, GRID_COLOR, DANGER_COLOR } from './colors';
-import type { Field } from '../../../game/types';
+import type { Field, ActivePair, Move } from '../../../game/types';
+import { ghostCells } from './ghost';
 
 export function Board() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [cell, setCell] = useState(32);
   const game = useGameStore((s) => s.game);
+  const { moves } = useAiSuggestion(5);
+  const bestMove = moves[0] ?? null;
 
   useGestures(wrapperRef);
 
@@ -29,8 +33,8 @@ export function Board() {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    draw(ctx, game.field, game.current, cell);
-  }, [game, cell]);
+    draw(ctx, game.field, game.current, cell, bestMove);
+  }, [game, cell, bestMove]);
 
   return (
     <div ref={wrapperRef} className="w-full max-w-sm">
@@ -44,7 +48,7 @@ export function Board() {
   );
 }
 
-function draw(ctx: CanvasRenderingContext2D, field: Field, current: unknown, cell: number) {
+function draw(ctx: CanvasRenderingContext2D, field: Field, current: unknown, cell: number, bestMove: Move | null) {
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, COLS * cell, ROWS * cell);
 
@@ -90,6 +94,15 @@ function draw(ctx: CanvasRenderingContext2D, field: Field, current: unknown, cel
     drawPuyo(ctx, axisRow, axisCol, PUYO_COLORS[pair.axis], 1, cell);
     drawPuyo(ctx, axisRow + dr, axisCol + dc, PUYO_COLORS[pair.child], 1, cell);
   }
+
+  const ghost = ghostCells(field, current as ActivePair | null, bestMove);
+  if (ghost && current) {
+    const { pair } = current as { pair: { axis: string; child: string } };
+    for (const p of ghost) {
+      const color = p.kind === 'axis' ? pair.axis : pair.child;
+      drawPuyoGhost(ctx, p.row, p.col, PUYO_COLORS[color as keyof typeof PUYO_COLORS], cell);
+    }
+  }
 }
 
 function drawPuyo(
@@ -107,5 +120,18 @@ function drawPuyo(
   ctx.beginPath();
   ctx.arc(col * cell + cell / 2, row * cell + cell / 2, cell / 2 - 2, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
+}
+
+function drawPuyoGhost(ctx: CanvasRenderingContext2D, row: number, col: number, color: string, cell: number) {
+  if (row < 0) return;
+  ctx.save();
+  ctx.globalAlpha = 0.35;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([4, 3]);
+  ctx.beginPath();
+  ctx.arc(col * cell + cell / 2, row * cell + cell / 2, cell / 2 - 2, 0, Math.PI * 2);
+  ctx.stroke();
   ctx.restore();
 }

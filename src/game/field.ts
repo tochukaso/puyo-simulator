@@ -15,3 +15,13 @@ export function getCell(field: Field, row: number, col: number): Cell {
   if (row < 0 || row >= ROWS || col < 0 || col >= COLS) return null;
   return field.cells[row]![col]!;
 }
+
+export function withCell(field: Field, row: number, col: number, value: Cell): Field {
+  if (row < 0 || row >= ROWS || col < 0 || col >= COLS) {
+    throw new Error(`withCell out of range: (${row}, ${col})`);
+  }
+  const newCells = field.cells.map((r, ri) =>
+    ri === row ? r.map((c, ci) => (ci === col ? value : c)) : r,
+  );
+  return { cells: newCells };
+}

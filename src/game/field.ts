@@ -1,5 +1,5 @@
 import { ROWS, COLS } from './constants';
-import type { Field, Cell } from './types';
+import type { Field, Cell, Color } from './types';
 
 export function createEmptyField(): Field {
   const cells: Cell[][] = [];
@@ -23,5 +23,21 @@ export function withCell(field: Field, row: number, col: number, value: Cell): F
   const newCells = field.cells.map((r, ri) =>
     ri === row ? r.map((c, ci) => (ci === col ? value : c)) : r,
   );
+  return { cells: newCells };
+}
+
+export function applyGravity(field: Field): Field {
+  const newCells: Cell[][] = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+  for (let c = 0; c < COLS; c++) {
+    const stack: Color[] = [];
+    for (let r = 0; r < ROWS; r++) {
+      const v = field.cells[r]![c]!;
+      if (v !== null) stack.push(v);
+    }
+    let row = ROWS - 1;
+    for (let i = stack.length - 1; i >= 0; i--, row--) {
+      newCells[row]![c] = stack[i]!;
+    }
+  }
   return { cells: newCells };
 }

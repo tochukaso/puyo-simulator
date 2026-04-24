@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { applyInput } from '../moves';
 import { createEmptyField } from '../field';
+import { ROWS } from '../constants';
 import type { GameState, ActivePair } from '../types';
 
 function makeState(current: ActivePair): GameState {
@@ -44,5 +45,17 @@ describe('applyInput move', () => {
     const s = makeState(current);
     const s2 = applyInput(s, { type: 'rotateCW' });
     expect(s2.current!.rotation).toBe(1);
+  });
+});
+
+describe('hardDrop', () => {
+  it('着地後に current が null、status が resolving', () => {
+    const s = makeState({
+      pair: { axis: 'R', child: 'B' }, axisRow: 0, axisCol: 2, rotation: 0,
+    });
+    const s2 = applyInput(s, { type: 'hardDrop' });
+    expect(s2.current).toBeNull();
+    expect(s2.status).toBe('resolving');
+    expect(s2.field.cells[ROWS - 1]![2]!).toBe('R');
   });
 });

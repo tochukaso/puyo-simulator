@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { columnHeights, heightVariance, dangerPenalty } from '../heuristic/evaluator';
+import { columnHeights, heightVariance, dangerPenalty, chainPotential } from '../heuristic/evaluator';
 import { createEmptyField, withCell } from '../../game/field';
 
 describe('columnHeights', () => {
@@ -29,5 +29,19 @@ describe('dangerPenalty', () => {
   it('3列目が高いほど大きい', () => {
     expect(dangerPenalty([0, 0, 0, 0, 0, 0])).toBe(0);
     expect(dangerPenalty([0, 0, 10, 0, 0, 0])).toBeGreaterThan(0);
+  });
+});
+
+describe('chainPotential', () => {
+  it('連鎖できる盤面では 0 より大きい', () => {
+    let f = createEmptyField();
+    f = withCell(f, 12, 0, 'R');
+    f = withCell(f, 12, 1, 'R');
+    f = withCell(f, 12, 2, 'R');
+    f = withCell(f, 12, 3, 'R');
+    expect(chainPotential(f)).toBeGreaterThan(0);
+  });
+  it('何もない盤面は 0', () => {
+    expect(chainPotential(createEmptyField())).toBe(0);
   });
 });

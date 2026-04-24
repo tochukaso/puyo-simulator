@@ -9,20 +9,26 @@ import { canPlace } from '../game/pair';
 interface Store {
   game: GameState;
   animatingSteps: ChainStep[];
+  history: GameState[];
   reset(seed?: number): void;
   dispatch(input: Input): void;
   commit(move: Move): Promise<void>;
+  undo(steps?: number): void;
+  canUndo(): boolean;
 }
 
 const STEP_MS = 400;
+const MAX_HISTORY = 100;
 
 export const useGameStore = create<Store>((set, get) => ({
   game: createInitialState(Date.now() | 0),
   animatingSteps: [],
+  history: [],
   reset: (seed?: number) =>
     set({
       game: createInitialState(seed ?? (Date.now() | 0)),
       animatingSteps: [],
+      history: [],
     }),
   dispatch: (input: Input) => set((s) => ({ game: applyInput(s.game, input) })),
   commit: async (move: Move) => {
@@ -34,7 +40,14 @@ export const useGameStore = create<Store>((set, get) => ({
     const locked = lockActive(s.field, placed);
     const { finalField, steps } = resolveChain(locked);
 
-    set({ game: { ...s, field: locked, current: null, status: 'resolving' }, animatingSteps: steps });
+    const priorHistory = get().history;
+    const newHistory = [...priorHistory, s].slice(-MAX_HISTORY);
+
+    set({
+      game: { ...s, field: locked, current: null, status: 'resolving' },
+      animatingSteps: steps,
+      history: newHistory,
+    });
 
     let score = s.score;
     for (const step of steps) {
@@ -55,6 +68,20 @@ export const useGameStore = create<Store>((set, get) => ({
     };
     set({ game: spawnNext(finalState), animatingSteps: [] });
   },
+  undo: (steps = 1) => {
+    const { history, animatingSteps } = get();
+    if (history.length === 0) return;
+    if (animatingSteps.length > 0) return;
+    const n = Math.min(Math.max(1, steps), history.length);
+    const targetIndex = history.length - n;
+    const target = history[targetIndex]!;
+    set({
+      game: target,
+      history: history.slice(0, targetIndex),
+      animatingSteps: [],
+    });
+  },
+  canUndo: () => get().history.length > 0 && get().animatingSteps.length === 0,
 }));
 
 function sleep(ms: number) {

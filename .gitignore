@@ -27,3 +27,10 @@ playwright/.cache/
 *.njsproj
 *.sln
 *.sw?
+
+# ML artifacts
+data/selfplay/
+python/checkpoints/
+python/.venv/
+python/__pycache__/
+python/**/__pycache__/

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { pairCells } from '../pair';
+import { pairCells, canPlace } from '../pair';
+import { createEmptyField, withCell } from '../field';
 import type { ActivePair } from '../types';
 
 describe('pairCells', () => {
@@ -30,5 +31,29 @@ describe('pairCells', () => {
   it('rotation=3: 子が軸の左', () => {
     const { axisPos, childPos } = pairCells({ ...axis, rotation: 3 });
     expect(childPos).toEqual({ row: 5, col: 1 });
+  });
+});
+
+describe('canPlace', () => {
+  it('空盤面の中央は合法', () => {
+    const f = createEmptyField();
+    expect(canPlace(f, { pair: { axis: 'R', child: 'B' }, axisRow: 5, axisCol: 2, rotation: 0 })).toBe(true);
+  });
+
+  it('壁の外は不可', () => {
+    const f = createEmptyField();
+    expect(canPlace(f, { pair: { axis: 'R', child: 'B' }, axisRow: 5, axisCol: 0, rotation: 3 })).toBe(false);
+    expect(canPlace(f, { pair: { axis: 'R', child: 'B' }, axisRow: 5, axisCol: 5, rotation: 1 })).toBe(false);
+  });
+
+  it('ぷよが埋まっているマスは不可', () => {
+    let f = createEmptyField();
+    f = withCell(f, 5, 2, 'Y');
+    expect(canPlace(f, { pair: { axis: 'R', child: 'B' }, axisRow: 5, axisCol: 2, rotation: 0 })).toBe(false);
+  });
+
+  it('子が上にはみ出す(row<0)のは合法', () => {
+    const f = createEmptyField();
+    expect(canPlace(f, { pair: { axis: 'R', child: 'B' }, axisRow: 0, axisCol: 2, rotation: 0 })).toBe(true);
   });
 });

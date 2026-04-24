@@ -3,6 +3,7 @@ import { Board } from './ui/components/Board/Board';
 import { NextQueue } from './ui/components/NextQueue/NextQueue';
 import { Stats } from './ui/components/Stats/Stats';
 import { Controls } from './ui/components/Controls/Controls';
+import { CandidateList } from './ui/components/CandidateList/CandidateList';
 
 export default function App() {
   useKeyboard();
@@ -17,6 +18,7 @@ export default function App() {
           </div>
           <Board />
           <Controls />
+          <CandidateList />
         </div>
       </div>
     </div>

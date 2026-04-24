@@ -90,3 +90,26 @@ export function evaluateField(field: Field, w: Weights): number {
     + w.connection * connectionSeed(field)
   );
 }
+
+export interface EvalBreakdown {
+  total: number;
+  chainPotential: number;
+  heightBalance: number;
+  danger: number;
+  connection: number;
+}
+
+export function evaluateFieldBreakdown(field: Field, w: Weights): EvalBreakdown {
+  const heights = columnHeights(field);
+  const chain = w.chainPotential * chainPotential(field);
+  const hb = -w.heightBalance * heightVariance(heights);
+  const dg = -w.danger * dangerPenalty(heights);
+  const cn = w.connection * connectionSeed(field);
+  return {
+    total: chain + hb + dg + cn,
+    chainPotential: chain,
+    heightBalance: hb,
+    danger: dg,
+    connection: cn,
+  };
+}

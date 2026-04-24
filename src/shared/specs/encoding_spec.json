@@ -1,0 +1,60 @@
+{
+  "cases": [
+    {
+      "name": "empty_board_RB_current_YP_RR_queue",
+      "state": {
+        "field": null,
+        "current": { "axis": "R", "child": "B", "axisRow": 1, "axisCol": 2, "rotation": 0 },
+        "nextQueue": [
+          { "axis": "Y", "child": "P" },
+          { "axis": "R", "child": "R" }
+        ]
+      },
+      "expected": {
+        "board_shape": [13, 6, 7],
+        "queue_shape": [16],
+        "board_samples": [
+          { "r": 0, "c": 0, "ch": 4, "value": 1.0 },
+          { "r": 12, "c": 5, "ch": 4, "value": 1.0 },
+          { "r": 6, "c": 3, "ch": 5, "value": 0.0 },
+          { "r": 6, "c": 3, "ch": 6, "value": 0.3333333333333333 }
+        ],
+        "queue_values": [
+          0, 0, 1, 0,
+          0, 0, 0, 1,
+          1, 0, 0, 0,
+          1, 0, 0, 0
+        ],
+        "legal_mask_sum": 22
+      }
+    },
+    {
+      "name": "R_at_5_3_then_BB_current",
+      "state": {
+        "field": [{ "row": 5, "col": 3, "color": "R" }],
+        "current": { "axis": "B", "child": "B", "axisRow": 1, "axisCol": 2, "rotation": 0 },
+        "nextQueue": [
+          { "axis": "Y", "child": "Y" },
+          { "axis": "P", "child": "P" }
+        ]
+      },
+      "expected": {
+        "board_shape": [13, 6, 7],
+        "queue_shape": [16],
+        "board_samples": [
+          { "r": 5, "c": 3, "ch": 0, "value": 1.0 },
+          { "r": 5, "c": 3, "ch": 4, "value": 0.0 },
+          { "r": 0, "c": 0, "ch": 5, "value": 0.3333333333333333 },
+          { "r": 0, "c": 0, "ch": 6, "value": 0.3333333333333333 }
+        ],
+        "queue_values": [
+          0, 0, 1, 0,
+          0, 0, 1, 0,
+          0, 0, 0, 1,
+          0, 0, 0, 1
+        ],
+        "legal_mask_sum": 22
+      }
+    }
+  ]
+}

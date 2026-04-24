@@ -124,8 +124,12 @@ function draw(
       3: [0, -1],
     };
     const [dr, dc] = offsets[rotation]!;
-    drawPuyo(ctx, axisRow, axisCol, PUYO_COLORS[pair.axis], 1, cell);
-    drawPuyo(ctx, axisRow + dr, axisCol + dc, PUYO_COLORS[pair.child], 1, cell);
+    // row 0 (高さ13、天井段) は半透明で描画して「ここは実質見えない領域」を示す
+    const axisAlpha = axisRow < VISIBLE_ROW_START ? 0.5 : 1;
+    const childRow = axisRow + dr;
+    const childAlpha = childRow < VISIBLE_ROW_START ? 0.5 : 1;
+    drawPuyo(ctx, axisRow, axisCol, PUYO_COLORS[pair.axis], axisAlpha, cell);
+    drawPuyo(ctx, childRow, axisCol + dc, PUYO_COLORS[pair.child], childAlpha, cell);
   }
 
   const ghost = ghostCells(field, current as ActivePair | null, bestMove);

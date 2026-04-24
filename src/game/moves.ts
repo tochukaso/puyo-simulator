@@ -3,6 +3,7 @@ import { COLS } from './constants';
 import { canPlace, childOffset } from './pair';
 import { tryRotate } from './rotation';
 import { lockActive } from './landing';
+import { reachableTargets } from './reachability';
 
 export function applyInput(state: GameState, input: Input): GameState {
   if (state.status !== 'playing' || !state.current) return state;
@@ -36,22 +37,18 @@ export function applyInput(state: GameState, input: Input): GameState {
   }
 }
 
+// 現在位置からツモを物理的に動かして到達できる (col, rotation) の手だけ返す。
+// 天井段のぷよで道が塞がれていると、その先の列は候補に入らない。
 export function enumerateLegalMoves(state: GameState): Move[] {
   if (!state.current) return [];
+  const reachable = reachableTargets(state.field, state.current);
   const out: Move[] = [];
-  const pair = state.current.pair;
   for (let col = 0; col < COLS; col++) {
     for (const rot of [0, 1, 2, 3] as Rotation[]) {
       const [, dc] = childOffset(rot);
       const childCol = col + dc;
       if (childCol < 0 || childCol >= COLS) continue;
-      const spawnCandidate: ActivePair = {
-        pair,
-        axisRow: 0,
-        axisCol: col,
-        rotation: rot,
-      };
-      if (!canPlace(state.field, spawnCandidate)) continue;
+      if (!reachable.has(`${col}-${rot}`)) continue;
       out.push({ axisCol: col, rotation: rot });
     }
   }

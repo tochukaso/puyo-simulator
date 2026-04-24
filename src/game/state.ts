@@ -1,5 +1,5 @@
 import type { GameState, ActivePair, Pair, Move } from './types';
-import { SPAWN_COL } from './constants';
+import { SPAWN_COL, SPAWN_AXIS_ROW } from './constants';
 import { createEmptyField } from './field';
 import { makeRng, randomPair } from './rng';
 import { resolveChain } from './chain';
@@ -15,7 +15,7 @@ export function createInitialState(seed: number): GameState {
 
   const active: ActivePair = {
     pair: first,
-    axisRow: 0,
+    axisRow: SPAWN_AXIS_ROW,
     axisCol: SPAWN_COL,
     rotation: 0,
   };
@@ -29,7 +29,7 @@ export function createInitialState(seed: number): GameState {
     totalChains: 0,
     maxChain: 0,
     status: 'playing',
-    rngSeed: rng.next() * 0xffffffff | 0,
+    rngSeed: (rng.next() * 0xffffffff) | 0,
   };
 }
 
@@ -40,13 +40,19 @@ export function spawnNext(state: GameState): GameState {
 
   const active: ActivePair = {
     pair: nextPair,
-    axisRow: 0,
+    axisRow: SPAWN_AXIS_ROW,
     axisCol: SPAWN_COL,
     rotation: 0,
   };
 
   if (!canPlace(state.field, active)) {
-    return { ...state, current: null, nextQueue: refilled, status: 'gameover', rngSeed: rng.next() * 0xffffffff | 0 };
+    return {
+      ...state,
+      current: null,
+      nextQueue: refilled,
+      status: 'gameover',
+      rngSeed: (rng.next() * 0xffffffff) | 0,
+    };
   }
 
   return {
@@ -54,24 +60,22 @@ export function spawnNext(state: GameState): GameState {
     current: active,
     nextQueue: refilled,
     status: 'playing',
-    rngSeed: rng.next() * 0xffffffff | 0,
+    rngSeed: (rng.next() * 0xffffffff) | 0,
   };
 }
 
 export function commitMove(state: GameState, move: Move): GameState {
   if (!state.current) return state;
 
-  // AI推奨手は `{axisCol, rotation}` だけで位置が決まるべき。current.axisRow が
-  // 変動(ユーザが softDrop した等)していても影響を受けないよう、spawn 基準で
-  // 合法性をチェックする。ロック自体は lockActive が列の最下空マスに落とすため
-  // axisRow の値には依存しない。
+  // lockActive は軸・子それぞれを「その列の最下空マス」に落とすので、
+  // 入力 ActivePair の axisRow の値は結果に影響しない。
+  // canPlace 判定は省く(AI 側の enumerateLegalMoves がすでに到達可能性を
+  // フィルタしているため、ここに来る時点で有効な手)。
   const placed: ActivePair = {
     ...state.current,
-    axisRow: 0,
     axisCol: move.axisCol,
     rotation: move.rotation,
   };
-  if (!canPlace(state.field, placed)) return state;
 
   const locked = lockActive(state.field, placed);
 

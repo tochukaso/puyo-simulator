@@ -4,7 +4,7 @@ import { createInitialState, spawnNext } from '../game/state';
 import { applyInput } from '../game/moves';
 import { resolveChain } from '../game/chain';
 import { lockActive } from '../game/landing';
-import { canPlace } from '../game/pair';
+import { isMoveReachable } from '../game/reachability';
 
 export interface PoppingCell {
   row: number;
@@ -48,13 +48,16 @@ export const useGameStore = create<Store>((set, get) => ({
   commit: async (move: Move) => {
     const s = get().game;
     if (!s.current) return;
+    // 現在位置から (axisCol, rotation) へ moveLeft/moveRight/softDrop/rotate
+    // だけで到達できるかチェック。天井段のぷよなどで道が塞がれているときは
+    // ワープ禁止(ぷよを跨いでの移動は物理的に不可)なので commit を拒否する。
+    if (!isMoveReachable(s, move)) return;
+
     const placed = {
       ...s.current,
-      axisRow: 0,
       axisCol: move.axisCol,
       rotation: move.rotation,
     };
-    if (!canPlace(s.field, placed)) return;
 
     const locked = lockActive(s.field, placed);
     const { finalField, steps } = resolveChain(locked);

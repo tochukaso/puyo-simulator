@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { createInitialState, spawnNext, commitMove } from '../state';
-import { SPAWN_COL } from '../constants';
+import { SPAWN_COL, SPAWN_AXIS_ROW } from '../constants';
 
 describe('createInitialState', () => {
   it('最初のツモが出現位置にいる', () => {
     const s = createInitialState(1);
     expect(s.current).not.toBeNull();
     expect(s.current!.axisCol).toBe(SPAWN_COL);
-    expect(s.current!.axisRow).toBe(0);
+    expect(s.current!.axisRow).toBe(SPAWN_AXIS_ROW);
     expect(s.nextQueue.length).toBeGreaterThanOrEqual(2);
     expect(s.status).toBe('playing');
   });

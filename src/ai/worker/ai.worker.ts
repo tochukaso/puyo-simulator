@@ -1,11 +1,58 @@
 import { HeuristicAI } from '../heuristic';
+import { MlAI } from '../ml/ml-ai';
+import type { PuyoAI } from '../types';
 import type { GameState, Move } from '../../game/types';
 
-const ai = new HeuristicAI();
+type Kind = 'heuristic' | 'ml';
 
-self.onmessage = async (e: MessageEvent<{ id: number; state: GameState; topK: number }>) => {
-  const { id, state, topK } = e.data;
-  await ai.init();
-  const moves = await ai.suggest(state, topK);
-  (self as unknown as Worker).postMessage({ id, moves } as { id: number; moves: Move[] });
-};
+export type WorkerMessage =
+  | { type: 'suggest'; id: number; state: GameState; topK: number }
+  | { type: 'set-ai'; kind: Kind };
+
+export type WorkerResponse =
+  | { type: 'suggest'; id: number; moves: Move[] }
+  | { type: 'set-ai'; kind: Kind; ok: boolean; error?: string };
+
+const heuristic = new HeuristicAI();
+let active: PuyoAI = heuristic;
+let ml: MlAI | null = null;
+
+export async function handleMessage(
+  msg: WorkerMessage,
+  send: (r: WorkerResponse) => void,
+): Promise<void> {
+  if (msg.type === 'set-ai') {
+    try {
+      if (msg.kind === 'heuristic') {
+        active = heuristic;
+        send({ type: 'set-ai', kind: 'heuristic', ok: true });
+        return;
+      }
+      if (ml === null) ml = new MlAI();
+      await ml.init();
+      active = ml;
+      send({ type: 'set-ai', kind: 'ml', ok: true });
+    } catch (err) {
+      active = heuristic;
+      send({
+        type: 'set-ai',
+        kind: msg.kind,
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    return;
+  }
+
+  if (msg.type === 'suggest') {
+    await active.init();
+    const moves = await active.suggest(msg.state, msg.topK);
+    send({ type: 'suggest', id: msg.id, moves });
+  }
+}
+
+if (typeof self !== 'undefined' && 'onmessage' in self) {
+  (self as unknown as Worker).onmessage = (e: MessageEvent<WorkerMessage>) => {
+    void handleMessage(e.data, (r) => (self as unknown as Worker).postMessage(r));
+  };
+}

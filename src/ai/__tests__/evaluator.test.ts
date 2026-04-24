@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { columnHeights, heightVariance, dangerPenalty, chainPotential } from '../heuristic/evaluator';
+import { columnHeights, heightVariance, dangerPenalty, chainPotential, connectionSeed } from '../heuristic/evaluator';
 import { createEmptyField, withCell } from '../../game/field';
 
 describe('columnHeights', () => {
@@ -43,5 +43,15 @@ describe('chainPotential', () => {
   });
   it('何もない盤面は 0', () => {
     expect(chainPotential(createEmptyField())).toBe(0);
+  });
+});
+
+describe('connectionSeed', () => {
+  it('2〜3 連結が多いほど大きい', () => {
+    let f1 = createEmptyField();
+    f1 = withCell(f1, 12, 0, 'R'); f1 = withCell(f1, 12, 1, 'R');
+    let f2 = createEmptyField();
+    f2 = withCell(f2, 12, 0, 'R');
+    expect(connectionSeed(f1)).toBeGreaterThan(connectionSeed(f2));
   });
 });

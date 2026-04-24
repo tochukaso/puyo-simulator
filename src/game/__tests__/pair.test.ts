@@ -24,13 +24,13 @@ describe('pairCells', () => {
   });
 
   it('rotation=2: 子が軸の下', () => {
-    const { axisPos, childPos } = pairCells({ ...axis, rotation: 2 });
-    expect(childPos).toEqual({ row: 6, col: 2 });
+    const result2 = pairCells({ ...axis, rotation: 2 });
+    expect(result2.childPos).toEqual({ row: 6, col: 2 });
   });
 
   it('rotation=3: 子が軸の左', () => {
-    const { axisPos, childPos } = pairCells({ ...axis, rotation: 3 });
-    expect(childPos).toEqual({ row: 5, col: 1 });
+    const result3 = pairCells({ ...axis, rotation: 3 });
+    expect(result3.childPos).toEqual({ row: 5, col: 1 });
   });
 });
 

@@ -1,9 +1,11 @@
+import { useKeyboard } from './ui/hooks/useKeyboard';
 import { Board } from './ui/components/Board/Board';
 import { NextQueue } from './ui/components/NextQueue/NextQueue';
 import { Stats } from './ui/components/Stats/Stats';
 import { Controls } from './ui/components/Controls/Controls';
 
 export default function App() {
+  useKeyboard();
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col">
       <header className="p-3 border-b border-slate-800 text-lg">Puyo Training</header>

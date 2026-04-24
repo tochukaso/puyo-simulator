@@ -34,7 +34,15 @@ export const useGameStore = create<Store>((set, get) => ({
   commit: async (move: Move) => {
     const s = get().game;
     if (!s.current) return;
-    const placed = { ...s.current, axisCol: move.axisCol, rotation: move.rotation };
+    // spawn 基準で合法性をチェック(current.axisRow がユーザ操作でズレていても
+    // AI 推奨手が適用できるように)。lockActive は列の最下空マスを使うので
+    // axisRow に依存しない。
+    const placed = {
+      ...s.current,
+      axisRow: 0,
+      axisCol: move.axisCol,
+      rotation: move.rotation,
+    };
     if (!canPlace(s.field, placed)) return;
 
     const locked = lockActive(s.field, placed);

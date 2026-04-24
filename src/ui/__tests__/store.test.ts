@@ -99,6 +99,18 @@ describe('useGameStore undo', () => {
     expect(useGameStore.getState().history.length).toBeLessThanOrEqual(100);
   });
 
+  it('softDrop で current.axisRow がズレていても commit(AI推奨手)が適用される', async () => {
+    const { commit, dispatch } = useGameStore.getState();
+    for (let i = 0; i < 5; i++) dispatch({ type: 'softDrop' });
+    const st = useGameStore.getState().game;
+    expect(st.current!.axisRow).toBeGreaterThan(0);
+
+    // AI 推奨手として別の列・別の回転を指定。以前のバグでは canPlace が
+    // current.axisRow 基準で評価されてこのコミットが silently 失敗した。
+    await commit({ axisCol: 0, rotation: 1 });
+    expect(useGameStore.getState().history.length).toBe(1);
+  });
+
   it('reset で履歴がクリアされる', async () => {
     const { commit } = useGameStore.getState();
     const st = useGameStore.getState().game;

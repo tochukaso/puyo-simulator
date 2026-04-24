@@ -60,8 +60,13 @@ export function spawnNext(state: GameState): GameState {
 export function commitMove(state: GameState, move: Move): GameState {
   if (!state.current) return state;
 
+  // AI推奨手は `{axisCol, rotation}` だけで位置が決まるべき。current.axisRow が
+  // 変動(ユーザが softDrop した等)していても影響を受けないよう、spawn 基準で
+  // 合法性をチェックする。ロック自体は lockActive が列の最下空マスに落とすため
+  // axisRow の値には依存しない。
   const placed: ActivePair = {
     ...state.current,
+    axisRow: 0,
     axisCol: move.axisCol,
     rotation: move.rotation,
   };

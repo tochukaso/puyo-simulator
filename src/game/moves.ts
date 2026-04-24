@@ -39,11 +39,19 @@ export function applyInput(state: GameState, input: Input): GameState {
 export function enumerateLegalMoves(state: GameState): Move[] {
   if (!state.current) return [];
   const out: Move[] = [];
+  const pair = state.current.pair;
   for (let col = 0; col < COLS; col++) {
     for (const rot of [0, 1, 2, 3] as Rotation[]) {
       const [, dc] = childOffset(rot);
       const childCol = col + dc;
       if (childCol < 0 || childCol >= COLS) continue;
+      const spawnCandidate: ActivePair = {
+        pair,
+        axisRow: 0,
+        axisCol: col,
+        rotation: rot,
+      };
+      if (!canPlace(state.field, spawnCandidate)) continue;
       out.push({ axisCol: col, rotation: rot });
     }
   }

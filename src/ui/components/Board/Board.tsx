@@ -27,7 +27,7 @@ export function Board() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     draw(ctx, game.field, game.current, cell);
-  }, [game.field, game.current, cell]);
+  }, [game, cell]);
 
   return (
     <div ref={wrapperRef} className="w-full max-w-sm">

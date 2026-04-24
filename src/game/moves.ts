@@ -1,5 +1,6 @@
-import type { GameState, ActivePair, Input } from './types';
-import { canPlace } from './pair';
+import type { GameState, ActivePair, Input, Move, Rotation } from './types';
+import { COLS } from './constants';
+import { canPlace, childOffset } from './pair';
 import { tryRotate } from './rotation';
 import { lockActive } from './landing';
 
@@ -33,4 +34,18 @@ export function applyInput(state: GameState, input: Input): GameState {
       return canPlace(state.field, next) ? { ...state, current: next } : state;
     }
   }
+}
+
+export function enumerateLegalMoves(state: GameState): Move[] {
+  if (!state.current) return [];
+  const out: Move[] = [];
+  for (let col = 0; col < COLS; col++) {
+    for (const rot of [0, 1, 2, 3] as Rotation[]) {
+      const [, dc] = childOffset(rot);
+      const childCol = col + dc;
+      if (childCol < 0 || childCol >= COLS) continue;
+      out.push({ axisCol: col, rotation: rot });
+    }
+  }
+  return out;
 }

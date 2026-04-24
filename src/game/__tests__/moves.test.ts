@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyInput } from '../moves';
+import { applyInput, enumerateLegalMoves } from '../moves';
 import { createEmptyField } from '../field';
 import { ROWS } from '../constants';
 import type { GameState, ActivePair } from '../types';
@@ -57,5 +57,22 @@ describe('hardDrop', () => {
     expect(s2.current).toBeNull();
     expect(s2.status).toBe('resolving');
     expect(s2.field.cells[ROWS - 1]![2]!).toBe('R');
+  });
+});
+
+describe('enumerateLegalMoves', () => {
+  it('空盤面では約22手返す', () => {
+    const s = makeState({
+      pair: { axis: 'R', child: 'B' }, axisRow: 0, axisCol: 2, rotation: 0,
+    });
+    const moves = enumerateLegalMoves(s);
+    expect(moves.length).toBe(22);
+  });
+
+  it('current が null なら空配列', () => {
+    const s = { ...makeState({
+      pair: { axis: 'R', child: 'B' }, axisRow: 0, axisCol: 2, rotation: 0,
+    }), current: null };
+    expect(enumerateLegalMoves(s)).toEqual([]);
   });
 });

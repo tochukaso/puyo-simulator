@@ -1,64 +1,77 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useGameStore } from '../../store';
 import { ROWS, COLS, SPAWN_COL, VISIBLE_ROW_START } from '../../../game/constants';
 import { PUYO_COLORS, BG_COLOR, GRID_COLOR, DANGER_COLOR } from './colors';
 import type { Field } from '../../../game/types';
 
-const CELL = 32;
-
 export function Board() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [cell, setCell] = useState(32);
   const game = useGameStore((s) => s.game);
+
+  useLayoutEffect(() => {
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]!.contentRect.width;
+      const maxCellByWidth = Math.floor(w / COLS);
+      const maxCellByHeight = Math.floor(window.innerHeight * 0.6 / ROWS);
+      setCell(Math.max(16, Math.min(maxCellByWidth, maxCellByHeight, 48)));
+    });
+    if (wrapperRef.current) ro.observe(wrapperRef.current);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    draw(ctx, game.field, game.current);
-  }, [game.field, game.current]);
+    draw(ctx, game.field, game.current, cell);
+  }, [game.field, game.current, cell]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={COLS * CELL}
-      height={ROWS * CELL}
-      className="bg-slate-900"
-    />
+    <div ref={wrapperRef} className="w-full max-w-sm">
+      <canvas
+        ref={canvasRef}
+        width={COLS * cell}
+        height={ROWS * cell}
+        className="bg-slate-900 mx-auto block"
+      />
+    </div>
   );
 }
 
-function draw(ctx: CanvasRenderingContext2D, field: Field, current: unknown) {
+function draw(ctx: CanvasRenderingContext2D, field: Field, current: unknown, cell: number) {
   ctx.fillStyle = BG_COLOR;
-  ctx.fillRect(0, 0, COLS * CELL, ROWS * CELL);
+  ctx.fillRect(0, 0, COLS * cell, ROWS * cell);
 
   ctx.strokeStyle = GRID_COLOR;
   ctx.lineWidth = 1;
   for (let r = 0; r <= ROWS; r++) {
     ctx.beginPath();
-    ctx.moveTo(0, r * CELL);
-    ctx.lineTo(COLS * CELL, r * CELL);
+    ctx.moveTo(0, r * cell);
+    ctx.lineTo(COLS * cell, r * cell);
     ctx.stroke();
   }
   for (let c = 0; c <= COLS; c++) {
     ctx.beginPath();
-    ctx.moveTo(c * CELL, 0);
-    ctx.lineTo(c * CELL, ROWS * CELL);
+    ctx.moveTo(c * cell, 0);
+    ctx.lineTo(c * cell, ROWS * cell);
     ctx.stroke();
   }
 
   ctx.fillStyle = 'rgba(15, 23, 42, 0.5)';
-  ctx.fillRect(0, 0, COLS * CELL, VISIBLE_ROW_START * CELL);
+  ctx.fillRect(0, 0, COLS * cell, VISIBLE_ROW_START * cell);
 
   ctx.strokeStyle = DANGER_COLOR;
   ctx.lineWidth = 2;
-  ctx.strokeRect(SPAWN_COL * CELL + 1, 1, CELL - 2, CELL - 2);
+  ctx.strokeRect(SPAWN_COL * cell + 1, 1, cell - 2, cell - 2);
 
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       const color = field.cells[r]![c]!;
       if (color === null) continue;
-      drawPuyo(ctx, r, c, PUYO_COLORS[color], r < VISIBLE_ROW_START ? 0.5 : 1);
+      drawPuyo(ctx, r, c, PUYO_COLORS[color], r < VISIBLE_ROW_START ? 0.5 : 1, cell);
     }
   }
 
@@ -71,8 +84,8 @@ function draw(ctx: CanvasRenderingContext2D, field: Field, current: unknown) {
       0: [-1, 0], 1: [0, 1], 2: [1, 0], 3: [0, -1],
     };
     const [dr, dc] = offsets[rotation]!;
-    drawPuyo(ctx, axisRow, axisCol, PUYO_COLORS[pair.axis], 1);
-    drawPuyo(ctx, axisRow + dr, axisCol + dc, PUYO_COLORS[pair.child], 1);
+    drawPuyo(ctx, axisRow, axisCol, PUYO_COLORS[pair.axis], 1, cell);
+    drawPuyo(ctx, axisRow + dr, axisCol + dc, PUYO_COLORS[pair.child], 1, cell);
   }
 }
 
@@ -82,13 +95,14 @@ function drawPuyo(
   col: number,
   color: string,
   alpha: number,
+  cell: number,
 ) {
   if (row < 0) return;
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.arc(col * CELL + CELL / 2, row * CELL + CELL / 2, CELL / 2 - 2, 0, Math.PI * 2);
+  ctx.arc(col * cell + cell / 2, row * cell + cell / 2, cell / 2 - 2, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }

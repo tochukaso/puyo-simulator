@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { columnHeights, heightVariance, dangerPenalty, chainPotential, connectionSeed } from '../heuristic/evaluator';
+import { columnHeights, heightVariance, dangerPenalty, chainPotential, connectionSeed, evaluateField, DEFAULT_WEIGHTS } from '../heuristic/evaluator';
 import { createEmptyField, withCell } from '../../game/field';
 
 describe('columnHeights', () => {
@@ -53,5 +53,23 @@ describe('connectionSeed', () => {
     let f2 = createEmptyField();
     f2 = withCell(f2, 12, 0, 'R');
     expect(connectionSeed(f1)).toBeGreaterThan(connectionSeed(f2));
+  });
+});
+
+describe('evaluateField', () => {
+  it('高い盤面は低スコア、平らな盤面は高スコア', () => {
+    let flat = createEmptyField();
+    flat = withCell(flat, 12, 0, 'R');
+    flat = withCell(flat, 12, 1, 'B');
+    flat = withCell(flat, 12, 2, 'Y');
+    flat = withCell(flat, 12, 3, 'P');
+    flat = withCell(flat, 12, 4, 'R');
+    flat = withCell(flat, 12, 5, 'B');
+
+    let tall = createEmptyField();
+    const colors = ['R', 'B', 'Y', 'P', 'R', 'B'] as const;
+    for (let r = 7; r <= 12; r++) tall = withCell(tall, r, 2, colors[12 - r]!);
+
+    expect(evaluateField(flat, DEFAULT_WEIGHTS)).toBeGreaterThan(evaluateField(tall, DEFAULT_WEIGHTS));
   });
 });

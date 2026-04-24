@@ -66,3 +66,27 @@ function bfsSize(field: Field, sr: number, sc: number, color: Color, visited: bo
   }
   return count;
 }
+
+export interface Weights {
+  chainPotential: number;
+  heightBalance: number;
+  danger: number;
+  connection: number;
+}
+
+export const DEFAULT_WEIGHTS: Weights = {
+  chainPotential: 1.0,
+  heightBalance: 0.5,
+  danger: 3.0,
+  connection: 0.3,
+};
+
+export function evaluateField(field: Field, w: Weights): number {
+  const heights = columnHeights(field);
+  return (
+    w.chainPotential * chainPotential(field)
+    - w.heightBalance * heightVariance(heights)
+    - w.danger * dangerPenalty(heights)
+    + w.connection * connectionSeed(field)
+  );
+}

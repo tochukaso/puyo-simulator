@@ -1,7 +1,16 @@
+import { createRequire } from 'node:module';
 import type { PuyoAI } from '../src/ai/types';
 import type { GameState, Move } from '../src/game/types';
 import { encodeState } from '../src/ai/ml/encoding';
 import { actionIndexToMove } from '../src/game/action';
+
+// Node 24 removed util.isNullOrUndefined which tfjs-node 4.22 still uses.
+// Restore it on the CJS util module before tfjs-node's transitive import runs.
+const _cjsRequire = createRequire(import.meta.url);
+const _util = _cjsRequire('util') as { isNullOrUndefined?: (v: unknown) => boolean };
+if (typeof _util.isNullOrUndefined !== 'function') {
+  _util.isNullOrUndefined = (v: unknown) => v === null || v === undefined;
+}
 
 export async function createNodeMlAI(modelPath: string): Promise<PuyoAI> {
   const tf = await import('@tensorflow/tfjs-node');
@@ -16,7 +25,11 @@ export async function createNodeMlAI(modelPath: string): Promise<PuyoAI> {
       const b = tf.tensor(board, [1, 13, 6, 7]);
       const q = tf.tensor(queue, [1, 16]);
       const outs = model.predict([b, q]) as tf.Tensor[];
-      const [logits, value] = await Promise.all([outs[0]!.data(), outs[1]!.data()]);
+      // Output order from onnx2tf is not guaranteed; policy has 22 elements,
+      // value has 1. Identify by size.
+      const policyOut = outs.find((t) => t.size === 22)!;
+      const valueOut = outs.find((t) => t.size === 1)!;
+      const [logits, value] = await Promise.all([policyOut.data(), valueOut.data()]);
       b.dispose();
       q.dispose();
       outs.forEach((t) => t.dispose());

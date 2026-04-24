@@ -49,16 +49,19 @@ export class MlAI implements PuyoAI {
     const tf = await import('@tensorflow/tfjs');
     const boardT = tf.tensor(board, [1, 13, 6, 7]);
     const queueT = tf.tensor(queue, [1, 16]);
-    const outs = this.model.predict([boardT, queueT]) as unknown as [
-      { data(): Promise<Float32Array>; dispose(): void },
-      { data(): Promise<Float32Array>; dispose(): void },
-    ];
-    const [logitsT, valueT] = outs;
+    const outs = this.model.predict([boardT, queueT]) as unknown as Array<{
+      size: number;
+      data(): Promise<Float32Array>;
+      dispose(): void;
+    }>;
+    // Output order from onnx2tf is not guaranteed; identify by tensor size
+    // (policy = 22, value = 1).
+    const logitsT = outs.find((t) => t.size === 22)!;
+    const valueT = outs.find((t) => t.size === 1)!;
     const [logits, valueArr] = await Promise.all([logitsT.data(), valueT.data()]);
     boardT.dispose();
     queueT.dispose();
-    logitsT.dispose();
-    valueT.dispose();
+    for (const t of outs) t.dispose();
 
     return pickTopK(logits, valueArr[0] ?? 0, legalMask, topK);
   }

@@ -6,21 +6,47 @@ import tempfile
 from pathlib import Path
 
 import torch
+from torch import nn
 
 from .model import PolicyValueNet
+
+
+class _NCHWExport(nn.Module):
+    """Wrapper that accepts NCHW board directly so the exported ONNX has no
+    leading Transpose — onnx2tf then preserves the natural NHWC shape
+    [B, 13, 6, 7] on the TF side instead of permuting it to [B, 6, 7, 13]."""
+
+    def __init__(self, net: PolicyValueNet) -> None:
+        super().__init__()
+        self.net = net
+
+    def forward(
+        self, board_nchw: torch.Tensor, queue: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        x = torch.relu(self.net.conv1(board_nchw))
+        x = torch.relu(self.net.conv2(x))
+        x = torch.relu(self.net.conv3(x))
+        x = x.flatten(start_dim=1)
+        q = torch.relu(self.net.queue_fc(queue))
+        h = torch.relu(self.net.trunk(torch.cat([x, q], dim=1)))
+        policy = self.net.policy_head(h)
+        value = torch.tanh(self.net.value_head(h)).squeeze(-1)
+        return policy, value
 
 
 def export_to_onnx(ckpt_path: Path, onnx_path: Path) -> None:
     net = PolicyValueNet()
     net.load_state_dict(torch.load(ckpt_path, map_location="cpu"))
     net.eval()
+    wrapped = _NCHWExport(net).eval()
 
-    dummy_board = torch.zeros(1, 13, 6, 7)
+    # NCHW dummy input: [B, C=7, H=13, W=6]
+    dummy_board = torch.zeros(1, 7, 13, 6)
     dummy_queue = torch.zeros(1, 16)
 
     onnx_path.parent.mkdir(parents=True, exist_ok=True)
     torch.onnx.export(
-        net,
+        wrapped,
         (dummy_board, dummy_queue),
         str(onnx_path),
         input_names=["board", "queue"],
@@ -46,6 +72,8 @@ def onnx_to_tfjs(onnx_path: Path, out_dir: Path) -> None:
                 "-i", str(onnx_path),
                 "-o", str(tf_saved),
                 "-osd",
+                "-kat", "board",
+                "-kat", "queue",
             ],
             check=True,
         )

@@ -38,10 +38,12 @@ describe('MlAI', () => {
     const fakeModel = {
       predict: vi.fn(() => {
         const policyTensor = {
+          size: 22,
           data: () => Promise.resolve(logits),
           dispose: () => {},
         };
         const valueTensor = {
+          size: 1,
           data: () => Promise.resolve(new Float32Array([0.12])),
           dispose: () => {},
         };

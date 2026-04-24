@@ -9,7 +9,10 @@ export default function App() {
   useKeyboard();
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col">
-      <header className="p-3 border-b border-slate-800 text-lg">Puyo Training</header>
+      <header className="p-3 border-b border-slate-800 flex justify-between items-center">
+        <span className="text-lg">Puyo Training</span>
+        <span className="text-xs text-slate-400">AI: heuristic v1.0</span>
+      </header>
       <div className="flex-1 flex flex-col items-center gap-3 p-3 lg:flex-row lg:items-start lg:justify-center">
         <div className="flex flex-col items-center gap-3 w-full max-w-sm">
           <div className="flex gap-4 items-center justify-between w-full">

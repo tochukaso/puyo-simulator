@@ -13,6 +13,10 @@ export function useKeyboard() {
           dispatch({ type: 'moveRight' });
           break;
         case 'ArrowUp':
+          e.preventDefault();
+          if (game.current)
+            commit({ axisCol: game.current.axisCol, rotation: game.current.rotation });
+          break;
         case 'x':
         case 'X':
           dispatch({ type: 'rotateCW' });

@@ -1,6 +1,9 @@
 import { COLS, ROWS, SPAWN_COL } from '../../game/constants';
 import type { Field, Color } from '../../game/types';
 import { resolveChain } from '../../game/chain';
+import { withCell } from '../../game/field';
+
+const ALL_COLORS: readonly Color[] = ['R', 'B', 'Y', 'P'];
 
 export function columnHeights(field: Field): number[] {
   const h: number[] = [];
@@ -27,9 +30,25 @@ export function dangerPenalty(heights: number[]): number {
   return Math.max(0, spawnHeight - 8) ** 2;
 }
 
+// 「今すぐ発火したら何点か」ではなく、「仮想的に 1 手足したら最大何連鎖の種になるか」を返す。
+// 各列の最上空マスに 4 色それぞれを仮置きし、そのときに起こる連鎖の totalScore + chainLength^2 * 100
+// の最大値を取る。発火可能な種がない盤面は 0。
 export function chainPotential(field: Field): number {
-  const { steps, totalScore } = resolveChain(field);
-  return totalScore + steps.length * steps.length * 100;
+  const heights = columnHeights(field);
+  let best = 0;
+  for (let col = 0; col < COLS; col++) {
+    const stackHeight = heights[col]!;
+    if (stackHeight >= ROWS) continue;
+    const row = ROWS - 1 - stackHeight;
+    for (const color of ALL_COLORS) {
+      const hypothetical = withCell(field, row, col, color);
+      const { steps, totalScore } = resolveChain(hypothetical);
+      if (steps.length === 0) continue;
+      const score = totalScore + steps.length * steps.length * 100;
+      if (score > best) best = score;
+    }
+  }
+  return best;
 }
 
 export function connectionSeed(field: Field): number {
@@ -55,8 +74,14 @@ function bfsSize(field: Field, sr: number, sc: number, color: Color, visited: bo
   while (stack.length > 0) {
     const [r, c] = stack.pop()!;
     count++;
-    for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as const) {
-      const nr = r + dr, nc = c + dc;
+    for (const [dr, dc] of [
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+    ] as const) {
+      const nr = r + dr,
+        nc = c + dc;
       if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
       if (visited[nr]![nc]!) continue;
       if (field.cells[nr]![nc]! !== color) continue;
@@ -74,20 +99,22 @@ export interface Weights {
   connection: number;
 }
 
+// 建設(将来の連鎖の種を仕込む) を「目先の発火」より強く評価するようバランス調整。
+// chainPotential の重みを上げ、小さな即発火より伸びしろを優先する。
 export const DEFAULT_WEIGHTS: Weights = {
-  chainPotential: 1.0,
+  chainPotential: 3.0,
   heightBalance: 0.5,
-  danger: 3.0,
+  danger: 5.0,
   connection: 0.3,
 };
 
 export function evaluateField(field: Field, w: Weights): number {
   const heights = columnHeights(field);
   return (
-    w.chainPotential * chainPotential(field)
-    - w.heightBalance * heightVariance(heights)
-    - w.danger * dangerPenalty(heights)
-    + w.connection * connectionSeed(field)
+    w.chainPotential * chainPotential(field) -
+    w.heightBalance * heightVariance(heights) -
+    w.danger * dangerPenalty(heights) +
+    w.connection * connectionSeed(field)
   );
 }
 

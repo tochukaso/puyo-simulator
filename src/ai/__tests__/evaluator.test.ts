@@ -32,17 +32,42 @@ describe('dangerPenalty', () => {
   });
 });
 
-describe('chainPotential', () => {
-  it('連鎖できる盤面では 0 より大きい', () => {
+describe('chainPotential (仮想ドロップで測る)', () => {
+  it('3個つながっていれば仮想 R の落下で発火できて potential > 0', () => {
     let f = createEmptyField();
     f = withCell(f, 12, 0, 'R');
     f = withCell(f, 12, 1, 'R');
     f = withCell(f, 12, 2, 'R');
-    f = withCell(f, 12, 3, 'R');
     expect(chainPotential(f)).toBeGreaterThan(0);
   });
   it('何もない盤面は 0', () => {
     expect(chainPotential(createEmptyField())).toBe(0);
+  });
+  it('分離した3個(隣接不能)では potential=0', () => {
+    let f = createEmptyField();
+    f = withCell(f, 12, 0, 'R');
+    f = withCell(f, 12, 3, 'R');
+    f = withCell(f, 12, 5, 'R');
+    expect(chainPotential(f)).toBe(0);
+  });
+  it('大きな連鎖の種ほど potential が大きい', () => {
+    // 2連鎖の種: 下段 R×3、上段(縦) B×3, 隣接して B×1
+    let twoChain = createEmptyField();
+    twoChain = withCell(twoChain, 12, 0, 'R');
+    twoChain = withCell(twoChain, 12, 1, 'R');
+    twoChain = withCell(twoChain, 12, 2, 'R');
+    twoChain = withCell(twoChain, 11, 0, 'B');
+    twoChain = withCell(twoChain, 11, 1, 'B');
+    twoChain = withCell(twoChain, 11, 2, 'B');
+    twoChain = withCell(twoChain, 10, 3, 'B');
+
+    // 1連鎖だけ: 下段 R×3
+    let oneChain = createEmptyField();
+    oneChain = withCell(oneChain, 12, 0, 'R');
+    oneChain = withCell(oneChain, 12, 1, 'R');
+    oneChain = withCell(oneChain, 12, 2, 'R');
+
+    expect(chainPotential(twoChain)).toBeGreaterThan(chainPotential(oneChain));
   });
 });
 

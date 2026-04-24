@@ -111,6 +111,10 @@ describe('useGameStore undo', () => {
     expect(useGameStore.getState().history.length).toBe(1);
   });
 
+  it('初期状態の maxChain は 0', () => {
+    expect(useGameStore.getState().game.maxChain).toBe(0);
+  });
+
   it('reset で履歴がクリアされる', async () => {
     const { commit } = useGameStore.getState();
     const st = useGameStore.getState().game;

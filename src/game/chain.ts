@@ -96,6 +96,7 @@ export function resolveChain(field: Field): {
     steps.push({
       beforeField: before,
       popped,
+      afterPop,
       afterGravity,
       chainIndex,
       scoreDelta: delta,

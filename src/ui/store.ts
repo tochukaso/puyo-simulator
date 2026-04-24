@@ -6,9 +6,16 @@ import { resolveChain } from '../game/chain';
 import { lockActive } from '../game/landing';
 import { canPlace } from '../game/pair';
 
+export interface PoppingCell {
+  row: number;
+  col: number;
+}
+
 interface Store {
   game: GameState;
   animatingSteps: ChainStep[];
+  /** 今まさに消えようとしているセル(highlight phase で光らせる) */
+  poppingCells: PoppingCell[];
   history: GameState[];
   reset(seed?: number): void;
   dispatch(input: Input): void;
@@ -17,26 +24,30 @@ interface Store {
   canUndo(): boolean;
 }
 
-const STEP_MS = 400;
+// 連鎖ステップのタイミング。ユーザが「ぷよがだんだん消える」実感を得られる長さにしている。
+const LOCK_PAUSE_MS = 200; // ツモが着地してから最初の連鎖チェックまで
+const HIGHLIGHT_MS = 400; // 消えるぷよを点滅強調する時間
+const POP_MS = 150; // ぷよが盤面から消えた直後(重力落下前)を見せる時間
+const GRAVITY_MS = 300; // 重力落下後の余韻
+
 const MAX_HISTORY = 100;
 
 export const useGameStore = create<Store>((set, get) => ({
   game: createInitialState(Date.now() | 0),
   animatingSteps: [],
+  poppingCells: [],
   history: [],
   reset: (seed?: number) =>
     set({
       game: createInitialState(seed ?? (Date.now() | 0)),
       animatingSteps: [],
+      poppingCells: [],
       history: [],
     }),
   dispatch: (input: Input) => set((s) => ({ game: applyInput(s.game, input) })),
   commit: async (move: Move) => {
     const s = get().game;
     if (!s.current) return;
-    // spawn 基準で合法性をチェック(current.axisRow がユーザ操作でズレていても
-    // AI 推奨手が適用できるように)。lockActive は列の最下空マスを使うので
-    // axisRow に依存しない。
     const placed = {
       ...s.current,
       axisRow: 0,
@@ -51,19 +62,48 @@ export const useGameStore = create<Store>((set, get) => ({
     const priorHistory = get().history;
     const newHistory = [...priorHistory, s].slice(-MAX_HISTORY);
 
+    // 着地直後の盤面を表示
     set({
       game: { ...s, field: locked, current: null, status: 'resolving' },
       animatingSteps: steps,
+      poppingCells: [],
       history: newHistory,
     });
 
+    if (steps.length > 0) {
+      await sleep(LOCK_PAUSE_MS);
+    }
+
     let score = s.score;
+    let maxChain = s.maxChain;
     for (const step of steps) {
-      await sleep(STEP_MS);
-      score += step.scoreDelta;
+      // Phase A: 消える直前(まだぷよはある)+ 点滅ハイライト
       set((st) => ({
-        game: { ...st.game, field: step.afterGravity, chainCount: step.chainIndex, score },
+        game: { ...st.game, field: step.beforeField },
+        poppingCells: step.popped.map((p) => ({ row: p.row, col: p.col })),
       }));
+      await sleep(HIGHLIGHT_MS);
+
+      // Phase B: ぷよが消えた直後(重力落下前)
+      set((st) => ({
+        game: { ...st.game, field: step.afterPop },
+        poppingCells: [],
+      }));
+      await sleep(POP_MS);
+
+      // Phase C: 重力落下 + スコア反映
+      score += step.scoreDelta;
+      maxChain = Math.max(maxChain, step.chainIndex);
+      set((st) => ({
+        game: {
+          ...st.game,
+          field: step.afterGravity,
+          chainCount: step.chainIndex,
+          score,
+          maxChain,
+        },
+      }));
+      await sleep(GRAVITY_MS);
     }
 
     const finalState: GameState = {
@@ -72,9 +112,10 @@ export const useGameStore = create<Store>((set, get) => ({
       score,
       chainCount: steps.length,
       totalChains: s.totalChains + steps.length,
+      maxChain,
       status: 'resolving',
     };
-    set({ game: spawnNext(finalState), animatingSteps: [] });
+    set({ game: spawnNext(finalState), animatingSteps: [], poppingCells: [] });
   },
   undo: (steps = 1) => {
     const { history, animatingSteps } = get();
@@ -87,6 +128,7 @@ export const useGameStore = create<Store>((set, get) => ({
       game: target,
       history: history.slice(0, targetIndex),
       animatingSteps: [],
+      poppingCells: [],
     });
   },
   canUndo: () => get().history.length > 0 && get().animatingSteps.length === 0,

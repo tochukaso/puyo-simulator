@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useGameStore } from '../../store';
+import { useGameStore, type PoppingCell } from '../../store';
 import { useGestures } from '../../hooks/useGestures';
 import { useAiSuggestion } from '../../hooks/useAiSuggestion';
 import { ROWS, COLS, SPAWN_COL, VISIBLE_ROW_START } from '../../../game/constants';
@@ -12,6 +12,7 @@ export function Board() {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [cell, setCell] = useState(32);
   const game = useGameStore((s) => s.game);
+  const poppingCells = useGameStore((s) => s.poppingCells);
   const { moves } = useAiSuggestion(5);
   const bestMove = moves[0] ?? null;
 
@@ -21,7 +22,7 @@ export function Board() {
     const ro = new ResizeObserver((entries) => {
       const w = entries[0]!.contentRect.width;
       const maxCellByWidth = Math.floor(w / COLS);
-      const maxCellByHeight = Math.floor(window.innerHeight * 0.6 / ROWS);
+      const maxCellByHeight = Math.floor((window.innerHeight * 0.6) / ROWS);
       setCell(Math.max(16, Math.min(maxCellByWidth, maxCellByHeight, 48)));
     });
     if (wrapperRef.current) ro.observe(wrapperRef.current);
@@ -33,8 +34,19 @@ export function Board() {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    draw(ctx, game.field, game.current, cell, bestMove);
-  }, [game, cell, bestMove]);
+
+    let rafId = 0;
+    const render = () => {
+      draw(ctx, game.field, game.current, cell, bestMove, poppingCells);
+      if (poppingCells.length > 0) {
+        rafId = requestAnimationFrame(render);
+      }
+    };
+    render();
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [game, cell, bestMove, poppingCells]);
 
   return (
     <div ref={wrapperRef} className="w-full max-w-sm">
@@ -48,7 +60,14 @@ export function Board() {
   );
 }
 
-function draw(ctx: CanvasRenderingContext2D, field: Field, current: unknown, cell: number, bestMove: Move | null) {
+function draw(
+  ctx: CanvasRenderingContext2D,
+  field: Field,
+  current: unknown,
+  cell: number,
+  bestMove: Move | null,
+  poppingCells: readonly PoppingCell[],
+) {
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, COLS * cell, ROWS * cell);
 
@@ -74,21 +93,35 @@ function draw(ctx: CanvasRenderingContext2D, field: Field, current: unknown, cel
   ctx.lineWidth = 2;
   ctx.strokeRect(SPAWN_COL * cell + 1, 1, cell - 2, cell - 2);
 
+  // Popping ハイライト用の点滅係数。`Date.now()` ベースで rAF から毎フレーム呼ばれる。
+  const popPulse = 0.55 + 0.45 * Math.sin(Date.now() / 80);
+  const popKey = (r: number, c: number) => r * COLS + c;
+  const poppingSet = new Set(poppingCells.map((p) => popKey(p.row, p.col)));
+
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       const color = field.cells[r]![c]!;
       if (color === null) continue;
-      drawPuyo(ctx, r, c, PUYO_COLORS[color], r < VISIBLE_ROW_START ? 0.5 : 1, cell);
+      const baseAlpha = r < VISIBLE_ROW_START ? 0.5 : 1;
+      drawPuyo(ctx, r, c, PUYO_COLORS[color], baseAlpha, cell);
+      if (poppingSet.has(popKey(r, c))) {
+        drawPopHighlight(ctx, r, c, cell, popPulse);
+      }
     }
   }
 
   if (current && typeof current === 'object' && 'pair' in current) {
     const { axisRow, axisCol, rotation, pair } = current as {
-      axisRow: number; axisCol: number; rotation: 0 | 1 | 2 | 3;
+      axisRow: number;
+      axisCol: number;
+      rotation: 0 | 1 | 2 | 3;
       pair: { axis: keyof typeof PUYO_COLORS; child: keyof typeof PUYO_COLORS };
     };
     const offsets: Record<number, [number, number]> = {
-      0: [-1, 0], 1: [0, 1], 2: [1, 0], 3: [0, -1],
+      0: [-1, 0],
+      1: [0, 1],
+      2: [1, 0],
+      3: [0, -1],
     };
     const [dr, dc] = offsets[rotation]!;
     drawPuyo(ctx, axisRow, axisCol, PUYO_COLORS[pair.axis], 1, cell);
@@ -123,7 +156,43 @@ function drawPuyo(
   ctx.restore();
 }
 
-function drawPuyoGhost(ctx: CanvasRenderingContext2D, row: number, col: number, color: string, cell: number) {
+function drawPopHighlight(
+  ctx: CanvasRenderingContext2D,
+  row: number,
+  col: number,
+  cell: number,
+  pulse: number,
+) {
+  if (row < 0) return;
+  const cx = col * cell + cell / 2;
+  const cy = row * cell + cell / 2;
+  // 白い光をぷよの上に重ねて「いま消えるぞ」という視覚的強調
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = pulse * 0.6;
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(cx, cy, cell / 2 - 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 外側に広がるリング
+  ctx.save();
+  ctx.strokeStyle = `rgba(255, 255, 255, ${pulse})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, (cell / 2 - 2) * (1 + 0.2 * pulse), 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawPuyoGhost(
+  ctx: CanvasRenderingContext2D,
+  row: number,
+  col: number,
+  color: string,
+  cell: number,
+) {
   if (row < 0) return;
   ctx.save();
   ctx.globalAlpha = 0.35;

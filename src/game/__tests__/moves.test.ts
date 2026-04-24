@@ -12,6 +12,7 @@ function makeState(current: ActivePair): GameState {
     score: 0,
     chainCount: 0,
     totalChains: 0,
+    maxChain: 0,
     status: 'playing',
     rngSeed: 0,
   };

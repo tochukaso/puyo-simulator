@@ -27,6 +27,7 @@ export interface GameState {
   readonly score: number;
   readonly chainCount: number;
   readonly totalChains: number;
+  readonly maxChain: number;
   readonly status: GameStatus;
   readonly rngSeed: number;
 }
@@ -49,6 +50,7 @@ export interface Move {
 export interface ChainStep {
   readonly beforeField: Field;
   readonly popped: ReadonlyArray<{ row: number; col: number; color: Color }>;
+  readonly afterPop: Field;
   readonly afterGravity: Field;
   readonly chainIndex: number;
   readonly scoreDelta: number;

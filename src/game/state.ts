@@ -27,6 +27,7 @@ export function createInitialState(seed: number): GameState {
     score: 0,
     chainCount: 0,
     totalChains: 0,
+    maxChain: 0,
     status: 'playing',
     rngSeed: rng.next() * 0xffffffff | 0,
   };
@@ -83,6 +84,7 @@ export function commitMove(state: GameState, move: Move): GameState {
     score: state.score + totalScore,
     chainCount: steps.length,
     totalChains: state.totalChains + steps.length,
+    maxChain: Math.max(state.maxChain, steps.length),
     status: 'resolving',
   };
   return spawnNext(resolvedState);

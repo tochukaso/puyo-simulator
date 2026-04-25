@@ -1,5 +1,6 @@
 import { HeuristicAI } from '../heuristic';
 import { MlAI } from '../ml/ml-ai';
+import { WasmAmaAI } from '../wasm-ama/wasm-ama-ai';
 import type { AiKind as Kind, PuyoAI } from '../types';
 import type { GameState, Move } from '../../game/types';
 
@@ -14,6 +15,7 @@ export type WorkerResponse =
 const heuristic = new HeuristicAI();
 let active: PuyoAI = heuristic;
 const mlInstances: Partial<Record<'ml-v1' | 'ml-ama-v1', MlAI>> = {};
+let amaWasmInstance: WasmAmaAI | null = null;
 
 async function getOrInitMl(kind: 'ml-v1' | 'ml-ama-v1'): Promise<MlAI> {
   let inst = mlInstances[kind];
@@ -25,6 +27,12 @@ async function getOrInitMl(kind: 'ml-v1' | 'ml-ama-v1'): Promise<MlAI> {
   return inst;
 }
 
+async function getOrInitAmaWasm(): Promise<WasmAmaAI> {
+  if (!amaWasmInstance) amaWasmInstance = new WasmAmaAI();
+  await amaWasmInstance.init();
+  return amaWasmInstance;
+}
+
 export async function handleMessage(
   msg: WorkerMessage,
   send: (r: WorkerResponse) => void,
@@ -34,6 +42,11 @@ export async function handleMessage(
       if (msg.kind === 'heuristic') {
         active = heuristic;
         send({ type: 'set-ai', kind: 'heuristic', ok: true });
+        return;
+      }
+      if (msg.kind === 'ama-wasm') {
+        active = await getOrInitAmaWasm();
+        send({ type: 'set-ai', kind: 'ama-wasm', ok: true });
         return;
       }
       const ml = await getOrInitMl(msg.kind);

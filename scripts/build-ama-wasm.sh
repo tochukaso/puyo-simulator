@@ -2,7 +2,9 @@
 set -euo pipefail
 
 AMA_REPO="${AMA_REPO:-/Users/yasumitsuomori/git/ama}"
-DEST_DIR="$(cd "$(dirname "$0")/.." && pwd)/public/wasm"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PUBLIC_DIR="$ROOT/public/wasm"
+GLUE_DIR="$ROOT/src/ai/wasm-ama/_glue"
 
 if [ ! -d "$AMA_REPO" ]; then
   echo "AMA_REPO not found at $AMA_REPO" >&2
@@ -15,9 +17,11 @@ fi
 
 (cd "$AMA_REPO" && make wasm)
 
-mkdir -p "$DEST_DIR"
-cp "$AMA_REPO/bin/wasm/ama.wasm" "$DEST_DIR/"
-cp "$AMA_REPO/bin/wasm/ama.js" "$DEST_DIR/"
+mkdir -p "$PUBLIC_DIR" "$GLUE_DIR"
+cp "$AMA_REPO/bin/wasm/ama.wasm" "$PUBLIC_DIR/"
+cp "$AMA_REPO/bin/wasm/ama.js" "$GLUE_DIR/"
 
-echo "ama WASM built and copied to $DEST_DIR"
-ls -lh "$DEST_DIR"
+echo "ama WASM built:"
+echo "  $PUBLIC_DIR/ama.wasm  (committed; fetched at runtime)"
+echo "  $GLUE_DIR/ama.js      (gitignored; imported by TS via _glue/ama.js)"
+ls -lh "$PUBLIC_DIR/ama.wasm" "$GLUE_DIR/ama.js"

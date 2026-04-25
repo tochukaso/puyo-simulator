@@ -29,14 +29,14 @@ async function loadFactoryAndPaths(): Promise<{
   nodeWasmPath: string | null;
 }> {
   if (isBrowser()) {
-    const mod = (await import(/* @vite-ignore */ '/wasm/ama.js')) as {
+    const mod = (await import('./_glue/ama.js')) as {
       default: AmaModuleFactory;
     };
     return { factory: mod.default, nodeWasmPath: null };
   }
   const { pathToFileURL } = await import('node:url');
   const { resolve } = await import('node:path');
-  const jsPath = resolve(process.cwd(), 'public/wasm/ama.js');
+  const jsPath = resolve(process.cwd(), 'src/ai/wasm-ama/_glue/ama.js');
   const wasmPath = resolve(process.cwd(), 'public/wasm/ama.wasm');
   const mod = (await import(/* @vite-ignore */ pathToFileURL(jsPath).href)) as {
     default: AmaModuleFactory;

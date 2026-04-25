@@ -22,6 +22,7 @@ export function ghostCells(
     axisRow: 0,
   };
   const after = lockActive(field, placed);
+  if (!after) return null;
 
   const axisColor = current.pair.axis;
   const newCells: Array<{ row: number; col: number; color: string }> = [];

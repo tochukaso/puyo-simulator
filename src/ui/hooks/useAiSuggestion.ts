@@ -92,6 +92,9 @@ export function useAiSuggestion(topK = 5) {
       return;
     }
     const id = ++idRef.current;
+    // Clear stale moves so the candidate list and board ghost don't display
+    // the previous turn's suggestion while ama recomputes.
+    setMoves([]);
     getWorker().postMessage({ type: 'suggest', id, state: fullGame, topK });
     setLoading(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps

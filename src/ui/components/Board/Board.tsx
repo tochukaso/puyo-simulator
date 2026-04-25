@@ -98,6 +98,9 @@ function draw(
   const popKey = (r: number, c: number) => r * COLS + c;
   const poppingSet = new Set(poppingCells.map((p) => popKey(p.row, p.col)));
 
+  // 同色隣接の接続バーを先に描く(ぷよ円より下に置きたい)。
+  drawConnectors(ctx, field, cell);
+
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       const color = field.cells[r]![c]!;
@@ -138,6 +141,36 @@ function draw(
     for (const p of ghost) {
       const color = p.kind === 'axis' ? pair.axis : pair.child;
       drawPuyoGhost(ctx, p.row, p.col, PUYO_COLORS[color as keyof typeof PUYO_COLORS], cell);
+    }
+  }
+}
+
+// 隣接する同色ぷよ同士を太いバーで繋ぐ(本家ぷよぷよの「連結表現」)。
+// バーはぷよ円より下に重ねたいので drawPuyo より先に呼ぶ。
+function drawConnectors(ctx: CanvasRenderingContext2D, field: Field, cell: number) {
+  const W = cell * 0.55; // バーの太さ。ぷよ円の直径より細くして「首」に見せる。
+  const alphaOf = (r: number) => (r < VISIBLE_ROW_START ? 0.5 : 1);
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const color = field.cells[r]![c]!;
+      if (color === null) continue;
+      const hex = PUYO_COLORS[color];
+      const cx = c * cell + cell / 2;
+      const cy = r * cell + cell / 2;
+      if (c + 1 < COLS && field.cells[r]![c + 1] === color) {
+        ctx.save();
+        ctx.globalAlpha = alphaOf(r);
+        ctx.fillStyle = hex;
+        ctx.fillRect(cx, cy - W / 2, cell, W);
+        ctx.restore();
+      }
+      if (r + 1 < ROWS && field.cells[r + 1]![c] === color) {
+        ctx.save();
+        ctx.globalAlpha = Math.min(alphaOf(r), alphaOf(r + 1));
+        ctx.fillStyle = hex;
+        ctx.fillRect(cx - W / 2, cy, W, cell);
+        ctx.restore();
+      }
     }
   }
 }

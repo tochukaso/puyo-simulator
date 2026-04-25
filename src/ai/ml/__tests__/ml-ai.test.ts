@@ -26,9 +26,23 @@ function makeState(): GameState {
   };
 }
 
+describe('MlAI modelKind', () => {
+  it('uses policy-v1 URL when kind = v1', () => {
+    const ai = new MlAI('v1');
+    expect(ai.version).toBe('policy-v1');
+    expect(ai.modelUrl).toBe('/models/policy-v1/model.json');
+  });
+
+  it('uses policy-ama-v1 URL when kind = ama-v1', () => {
+    const ai = new MlAI('ama-v1');
+    expect(ai.version).toBe('policy-ama-v1');
+    expect(ai.modelUrl).toBe('/models/policy-ama-v1/model.json');
+  });
+});
+
 describe('MlAI', () => {
   it('suggest() uses fake predict() to produce top-K moves honoring legalMask', async () => {
-    const ai = new MlAI();
+    const ai = new MlAI('v1');
 
     const logits = new Float32Array(22);
     logits[5] = 100;
@@ -69,7 +83,7 @@ describe('MlAI', () => {
   });
 
   it('returns [] when current is null', async () => {
-    const ai = new MlAI();
+    const ai = new MlAI('v1');
     const fakeModel = {
       predict: vi.fn(),
       dispose: vi.fn(),

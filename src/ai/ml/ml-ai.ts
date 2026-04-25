@@ -8,13 +8,26 @@ interface TfModel {
   dispose(): void;
 }
 
-const MODEL_URL = '/models/policy-v1/model.json';
+export type MlModelKind = 'v1' | 'ama-v1';
+
+const MODEL_URLS: Record<MlModelKind, string> = {
+  'v1': '/models/policy-v1/model.json',
+  'ama-v1': '/models/policy-ama-v1/model.json',
+};
 
 export class MlAI implements PuyoAI {
   readonly name = 'ml';
-  readonly version = 'policy-v1';
+  readonly version: string;
+  readonly modelUrl: string;
+  readonly modelKind: MlModelKind;
   private model: TfModel | null = null;
   private loading: Promise<void> | null = null;
+
+  constructor(modelKind: MlModelKind = 'v1') {
+    this.modelKind = modelKind;
+    this.version = `policy-${modelKind}`;
+    this.modelUrl = MODEL_URLS[modelKind];
+  }
 
   async init(): Promise<void> {
     if (this.model) return;
@@ -32,7 +45,7 @@ export class MlAI implements PuyoAI {
 
   private async loadModel(): Promise<void> {
     const tf = await import('@tensorflow/tfjs');
-    const model = await tf.loadGraphModel(MODEL_URL);
+    const model = await tf.loadGraphModel(this.modelUrl);
     this.model = model as unknown as TfModel;
     const board = tf.zeros([1, 13, 6, 7]);
     const queue = tf.zeros([1, 16]);

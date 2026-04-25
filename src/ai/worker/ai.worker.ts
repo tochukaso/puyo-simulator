@@ -3,7 +3,7 @@ import { MlAI } from '../ml/ml-ai';
 import type { PuyoAI } from '../types';
 import type { GameState, Move } from '../../game/types';
 
-type Kind = 'heuristic' | 'ml';
+type Kind = 'heuristic' | 'ml-v1' | 'ml-ama-v1';
 
 export type WorkerMessage =
   | { type: 'suggest'; id: number; state: GameState; topK: number }
@@ -15,7 +15,17 @@ export type WorkerResponse =
 
 const heuristic = new HeuristicAI();
 let active: PuyoAI = heuristic;
-let ml: MlAI | null = null;
+const mlInstances: Partial<Record<'ml-v1' | 'ml-ama-v1', MlAI>> = {};
+
+async function getOrInitMl(kind: 'ml-v1' | 'ml-ama-v1'): Promise<MlAI> {
+  let inst = mlInstances[kind];
+  if (!inst) {
+    inst = new MlAI(kind === 'ml-v1' ? 'v1' : 'ama-v1');
+    mlInstances[kind] = inst;
+  }
+  await inst.init();
+  return inst;
+}
 
 export async function handleMessage(
   msg: WorkerMessage,
@@ -28,10 +38,9 @@ export async function handleMessage(
         send({ type: 'set-ai', kind: 'heuristic', ok: true });
         return;
       }
-      if (ml === null) ml = new MlAI();
-      await ml.init();
+      const ml = await getOrInitMl(msg.kind);
       active = ml;
-      send({ type: 'set-ai', kind: 'ml', ok: true });
+      send({ type: 'set-ai', kind: msg.kind, ok: true });
     } catch (err) {
       active = heuristic;
       send({
@@ -43,7 +52,6 @@ export async function handleMessage(
     }
     return;
   }
-
   if (msg.type === 'suggest') {
     await active.init();
     const moves = await active.suggest(msg.state, msg.topK);

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useGameStore, type PoppingCell } from '../../store';
+import { useGameStore, type PoppingCell, type LandedCell, LANDING_BOUNCE_MS } from '../../store';
 import { useGestures } from '../../hooks/useGestures';
 import { useAiSuggestion } from '../../hooks/useAiSuggestion';
 import { useGhostEnabled } from '../../hooks/useUiPrefs';
@@ -15,6 +15,7 @@ export function Board() {
   const game = useGameStore((s) => s.game);
   const poppingCells = useGameStore((s) => s.poppingCells);
   const chainTexts = useGameStore((s) => s.chainTexts);
+  const landedCells = useGameStore((s) => s.landedCells);
   const { moves } = useAiSuggestion(5);
   const ghostEnabled = useGhostEnabled();
   const bestMove = ghostEnabled ? (moves[0] ?? null) : null;
@@ -40,8 +41,13 @@ export function Board() {
 
     let rafId = 0;
     const render = () => {
-      draw(ctx, game.field, game.current, cell, bestMove, poppingCells);
-      if (poppingCells.length > 0) {
+      const now = Date.now();
+      draw(ctx, game.field, game.current, cell, bestMove, poppingCells, landedCells, now);
+      // 着地アニメ・点滅アニメのどちらかが進行中なら次フレームを予約。
+      const hasLandingActive = landedCells.some(
+        (c) => now - c.landedAt < LANDING_BOUNCE_MS,
+      );
+      if (poppingCells.length > 0 || hasLandingActive) {
         rafId = requestAnimationFrame(render);
       }
     };
@@ -49,7 +55,7 @@ export function Board() {
     return () => {
       if (rafId) cancelAnimationFrame(rafId);
     };
-  }, [game, cell, bestMove, poppingCells]);
+  }, [game, cell, bestMove, poppingCells, landedCells]);
 
   return (
     <div ref={wrapperRef} className="w-full max-w-sm">
@@ -84,6 +90,8 @@ function draw(
   cell: number,
   bestMove: Move | null,
   poppingCells: readonly PoppingCell[],
+  landedCells: readonly LandedCell[],
+  now: number,
 ) {
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, COLS * cell, ROWS * cell);
@@ -111,9 +119,16 @@ function draw(
   ctx.strokeRect(SPAWN_COL * cell + 1, 1, cell - 2, cell - 2);
 
   // Popping ハイライト用の点滅係数。`Date.now()` ベースで rAF から毎フレーム呼ばれる。
-  const popPulse = 0.55 + 0.45 * Math.sin(Date.now() / 80);
+  const popPulse = 0.55 + 0.45 * Math.sin(now / 80);
   const popKey = (r: number, c: number) => r * COLS + c;
   const poppingSet = new Set(poppingCells.map((p) => popKey(p.row, p.col)));
+  // (r,c) → 一番新しい着地時刻。複数候補があれば一番新しいものを採用。
+  const landedAtMap = new Map<number, number>();
+  for (const c of landedCells) {
+    const k = popKey(c.row, c.col);
+    const prev = landedAtMap.get(k) ?? 0;
+    if (c.landedAt > prev) landedAtMap.set(k, c.landedAt);
+  }
 
   // 同色隣接の接続バーを先に描く(ぷよ円より下に置きたい)。
   drawConnectors(ctx, field, cell);
@@ -123,8 +138,12 @@ function draw(
       const color = field.cells[r]![c]!;
       if (color === null) continue;
       const baseAlpha = r < VISIBLE_ROW_START ? 0.5 : 1;
-      drawPuyo(ctx, r, c, PUYO_COLORS[color], baseAlpha, cell);
-      if (poppingSet.has(popKey(r, c))) {
+      const k = popKey(r, c);
+      const landedAt = landedAtMap.get(k);
+      const scale =
+        landedAt !== undefined ? landingScale(now - landedAt) : ONE_SCALE;
+      drawPuyo(ctx, r, c, PUYO_COLORS[color], baseAlpha, cell, scale);
+      if (poppingSet.has(k)) {
         drawPopHighlight(ctx, r, c, cell, popPulse);
       }
     }
@@ -192,6 +211,25 @@ function drawConnectors(ctx: CanvasRenderingContext2D, field: Field, cell: numbe
   }
 }
 
+interface PuyoScale {
+  sx: number;
+  sy: number;
+}
+const ONE_SCALE: PuyoScale = { sx: 1, sy: 1 };
+
+// 着地直後の squash-stretch。減衰サイン波で 0→0.6 (squish) →1.1 (rebound) →1。
+// セルの底に重心がある感じを出すため、変形は底辺基準。
+function landingScale(elapsedMs: number): PuyoScale {
+  if (elapsedMs <= 0) return { sx: 1.2, sy: 0.65 };
+  if (elapsedMs >= LANDING_BOUNCE_MS) return ONE_SCALE;
+  const t = elapsedMs / LANDING_BOUNCE_MS;
+  // 減衰係数を強めにして「短く軽い弾み」にする。
+  const offset = -0.35 * Math.exp(-4.5 * t) * Math.cos(8 * t);
+  const sy = 1 + offset;
+  const sx = 1 - offset * 0.6;
+  return { sx, sy };
+}
+
 function drawPuyo(
   ctx: CanvasRenderingContext2D,
   row: number,
@@ -199,13 +237,20 @@ function drawPuyo(
   color: string,
   alpha: number,
   cell: number,
+  scale: PuyoScale = ONE_SCALE,
 ) {
   if (row < 0) return;
+  const cx = col * cell + cell / 2;
+  // 「弾むときも底辺は床に貼り付いている」見せ方:変形の中心をセル底にする。
+  const baseY = row * cell + cell - 2;
+  const r = cell / 2 - 2;
+  const ry = r * scale.sy;
+  const rx = r * scale.sx;
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.arc(col * cell + cell / 2, row * cell + cell / 2, cell / 2 - 2, 0, Math.PI * 2);
+  ctx.ellipse(cx, baseY - ry, rx, ry, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }

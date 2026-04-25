@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import type { GameState, Input, Move, ChainStep } from '../game/types';
+import type { GameState, Field, Input, Move, ChainStep } from '../game/types';
+import { ROWS, COLS } from '../game/constants';
 import { createInitialState, spawnNext } from '../game/state';
 import { applyInput } from '../game/moves';
 import { resolveChain } from '../game/chain';
@@ -19,6 +20,14 @@ export interface ChainTextEntry {
   col: number;
 }
 
+/** 着地直後にプヨっと弾むアニメーションを掛けるためのエントリ。 */
+export interface LandedCell {
+  row: number;
+  col: number;
+  /** Date.now() 基準の着地時刻。Board の draw が経過時間からスケールを計算する。 */
+  landedAt: number;
+}
+
 interface Store {
   game: GameState;
   animatingSteps: ChainStep[];
@@ -26,6 +35,8 @@ interface Store {
   poppingCells: PoppingCell[];
   /** 連鎖テキスト("1れんさ!" 等)。CSS animation で 2 秒フェードアウト。 */
   chainTexts: ChainTextEntry[];
+  /** 着地直後のぷよ。Board が squash-stretch で弾ませる。 */
+  landedCells: LandedCell[];
   history: GameState[];
   reset(seed?: number): void;
   dispatch(input: Input): void;
@@ -35,6 +46,7 @@ interface Store {
 }
 
 const CHAIN_TEXT_LIFETIME_MS = 2000;
+export const LANDING_BOUNCE_MS = 280;
 let chainTextIdSeq = 1;
 
 // 連鎖ステップのタイミング。ユーザが「ぷよがだんだん消える」実感を得られる長さにしている。
@@ -50,6 +62,7 @@ export const useGameStore = create<Store>((set, get) => ({
   animatingSteps: [],
   poppingCells: [],
   chainTexts: [],
+  landedCells: [],
   history: [],
   reset: (seed?: number) =>
     set({
@@ -57,6 +70,7 @@ export const useGameStore = create<Store>((set, get) => ({
       animatingSteps: [],
       poppingCells: [],
       chainTexts: [],
+      landedCells: [],
       history: [],
     }),
   dispatch: (input: Input) => set((s) => ({ game: applyInput(s.game, input) })),
@@ -78,7 +92,10 @@ export const useGameStore = create<Store>((set, get) => ({
     const priorHistory = get().history;
     const newHistory = [...priorHistory, s].slice(-MAX_HISTORY);
 
-    // 着地直後の盤面を表示
+    // 着地直後の盤面を表示。lockActive で増えたセル(=このツモの 2 つ)を bounce
+    // 対象として記録する。
+    const placedCells = diffNewlyOccupied(s.field, locked);
+    pushLanded(set, placedCells);
     set({
       game: { ...s, field: locked, current: null, status: 'resolving' },
       animatingSteps: steps,
@@ -121,9 +138,11 @@ export const useGameStore = create<Store>((set, get) => ({
       }));
       await sleep(POP_MS);
 
-      // Phase C: 重力落下 + スコア反映
+      // Phase C: 重力落下 + スコア反映 + 落ちて着地したセルを bounce 対象に
       score += step.scoreDelta;
       maxChain = Math.max(maxChain, step.chainIndex);
+      const fallen = diffNewlyOccupied(step.afterPop, step.afterGravity);
+      pushLanded(set, fallen);
       set((st) => ({
         game: {
           ...st.game,
@@ -160,6 +179,7 @@ export const useGameStore = create<Store>((set, get) => ({
       animatingSteps: [],
       poppingCells: [],
       chainTexts: [],
+      landedCells: [],
     });
   },
   canUndo: () => get().history.length > 0 && get().animatingSteps.length === 0,
@@ -167,6 +187,47 @@ export const useGameStore = create<Store>((set, get) => ({
 
 function sleep(ms: number) {
   return new Promise<void>((r) => setTimeout(r, ms));
+}
+
+// Returns cells that are non-null in `after` but were null (or absent) in
+// `before`. Used to detect freshly placed / freshly fallen puyos so the
+// renderer can play the squash-stretch landing animation on exactly those.
+function diffNewlyOccupied(
+  before: Field,
+  after: Field,
+): Array<{ row: number; col: number }> {
+  const result: Array<{ row: number; col: number }> = [];
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (after.cells[r]![c] !== null && before.cells[r]![c] === null) {
+        result.push({ row: r, col: c });
+      }
+    }
+  }
+  return result;
+}
+
+// Adds landing entries with the current timestamp, dropping any earlier
+// entry at the same (row, col) so the freshest landing wins. Schedules
+// a single setTimeout per batch to expire entries past LANDING_BOUNCE_MS.
+function pushLanded(
+  set: (fn: (s: { landedCells: LandedCell[] }) => Partial<{ landedCells: LandedCell[] }>) => void,
+  cells: ReadonlyArray<{ row: number; col: number }>,
+): void {
+  if (cells.length === 0) return;
+  const landedAt = Date.now();
+  const newOnes: LandedCell[] = cells.map((c) => ({ row: c.row, col: c.col, landedAt }));
+  set((st) => {
+    const carryOver = st.landedCells.filter(
+      (e) => !newOnes.some((n) => n.row === e.row && n.col === e.col),
+    );
+    return { landedCells: [...carryOver, ...newOnes] };
+  });
+  setTimeout(() => {
+    set((st) => ({
+      landedCells: st.landedCells.filter((e) => e.landedAt !== landedAt),
+    }));
+  }, LANDING_BOUNCE_MS + 50);
 }
 
 // Dev-only: expose store on window for debugging (e.g. __store__.getState().reset(1))

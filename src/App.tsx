@@ -13,11 +13,11 @@ export default function App() {
       <Header />
       <div className="flex-1 flex flex-col items-center gap-3 p-3 lg:flex-row lg:items-start lg:justify-center">
         <div className="flex flex-col items-center gap-3 w-full max-w-sm">
-          <div className="flex gap-4 items-center justify-between w-full">
+          <Stats />
+          <div className="flex gap-3 items-start justify-center w-full">
+            <Board />
             <NextQueue />
-            <Stats />
           </div>
-          <Board />
           <Controls />
           <CandidateList />
         </div>

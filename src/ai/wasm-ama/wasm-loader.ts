@@ -91,9 +91,12 @@ export function loadAmaModule(): Promise<AmaModule> {
 
       const t2 = performance.now();
       const initRet = Module.ccall('ama_init', 'number', [], []);
-      console.log(`[ama-wasm] ama_init returned ${initRet} in ${(performance.now() - t2).toFixed(0)}ms`);
-      if (initRet !== 0) {
+      console.log(`[ama-wasm] ama_init returned ${initRet} (weight keys) in ${(performance.now() - t2).toFixed(0)}ms`);
+      if (initRet < 0) {
         throw new Error(`ama_init failed: ${initRet}`);
+      }
+      if (initRet === 0) {
+        throw new Error(`ama_init read empty weight — embed file likely broken`);
       }
       return Module;
     })();

@@ -28,8 +28,14 @@ async function getOrInitMl(kind: 'ml-v1' | 'ml-ama-v1'): Promise<MlAI> {
 }
 
 async function getOrInitAmaWasm(): Promise<WasmAmaAI> {
-  if (!amaWasmInstance) amaWasmInstance = new WasmAmaAI();
+  if (!amaWasmInstance) {
+    console.log('[ama-wasm worker] creating WasmAmaAI instance');
+    amaWasmInstance = new WasmAmaAI();
+  }
+  console.log('[ama-wasm worker] init() start');
+  const t0 = performance.now();
   await amaWasmInstance.init();
+  console.log(`[ama-wasm worker] init() done in ${(performance.now() - t0).toFixed(0)}ms`);
   return amaWasmInstance;
 }
 
@@ -46,6 +52,7 @@ export async function handleMessage(
       }
       if (msg.kind === 'ama-wasm') {
         active = await getOrInitAmaWasm();
+        console.log('[ama-wasm worker] active set, sending set-ai ok=true');
         send({ type: 'set-ai', kind: 'ama-wasm', ok: true });
         return;
       }

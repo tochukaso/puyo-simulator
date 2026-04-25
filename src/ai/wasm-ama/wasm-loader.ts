@@ -47,14 +47,25 @@ async function loadFactoryAndPaths(): Promise<{
 export function loadAmaModule(): Promise<AmaModule> {
   if (!cached) {
     cached = (async () => {
+      console.log('[ama-wasm] loadAmaModule: loading factory…');
+      const t0 = performance.now();
       const { factory, nodeWasmPath } = await loadFactoryAndPaths();
+      console.log(`[ama-wasm] factory loaded in ${(performance.now() - t0).toFixed(0)}ms`);
+
+      const t1 = performance.now();
       const Module = await factory({
         locateFile: (path: string) => {
           if (!path.endsWith('.wasm')) return path;
-          return nodeWasmPath ?? '/wasm/ama.wasm';
+          const url = nodeWasmPath ?? '/wasm/ama.wasm';
+          console.log(`[ama-wasm] locateFile -> ${url}`);
+          return url;
         },
       });
+      console.log(`[ama-wasm] WASM instantiated in ${(performance.now() - t1).toFixed(0)}ms`);
+
+      const t2 = performance.now();
       const initRet = Module.ccall('ama_init', 'number', [], []);
+      console.log(`[ama-wasm] ama_init returned ${initRet} in ${(performance.now() - t2).toFixed(0)}ms`);
       if (initRet !== 0) {
         throw new Error(`ama_init failed: ${initRet}`);
       }

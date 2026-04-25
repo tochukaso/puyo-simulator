@@ -29,14 +29,26 @@ async function loadFactoryAndPaths(): Promise<{
   nodeWasmPath: string | null;
 }> {
   if (isBrowser()) {
-    // Use ?url so Vite serves the glue as a raw asset instead of pre-bundling
-    // it through esbuild — emscripten glue uses Function/eval patterns that
-    // esbuild rewrites incorrectly, leaving the dynamic import pending forever.
+    // Vite dev mode pre-bundles dynamic imports through esbuild and that
+    // breaks emscripten glue (Function/eval patterns get rewritten and the
+    // module never finishes initializing). Bypass Vite entirely by fetching
+    // the raw .js text and importing it via a Blob URL.
     const amaJsUrlMod = (await import('./_glue/ama.js?url')) as { default: string };
-    const mod = (await import(/* @vite-ignore */ amaJsUrlMod.default)) as {
-      default: AmaModuleFactory;
-    };
-    return { factory: mod.default, nodeWasmPath: null };
+    const res = await fetch(amaJsUrlMod.default);
+    if (!res.ok) {
+      throw new Error(`failed to fetch ama glue: ${res.status} ${res.statusText}`);
+    }
+    const code = await res.text();
+    const blob = new Blob([code], { type: 'application/javascript' });
+    const blobUrl = URL.createObjectURL(blob);
+    try {
+      const mod = (await import(/* @vite-ignore */ blobUrl)) as {
+        default: AmaModuleFactory;
+      };
+      return { factory: mod.default, nodeWasmPath: null };
+    } finally {
+      URL.revokeObjectURL(blobUrl);
+    }
   }
   const { pathToFileURL } = await import('node:url');
   const { resolve } = await import('node:path');

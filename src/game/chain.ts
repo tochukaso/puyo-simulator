@@ -1,4 +1,4 @@
-import { ROWS, COLS } from './constants';
+import { ROWS, COLS, VISIBLE_ROW_START } from './constants';
 import type { Field, Color } from './types';
 import { withCell, applyGravity } from './field';
 import type { ChainStep } from './types';
@@ -14,11 +14,15 @@ export interface ConnectedGroup {
   cells: PoppedCell[];
 }
 
+// Standard Puyo rules: row 0 (ceiling, 13段目) puyos exist for stacking but
+// do NOT participate in 4-connection pops. Restricting the search to
+// VISIBLE_ROW_START..ROWS keeps clusters that cross the ceiling row from
+// counting that ceiling cell, matching native ama / Puyo eSports behavior.
 export function findConnectedGroups(field: Field): ConnectedGroup[] {
   const visited: boolean[][] = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
   const groups: ConnectedGroup[] = [];
 
-  for (let r = 0; r < ROWS; r++) {
+  for (let r = VISIBLE_ROW_START; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       if (visited[r]![c]!) continue;
       const color = field.cells[r]![c]!;
@@ -42,7 +46,7 @@ function bfs(field: Field, sr: number, sc: number, color: Color, visited: boolea
     out.push({ row: r, col: c, color });
     for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as const) {
       const nr = r + dr, nc = c + dc;
-      if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
+      if (nr < VISIBLE_ROW_START || nr >= ROWS || nc < 0 || nc >= COLS) continue;
       if (visited[nr]![nc]!) continue;
       if (field.cells[nr]![nc]! !== color) continue;
       visited[nr]![nc] = true;

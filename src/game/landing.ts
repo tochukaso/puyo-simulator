@@ -24,10 +24,11 @@ function canLand(field: Field, active: ActivePair): boolean {
   return true;
 }
 
-// Returns the new field with the active pair landed via gravity, or null if
-// any piece can't fit (target column is full). Caller should treat null as
-// game-over rather than silently dropping puyos.
-export function lockActive(field: Field, active: ActivePair): Field | null {
+// Drops the active pair into the field via gravity. Pieces that don't fit in
+// the column (column already full to the ceiling) are silently discarded —
+// matching standard Puyo eSports / native ama behaviour. Game-over is decided
+// at spawn time (see `spawnNext` in state.ts), not here.
+export function lockActive(field: Field, active: ActivePair): Field {
   const { axisPos, childPos, axisColor, childColor } = pairCells(active);
 
   const pieces = [
@@ -38,7 +39,7 @@ export function lockActive(field: Field, active: ActivePair): Field | null {
   let f = field;
   for (const p of pieces) {
     const landRow = lowestEmpty(f, p.col);
-    if (landRow < 0) return null;
+    if (landRow < 0) continue;
     f = withCell(f, landRow, p.col, p.color);
   }
   return f;

@@ -22,7 +22,6 @@ export function ghostCells(
     axisRow: 0,
   };
   const after = lockActive(field, placed);
-  if (!after) return null;
 
   const axisColor = current.pair.axis;
   const newCells: Array<{ row: number; col: number; color: string }> = [];
@@ -35,6 +34,9 @@ export function ghostCells(
       }
     }
   }
+  // When a piece overflows the ceiling row both pieces may not appear in the
+  // diff (one is silently discarded). Skip ghost render in that case rather
+  // than guessing positions.
   if (newCells.length !== 2) return null;
 
   let axisIdx = newCells.findIndex(

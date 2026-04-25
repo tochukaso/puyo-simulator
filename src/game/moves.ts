@@ -28,7 +28,6 @@ export function applyInput(state: GameState, input: Input): GameState {
     }
     case 'hardDrop': {
       const locked = lockActive(state.field, c);
-      if (!locked) return { ...state, current: null, status: 'gameover' };
       return { ...state, field: locked, current: null, status: 'resolving' };
     }
     case 'softDrop': {

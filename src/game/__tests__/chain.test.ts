@@ -31,6 +31,18 @@ describe('findConnectedGroups', () => {
     f = withCell(f, 12, 3, 'R');
     expect(findConnectedGroups(f)).toEqual([]);
   });
+
+  // ぷよぷよ通信ルール:13段目(row 0)は積めるが消えない。
+  // row 0 のぷよは 4 連結カウントから除外する。
+  it('天井段(row 0)のぷよは 4 連結に含めない', () => {
+    let f = createEmptyField();
+    f = withCell(f, 0, 0, 'Y');
+    f = withCell(f, 1, 0, 'Y');
+    f = withCell(f, 1, 1, 'Y');
+    f = withCell(f, 2, 1, 'Y');
+    // row 0 を除くと 3 個 → 消えない
+    expect(findConnectedGroups(f)).toEqual([]);
+  });
 });
 
 describe('removePoppedCells', () => {

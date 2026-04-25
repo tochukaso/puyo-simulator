@@ -75,10 +75,6 @@ export function commitMove(state: GameState, move: Move): GameState {
     rotation: move.rotation,
   };
   const locked = lockActive(state.field, placed);
-  if (!locked) {
-    // 目的列が満タン → 窒息でゲーム終了
-    return { ...state, current: null, status: 'gameover' };
-  }
   const { finalField, steps, totalScore } = resolveChain(locked);
   const resolvedState: GameState = {
     ...state,

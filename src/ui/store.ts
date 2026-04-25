@@ -57,14 +57,6 @@ export const useGameStore = create<Store>((set, get) => ({
     };
 
     const locked = lockActive(s.field, placed);
-    if (!locked) {
-      // 目的列が満タン → 窒息(ぷよぷよ通信ルールでもこの手は不可)
-      set({
-        game: { ...s, current: null, status: 'gameover' },
-        history: [...get().history, s].slice(-MAX_HISTORY),
-      });
-      return;
-    }
     const { finalField, steps } = resolveChain(locked);
 
     const priorHistory = get().history;

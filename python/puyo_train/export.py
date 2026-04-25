@@ -9,6 +9,14 @@ import torch
 from torch import nn
 
 from .model import PolicyValueNet
+from .model_v2 import PolicyValueNetV2
+
+
+def _detect_model_cls(state_dict: dict) -> type:
+    """Pick model class by sniffing state_dict keys."""
+    if any("body." in k for k in state_dict.keys()):
+        return PolicyValueNetV2
+    return PolicyValueNet
 
 
 class _NCHWExport(nn.Module):
@@ -16,13 +24,23 @@ class _NCHWExport(nn.Module):
     leading Transpose — onnx2tf then preserves the natural NHWC shape
     [B, 13, 6, 7] on the TF side instead of permuting it to [B, 6, 7, 13]."""
 
-    def __init__(self, net: PolicyValueNet) -> None:
+    def __init__(self, net: nn.Module) -> None:
         super().__init__()
         self.net = net
 
     def forward(
         self, board_nchw: torch.Tensor, queue: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor]:
+        if isinstance(self.net, PolicyValueNetV2):
+            x = torch.relu(self.net.stem_bn(self.net.stem(board_nchw)))
+            for blk in self.net.body:
+                x = blk(x)
+            x = x.flatten(start_dim=1)
+            q = torch.relu(self.net.queue_fc(queue))
+            h = torch.relu(self.net.trunk(torch.cat([x, q], dim=1)))
+            policy = self.net.policy_head(h)
+            value = torch.tanh(self.net.value_head(h)).squeeze(-1)
+            return policy, value
         x = torch.relu(self.net.conv1(board_nchw))
         x = torch.relu(self.net.conv2(x))
         x = torch.relu(self.net.conv3(x))
@@ -35,8 +53,10 @@ class _NCHWExport(nn.Module):
 
 
 def export_to_onnx(ckpt_path: Path, onnx_path: Path) -> None:
-    net = PolicyValueNet()
-    net.load_state_dict(torch.load(ckpt_path, map_location="cpu"))
+    state = torch.load(ckpt_path, map_location="cpu")
+    cls = _detect_model_cls(state)
+    net = cls()
+    net.load_state_dict(state)
     net.eval()
     wrapped = _NCHWExport(net).eval()
 

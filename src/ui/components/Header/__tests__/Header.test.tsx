@@ -8,22 +8,29 @@ vi.mock('../../../hooks/useAiSuggestion', () => ({
   useAiSuggestion: () => ({ moves: [], loading: false }),
 }));
 
-describe('Header AI selector', () => {
+describe('Header AI selector (3-way)', () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
-  it('defaults to heuristic when localStorage is empty', () => {
+  it('defaults to ml-ama-v1 when localStorage is empty', () => {
+    render(<Header />);
+    const select = screen.getByLabelText('AI') as HTMLSelectElement;
+    expect(select.value).toBe('ml-ama-v1');
+  });
+
+  it('reads ml-v1 from localStorage', () => {
+    localStorage.setItem('puyo.ai.kind', 'ml-v1');
+    render(<Header />);
+    const select = screen.getByLabelText('AI') as HTMLSelectElement;
+    expect(select.value).toBe('ml-v1');
+  });
+
+  it('reads heuristic from localStorage', () => {
+    localStorage.setItem('puyo.ai.kind', 'heuristic');
     render(<Header />);
     const select = screen.getByLabelText('AI') as HTMLSelectElement;
     expect(select.value).toBe('heuristic');
-  });
-
-  it('reads saved choice from localStorage', () => {
-    localStorage.setItem('puyo.ai.kind', 'ml');
-    render(<Header />);
-    const select = screen.getByLabelText('AI') as HTMLSelectElement;
-    expect(select.value).toBe('ml');
   });
 
   it('persists change to localStorage and calls setAiKind', async () => {
@@ -31,8 +38,8 @@ describe('Header AI selector', () => {
       setAiKind: ReturnType<typeof vi.fn>;
     };
     render(<Header />);
-    await userEvent.selectOptions(screen.getByLabelText('AI'), 'ml');
-    expect(localStorage.getItem('puyo.ai.kind')).toBe('ml');
-    expect(setAiKind).toHaveBeenCalledWith('ml');
+    await userEvent.selectOptions(screen.getByLabelText('AI'), 'ml-v1');
+    expect(localStorage.getItem('puyo.ai.kind')).toBe('ml-v1');
+    expect(setAiKind).toHaveBeenCalledWith('ml-v1');
   });
 });

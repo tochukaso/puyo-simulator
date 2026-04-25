@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { setAiKind } from '../../hooks/useAiSuggestion';
 
 const STORAGE_KEY = 'puyo.ai.kind';
-type Kind = 'heuristic' | 'ml';
+type Kind = 'heuristic' | 'ml-v1' | 'ml-ama-v1';
+const VALID: readonly Kind[] = ['heuristic', 'ml-v1', 'ml-ama-v1'] as const;
 
 function readInitialKind(): Kind {
-  const v = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
-  return v === 'ml' ? 'ml' : 'heuristic';
+  const v =
+    typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
+  return (VALID as readonly string[]).includes(v ?? '') ? (v as Kind) : 'ml-ama-v1';
 }
 
 export function Header() {
@@ -32,7 +34,8 @@ export function Header() {
           className="bg-slate-800 text-slate-100 border border-slate-700 rounded px-2 py-1"
         >
           <option value="heuristic">Heuristic</option>
-          <option value="ml">ML (policy-v1)</option>
+          <option value="ml-v1">ML (policy-v1)</option>
+          <option value="ml-ama-v1">ML (ama-distilled-v1)</option>
         </select>
       </label>
     </header>

@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useGameStore } from '../store';
 import type { Move } from '../../game/types';
 
-type Kind = 'heuristic' | 'ml';
+type Kind = 'heuristic' | 'ml-v1' | 'ml-ama-v1';
 
 // シングルトン Worker: Header のセレクタと Suggestion Hook が同じ Worker を
 // 共有し、set-ai で AI を切り替えると次の suggest からそれが使われる。

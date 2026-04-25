@@ -12,6 +12,7 @@ interface Args {
   weights: string;
   outDir: string;
   topk: number;
+  earlyStopChain: number;
 }
 
 function parseArgs(): Args {
@@ -27,6 +28,7 @@ function parseArgs(): Args {
     weights: get('--weights', 'build'),
     outDir: get('--out', 'data/ama-selfplay'),
     topk: Number(get('--topk', '5')),
+    earlyStopChain: Number(get('--early-stop-chain', '0')),
   };
 }
 
@@ -57,6 +59,9 @@ async function main() {
       '--out', wout,
       '--topk', String(args.topk),
     ];
+    if (args.earlyStopChain > 0) {
+      cmd.push('--early-stop-chain', String(args.earlyStopChain));
+    }
     promises.push(
       new Promise((resolve, reject) => {
         const proc = spawn(cmd[0]!, cmd.slice(1), { cwd: AMA_REPO, stdio: 'inherit' });

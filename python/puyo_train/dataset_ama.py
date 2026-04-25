@@ -63,13 +63,19 @@ def _row_to_state(row: dict) -> dict:
 class AmaDataset(Dataset):
     def __init__(self, files: list[Path], temperature: float = 100.0):
         rows: list[dict] = []
+        skipped = 0
         for f in files:
             with open(f) as fp:
                 for line in fp:
                     line = line.strip()
                     if not line:
                         continue
-                    rows.append(json.loads(line))
+                    try:
+                        rows.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        skipped += 1
+        if skipped:
+            print(f"AmaDataset: skipped {skipped} malformed lines")
         self.rows = rows
         self.temperature = temperature
 

@@ -90,9 +90,16 @@ export class WasmAmaAI implements PuyoAI {
     const moves: Move[] = [];
     for (let i = 0; i < n; i++) {
       const p = this.outBuf + i * 8;
+      // out バッファ内訳: [axisCol, rotation, score(int32 LE), expectedChain, _]
+      const score =
+        heap[p + 2]! |
+        (heap[p + 3]! << 8) |
+        (heap[p + 4]! << 16) |
+        (heap[p + 5]! << 24);
       moves.push({
         axisCol: heap[p + 0]!,
         rotation: heap[p + 1]! as Rotation,
+        score: score | 0,
       });
     }
     return moves;

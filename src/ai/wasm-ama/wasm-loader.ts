@@ -21,7 +21,12 @@ function isVitest(): boolean {
 }
 
 function isBrowser(): boolean {
-  return typeof window !== 'undefined' && !isVitest();
+  // Browser main: window + self defined.
+  // Browser/dedicated worker: self defined, window undefined.
+  // Node: neither defined.
+  // Vitest (jsdom): both defined AND process defined — gated by VITEST env.
+  if (isVitest()) return false;
+  return typeof self !== 'undefined' && typeof process === 'undefined';
 }
 
 async function loadFactoryAndPaths(): Promise<{

@@ -29,28 +29,27 @@ async function loadFactoryAndPaths(): Promise<{
   nodeWasmPath: string | null;
 }> {
   if (isBrowser()) {
-    console.log('[ama-wasm] step 1: resolving glue asset URL');
-    const amaJsUrlMod = (await import('./_glue/ama.js?url')) as { default: string };
-    console.log(`[ama-wasm] step 2: asset URL = ${amaJsUrlMod.default}`);
-
-    console.log('[ama-wasm] step 3: fetching glue text');
-    const res = await fetch(amaJsUrlMod.default);
+    // Fetch the glue from /public/wasm/ama.js directly (no Vite import path).
+    // Any Vite-aware import (even ?url) hangs in worker context. fetch +
+    // Blob URL bypasses Vite entirely.
+    console.log('[ama-wasm] step 1: fetching /wasm/ama.js');
+    const res = await fetch('/wasm/ama.js');
     if (!res.ok) {
       throw new Error(`failed to fetch ama glue: ${res.status} ${res.statusText}`);
     }
     const code = await res.text();
-    console.log(`[ama-wasm] step 4: glue text fetched (${code.length} bytes)`);
+    console.log(`[ama-wasm] step 2: glue text fetched (${code.length} bytes)`);
 
     const blob = new Blob([code], { type: 'application/javascript' });
     const blobUrl = URL.createObjectURL(blob);
-    console.log(`[ama-wasm] step 5: blob URL created = ${blobUrl}`);
+    console.log(`[ama-wasm] step 3: blob URL created`);
 
     try {
-      console.log('[ama-wasm] step 6: dynamic-importing blob URL');
+      console.log('[ama-wasm] step 4: dynamic-importing blob URL');
       const mod = (await import(/* @vite-ignore */ blobUrl)) as {
         default: AmaModuleFactory;
       };
-      console.log(`[ama-wasm] step 7: blob imported, default type = ${typeof mod.default}`);
+      console.log(`[ama-wasm] step 5: blob imported, factory type = ${typeof mod.default}`);
       return { factory: mod.default, nodeWasmPath: null };
     } finally {
       URL.revokeObjectURL(blobUrl);

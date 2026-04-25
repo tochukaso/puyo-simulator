@@ -19,9 +19,11 @@ fi
 
 mkdir -p "$PUBLIC_DIR" "$GLUE_DIR"
 cp "$AMA_REPO/bin/wasm/ama.wasm" "$PUBLIC_DIR/"
+cp "$AMA_REPO/bin/wasm/ama.js" "$PUBLIC_DIR/"
 cp "$AMA_REPO/bin/wasm/ama.js" "$GLUE_DIR/"
 
 echo "ama WASM built:"
 echo "  $PUBLIC_DIR/ama.wasm  (committed; fetched at runtime)"
-echo "  $GLUE_DIR/ama.js      (gitignored; imported by TS via _glue/ama.js)"
-ls -lh "$PUBLIC_DIR/ama.wasm" "$GLUE_DIR/ama.js"
+echo "  $PUBLIC_DIR/ama.js    (committed; fetched + Blob-imported in browser)"
+echo "  $GLUE_DIR/ama.js      (gitignored; node fallback for vitest)"
+ls -lh "$PUBLIC_DIR/ama.wasm" "$PUBLIC_DIR/ama.js" "$GLUE_DIR/ama.js"

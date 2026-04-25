@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { setAiKind } from '../../hooks/useAiSuggestion';
+import type { AiKind as Kind } from '../../../ai/types';
 
 const STORAGE_KEY = 'puyo.ai.kind';
-type Kind = 'heuristic' | 'ml-v1' | 'ml-ama-v1';
-const VALID: readonly Kind[] = ['heuristic', 'ml-v1', 'ml-ama-v1'] as const;
+const VALID: readonly Kind[] = ['heuristic', 'ml-v1', 'ml-ama-v1', 'ama-wasm'] as const;
 
 function readInitialKind(): Kind {
   const v =

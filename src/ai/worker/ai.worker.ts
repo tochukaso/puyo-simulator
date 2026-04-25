@@ -1,9 +1,7 @@
 import { HeuristicAI } from '../heuristic';
 import { MlAI } from '../ml/ml-ai';
-import type { PuyoAI } from '../types';
+import type { AiKind as Kind, PuyoAI } from '../types';
 import type { GameState, Move } from '../../game/types';
-
-type Kind = 'heuristic' | 'ml-v1' | 'ml-ama-v1';
 
 export type WorkerMessage =
   | { type: 'suggest'; id: number; state: GameState; topK: number }

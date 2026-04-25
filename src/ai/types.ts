@@ -6,3 +6,5 @@ export interface PuyoAI {
   init(): Promise<void>;
   suggest(state: GameState, topK: number): Promise<Move[]>;
 }
+
+export type AiKind = 'heuristic' | 'ml-v1' | 'ml-ama-v1' | 'ama-wasm';

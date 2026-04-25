@@ -8,14 +8,28 @@ import type { AiKind as Kind } from '../../ai/types';
 let workerSingleton: Worker | null = null;
 const suggestHandlers = new Set<(msg: { id: number; moves: Move[] }) => void>();
 
+type AiReadyHandler = (kind: Kind, ok: boolean) => void;
+const aiReadyHandlers = new Set<AiReadyHandler>();
+let currentAiKind: Kind = 'ml-ama-v1';
+let currentAiReady = false;
+
 function getWorker(): Worker {
   if (workerSingleton) return workerSingleton;
   const w = new Worker(new URL('../../ai/worker/ai.worker.ts', import.meta.url), {
     type: 'module',
   });
-  w.onmessage = (e: MessageEvent<{ type: string; id?: number; moves?: Move[] }>) => {
+  w.onmessage = (e: MessageEvent<{
+    type: string;
+    id?: number;
+    moves?: Move[];
+    kind?: Kind;
+    ok?: boolean;
+  }>) => {
     if (e.data.type === 'suggest' && typeof e.data.id === 'number' && e.data.moves) {
       for (const h of suggestHandlers) h({ id: e.data.id, moves: e.data.moves });
+    } else if (e.data.type === 'set-ai' && e.data.kind && typeof e.data.ok === 'boolean') {
+      if (e.data.kind === currentAiKind) currentAiReady = e.data.ok;
+      for (const h of aiReadyHandlers) h(e.data.kind, e.data.ok);
     }
   };
   workerSingleton = w;
@@ -23,6 +37,9 @@ function getWorker(): Worker {
 }
 
 export function setAiKind(kind: Kind): void {
+  currentAiKind = kind;
+  currentAiReady = false;
+  for (const h of aiReadyHandlers) h(kind, false);
   getWorker().postMessage({ type: 'set-ai', kind });
 }
 
@@ -35,6 +52,8 @@ export function useAiSuggestion(topK = 5) {
 
   const [moves, setMoves] = useState<Move[]>([]);
   const [loading, setLoading] = useState(false);
+  const [aiKind, setAiKindState] = useState<Kind>(currentAiKind);
+  const [aiReady, setAiReady] = useState<boolean>(currentAiReady);
   const idRef = useRef(0);
 
   const handleSuggest = useCallback((msg: { id: number; moves: Move[] }) => {
@@ -42,6 +61,17 @@ export function useAiSuggestion(topK = 5) {
       setMoves(msg.moves);
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    const handler: AiReadyHandler = (kind, ok) => {
+      setAiKindState(kind);
+      setAiReady(ok);
+    };
+    aiReadyHandlers.add(handler);
+    return () => {
+      aiReadyHandlers.delete(handler);
+    };
   }, []);
 
   useEffect(() => {
@@ -60,5 +90,5 @@ export function useAiSuggestion(topK = 5) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [field, currentPair, nextQueue, status, topK]);
 
-  return { moves, loading };
+  return { moves, loading, aiKind, aiReady };
 }

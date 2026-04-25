@@ -29,22 +29,28 @@ async function loadFactoryAndPaths(): Promise<{
   nodeWasmPath: string | null;
 }> {
   if (isBrowser()) {
-    // Vite dev mode pre-bundles dynamic imports through esbuild and that
-    // breaks emscripten glue (Function/eval patterns get rewritten and the
-    // module never finishes initializing). Bypass Vite entirely by fetching
-    // the raw .js text and importing it via a Blob URL.
+    console.log('[ama-wasm] step 1: resolving glue asset URL');
     const amaJsUrlMod = (await import('./_glue/ama.js?url')) as { default: string };
+    console.log(`[ama-wasm] step 2: asset URL = ${amaJsUrlMod.default}`);
+
+    console.log('[ama-wasm] step 3: fetching glue text');
     const res = await fetch(amaJsUrlMod.default);
     if (!res.ok) {
       throw new Error(`failed to fetch ama glue: ${res.status} ${res.statusText}`);
     }
     const code = await res.text();
+    console.log(`[ama-wasm] step 4: glue text fetched (${code.length} bytes)`);
+
     const blob = new Blob([code], { type: 'application/javascript' });
     const blobUrl = URL.createObjectURL(blob);
+    console.log(`[ama-wasm] step 5: blob URL created = ${blobUrl}`);
+
     try {
+      console.log('[ama-wasm] step 6: dynamic-importing blob URL');
       const mod = (await import(/* @vite-ignore */ blobUrl)) as {
         default: AmaModuleFactory;
       };
+      console.log(`[ama-wasm] step 7: blob imported, default type = ${typeof mod.default}`);
       return { factory: mod.default, nodeWasmPath: null };
     } finally {
       URL.revokeObjectURL(blobUrl);

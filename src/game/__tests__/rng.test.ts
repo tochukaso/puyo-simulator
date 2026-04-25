@@ -1,24 +1,47 @@
 import { describe, it, expect } from 'vitest';
-import { makeRng, randomPair } from '../rng';
+import { makeEsportQueue, getEsportQueue } from '../rng';
 
-describe('makeRng', () => {
-  it('同じシードは同じ列を生成する', () => {
-    const a = makeRng(42);
-    const b = makeRng(42);
-    for (let i = 0; i < 5; i++) expect(a.next()).toBe(b.next());
+describe('makeEsportQueue', () => {
+  it('returns 128 pairs', () => {
+    const q = makeEsportQueue(42);
+    expect(q.length).toBe(128);
   });
-  it('異なるシードは異なる列を生成する', () => {
-    const a = makeRng(1);
-    const b = makeRng(2);
-    expect(a.next()).not.toBe(b.next());
+
+  it('same seed yields same queue', () => {
+    const a = makeEsportQueue(42);
+    const b = makeEsportQueue(42);
+    expect(a).toEqual(b);
+  });
+
+  it('different seeds yield different first pair', () => {
+    const a = makeEsportQueue(1);
+    const b = makeEsportQueue(2);
+    expect(a[0]).not.toEqual(b[0]);
+  });
+
+  it('first 2 pairs use only 3 distinct colors', () => {
+    const q = makeEsportQueue(123456);
+    const colors = new Set<string>();
+    colors.add(q[0]!.axis);
+    colors.add(q[0]!.child);
+    colors.add(q[1]!.axis);
+    colors.add(q[1]!.child);
+    expect(colors.size).toBeLessThanOrEqual(3);
+  });
+
+  it('all colors are valid (R B Y P)', () => {
+    const q = makeEsportQueue(7);
+    for (const p of q) {
+      expect(['R', 'B', 'Y', 'P']).toContain(p.axis);
+      expect(['R', 'B', 'Y', 'P']).toContain(p.child);
+    }
   });
 });
 
-describe('randomPair', () => {
-  it('有効な色のツモを返す', () => {
-    const rng = makeRng(7);
-    const p = randomPair(rng);
-    expect(['R', 'B', 'Y', 'P']).toContain(p.axis);
-    expect(['R', 'B', 'Y', 'P']).toContain(p.child);
+describe('getEsportQueue (memoized)', () => {
+  it('returns same array reference for same seed', () => {
+    const a = getEsportQueue(99);
+    const b = getEsportQueue(99);
+    expect(a).toBe(b);
   });
 });

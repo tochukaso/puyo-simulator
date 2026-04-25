@@ -5,9 +5,13 @@ import { useEffect, useState } from 'react';
 const STORAGE_KEY_GHOST = 'puyo.ghost.enabled';
 
 function readInitialGhost(): boolean {
-  if (typeof localStorage === 'undefined') return true;
-  const v = localStorage.getItem(STORAGE_KEY_GHOST);
-  return v === null ? true : v === 'true';
+  try {
+    const v = localStorage.getItem(STORAGE_KEY_GHOST);
+    return v === null ? true : v === 'true';
+  } catch {
+    // テスト環境(jsdom)で localStorage が未実装の場合は default ON。
+    return true;
+  }
 }
 
 let ghostEnabled = readInitialGhost();
@@ -15,8 +19,10 @@ const ghostListeners = new Set<(v: boolean) => void>();
 
 export function setGhostEnabled(v: boolean): void {
   ghostEnabled = v;
-  if (typeof localStorage !== 'undefined') {
+  try {
     localStorage.setItem(STORAGE_KEY_GHOST, String(v));
+  } catch {
+    // localStorage 未対応環境では永続化をスキップ。
   }
   for (const h of ghostListeners) h(v);
 }

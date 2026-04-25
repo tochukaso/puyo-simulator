@@ -14,6 +14,7 @@ export function Board() {
   const [cell, setCell] = useState(32);
   const game = useGameStore((s) => s.game);
   const poppingCells = useGameStore((s) => s.poppingCells);
+  const chainTexts = useGameStore((s) => s.chainTexts);
   const { moves } = useAiSuggestion(5);
   const ghostEnabled = useGhostEnabled();
   const bestMove = ghostEnabled ? (moves[0] ?? null) : null;
@@ -52,12 +53,26 @@ export function Board() {
 
   return (
     <div ref={wrapperRef} className="w-full max-w-sm">
-      <canvas
-        ref={canvasRef}
-        width={COLS * cell}
-        height={ROWS * cell}
-        className="bg-slate-900 mx-auto block"
-      />
+      <div
+        className="relative mx-auto"
+        style={{ width: COLS * cell, height: ROWS * cell }}
+      >
+        <canvas
+          ref={canvasRef}
+          width={COLS * cell}
+          height={ROWS * cell}
+          className="bg-slate-900 block"
+        />
+        {chainTexts.map((t) => (
+          <div
+            key={t.id}
+            className="chain-text-overlay"
+            style={{ left: (t.col + 0.5) * cell, top: (t.row - 0.5) * cell }}
+          >
+            {t.chainIndex}れんさ!
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

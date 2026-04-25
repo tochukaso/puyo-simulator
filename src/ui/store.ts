@@ -10,11 +10,22 @@ export interface PoppingCell {
   col: number;
 }
 
+/** 連鎖発生時に「Nれんさ!」と表示するためのオーバーレイエントリ。 */
+export interface ChainTextEntry {
+  id: number;
+  chainIndex: number;
+  /** 消えたセル群の重心。Board が overlay を絶対座標で配置するのに使う。 */
+  row: number;
+  col: number;
+}
+
 interface Store {
   game: GameState;
   animatingSteps: ChainStep[];
   /** 今まさに消えようとしているセル(highlight phase で光らせる) */
   poppingCells: PoppingCell[];
+  /** 連鎖テキスト("1れんさ!" 等)。CSS animation で 2 秒フェードアウト。 */
+  chainTexts: ChainTextEntry[];
   history: GameState[];
   reset(seed?: number): void;
   dispatch(input: Input): void;
@@ -22,6 +33,9 @@ interface Store {
   undo(steps?: number): void;
   canUndo(): boolean;
 }
+
+const CHAIN_TEXT_LIFETIME_MS = 2000;
+let chainTextIdSeq = 1;
 
 // 連鎖ステップのタイミング。ユーザが「ぷよがだんだん消える」実感を得られる長さにしている。
 const LOCK_PAUSE_MS = 200; // ツモが着地してから最初の連鎖チェックまで
@@ -35,12 +49,14 @@ export const useGameStore = create<Store>((set, get) => ({
   game: createInitialState(Date.now() | 0),
   animatingSteps: [],
   poppingCells: [],
+  chainTexts: [],
   history: [],
   reset: (seed?: number) =>
     set({
       game: createInitialState(seed ?? (Date.now() | 0)),
       animatingSteps: [],
       poppingCells: [],
+      chainTexts: [],
       history: [],
     }),
   dispatch: (input: Input) => set((s) => ({ game: applyInput(s.game, input) })),
@@ -77,11 +93,25 @@ export const useGameStore = create<Store>((set, get) => ({
     let score = s.score;
     let maxChain = s.maxChain;
     for (const step of steps) {
-      // Phase A: 消える直前(まだぷよはある)+ 点滅ハイライト
+      // Phase A: 消える直前(まだぷよはある)+ 点滅ハイライト + 連鎖テキスト出現
+      const avgRow = step.popped.reduce((a, p) => a + p.row, 0) / step.popped.length;
+      const avgCol = step.popped.reduce((a, p) => a + p.col, 0) / step.popped.length;
+      const textId = chainTextIdSeq++;
       set((st) => ({
         game: { ...st.game, field: step.beforeField },
         poppingCells: step.popped.map((p) => ({ row: p.row, col: p.col })),
+        chainTexts: [
+          ...st.chainTexts,
+          { id: textId, chainIndex: step.chainIndex, row: avgRow, col: avgCol },
+        ],
       }));
+      // CSS の fade animation 完了に合わせて自動撤去。setTimeout が undo / reset と
+      // 競合しないよう、エントリが残っていれば消すだけにしておく。
+      setTimeout(() => {
+        set((st) => ({
+          chainTexts: st.chainTexts.filter((x) => x.id !== textId),
+        }));
+      }, CHAIN_TEXT_LIFETIME_MS);
       await sleep(HIGHLIGHT_MS);
 
       // Phase B: ぷよが消えた直後(重力落下前)
@@ -129,6 +159,7 @@ export const useGameStore = create<Store>((set, get) => ({
       history: history.slice(0, targetIndex),
       animatingSteps: [],
       poppingCells: [],
+      chainTexts: [],
     });
   },
   canUndo: () => get().history.length > 0 && get().animatingSteps.length === 0,

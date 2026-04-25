@@ -10,3 +10,39 @@ body {
   margin: 0;
   font-family: system-ui, sans-serif;
 }
+
+/* 連鎖発生時のテキスト("Nれんさ!")。本家ぷよぷよを参考に、
+   一瞬大きく現れ、徐々に上にフロートしながら 2 秒でフェードアウト。 */
+@keyframes chain-text-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.5);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.25);
+  }
+  30% {
+    transform: translate(-50%, -55%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -150%) scale(1);
+  }
+}
+.chain-text-overlay {
+  position: absolute;
+  pointer-events: none;
+  font-weight: 800;
+  font-size: 1.6rem;
+  white-space: nowrap;
+  color: #fde68a;
+  text-shadow:
+    -2px -2px 0 #7c2d12,
+    2px -2px 0 #7c2d12,
+    -2px 2px 0 #7c2d12,
+    2px 2px 0 #7c2d12,
+    0 0 6px rgba(0, 0, 0, 0.6);
+  animation: chain-text-pop 2s ease-out forwards;
+  z-index: 10;
+}

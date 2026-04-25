@@ -36,6 +36,7 @@ export function Header() {
           <option value="heuristic">Heuristic</option>
           <option value="ml-v1">ML (policy-v1)</option>
           <option value="ml-ama-v1">ML (ama-distilled-v1)</option>
+          <option value="ama-wasm">ama (WASM)</option>
         </select>
       </label>
     </header>

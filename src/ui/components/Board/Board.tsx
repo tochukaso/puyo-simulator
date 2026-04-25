@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useGameStore, type PoppingCell } from '../../store';
 import { useGestures } from '../../hooks/useGestures';
 import { useAiSuggestion } from '../../hooks/useAiSuggestion';
+import { useGhostEnabled } from '../../hooks/useUiPrefs';
 import { ROWS, COLS, SPAWN_COL, VISIBLE_ROW_START } from '../../../game/constants';
 import { PUYO_COLORS, BG_COLOR, GRID_COLOR, DANGER_COLOR } from './colors';
 import type { Field, ActivePair, Move } from '../../../game/types';
@@ -14,7 +15,8 @@ export function Board() {
   const game = useGameStore((s) => s.game);
   const poppingCells = useGameStore((s) => s.poppingCells);
   const { moves } = useAiSuggestion(5);
-  const bestMove = moves[0] ?? null;
+  const ghostEnabled = useGhostEnabled();
+  const bestMove = ghostEnabled ? (moves[0] ?? null) : null;
 
   useGestures(wrapperRef);
 

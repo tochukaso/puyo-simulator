@@ -95,15 +95,18 @@ export class WasmAmaAI implements PuyoAI {
         rotation: heap[p + 1]! as Rotation,
       });
     }
-    // DEBUG: log a brief field summary + ama output
-    let nonEmpty = 0;
-    for (let r = 0; r < 13; r++) {
-      const row = state.field.cells[r]!;
-      for (let c = 0; c < 6; c++) if (row[c]) nonEmpty++;
+    // DEBUG: log per-column heights + ama output
+    const colHeights = [0, 0, 0, 0, 0, 0];
+    for (let c = 0; c < 6; c++) {
+      for (let r = 12; r >= 0; r--) {
+        if (state.field.cells[r]![c]) colHeights[c]!++;
+        else break;
+      }
     }
     const cur = state.current.pair;
+    const n1 = state.nextQueue[0]!;
     console.log(
-      `[wasm-ama suggest] field=${nonEmpty} cur=${cur.axis}${cur.child} -> moves=`,
+      `[wasm-ama] heights=${colHeights.join(',')} cur=${cur.axis}${cur.child} n1=${n1.axis}${n1.child} -> moves=`,
       moves.map((m) => `c${m.axisCol}r${m.rotation}`).join(','),
     );
     return moves;

@@ -84,11 +84,18 @@ export function useAiSuggestion(topK = 5) {
 
   useEffect(() => {
     if (!currentPair || status !== 'playing') return;
+    if (!aiReady) {
+      // AI がロード中の間は suggest を送らない。古い AI(別 kind)から suggest が
+      // 戻ってくるのを避けるため、moves はクリアしておく。
+      setMoves([]);
+      setLoading(false);
+      return;
+    }
     const id = ++idRef.current;
     getWorker().postMessage({ type: 'suggest', id, state: fullGame, topK });
     setLoading(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [field, currentPair, nextQueue, status, topK]);
+  }, [field, currentPair, nextQueue, status, topK, aiReady]);
 
   return { moves, loading, aiKind, aiReady };
 }

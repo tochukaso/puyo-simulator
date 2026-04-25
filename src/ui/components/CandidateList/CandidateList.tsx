@@ -3,9 +3,15 @@ import { useAiSuggestion } from '../../hooks/useAiSuggestion';
 import { useGameStore } from '../../store';
 
 export function CandidateList() {
-  const { moves, loading } = useAiSuggestion(5);
+  const { moves, loading, aiKind, aiReady } = useAiSuggestion(5);
   const commit = useGameStore((s) => s.commit);
   const [open, setOpen] = useState(false);
+
+  const status = !aiReady
+    ? `(${aiKind} 読み込み中…)`
+    : loading
+      ? '(思考中)'
+      : `(${moves.length})`;
 
   return (
     <div className="w-full bg-slate-900 border-t border-slate-700">
@@ -13,7 +19,7 @@ export function CandidateList() {
         className="w-full p-2 text-sm text-slate-300 flex justify-between items-center"
         onClick={() => setOpen(!open)}
       >
-        <span>AI候補 {loading ? '(思考中)' : `(${moves.length})`}</span>
+        <span>AI候補 {status}</span>
         <span>{open ? '▼' : '▲'}</span>
       </button>
       {open && (

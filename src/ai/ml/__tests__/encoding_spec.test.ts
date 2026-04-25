@@ -39,6 +39,7 @@ function buildState(s: SpecState): GameState {
     maxChain: 0,
     status: 'playing',
     rngSeed: 0,
+    queueIndex: 0,
   };
 }
 

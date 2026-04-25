@@ -15,6 +15,7 @@ function makeState(current: ActivePair): GameState {
     maxChain: 0,
     status: 'playing',
     rngSeed: 0,
+    queueIndex: 0,
   };
 }
 

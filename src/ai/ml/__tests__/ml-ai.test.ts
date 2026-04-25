@@ -22,6 +22,7 @@ function makeState(): GameState {
     maxChain: 0,
     status: 'playing',
     rngSeed: 0,
+    queueIndex: 0,
   };
 }
 

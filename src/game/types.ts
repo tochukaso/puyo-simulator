@@ -30,6 +30,7 @@ export interface GameState {
   readonly maxChain: number;
   readonly status: GameStatus;
   readonly rngSeed: number;
+  readonly queueIndex: number;
 }
 
 export type Input =

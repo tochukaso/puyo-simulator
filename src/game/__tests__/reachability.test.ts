@@ -14,6 +14,7 @@ function makeState(field = createEmptyField(), current: ActivePair): GameState {
     maxChain: 0,
     status: 'playing',
     rngSeed: 0,
+    queueIndex: 0,
   };
 }
 
@@ -84,6 +85,7 @@ describe('isMoveReachable', () => {
       maxChain: 0,
       status: 'playing',
       rngSeed: 0,
+    queueIndex: 0,
     };
     expect(isMoveReachable(state, { axisCol: 0, rotation: 0 })).toBe(false);
   });

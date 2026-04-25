@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:ama-wasm": "bash scripts/build-ama-wasm.sh",
     "lint": "eslint . --ext ts,tsx",
     "format": "prettier --write .",
     "preview": "vite preview",

@@ -1,6 +1,5 @@
 import type { PuyoAI } from '../types';
 import type { GameState, Move, Rotation } from '../../game/types';
-import { legalActionMask, moveToActionIndex } from '../../game/action';
 import { loadAmaModule, type AmaModule } from './wasm-loader';
 import {
   FIELD_BUFFER_BYTES,
@@ -86,21 +85,15 @@ export class WasmAmaAI implements PuyoAI {
     if (!state.current) return [];
     const ret = this.callSuggest(state);
     if (ret === 0) return [];
-
-    // ama doesn't model reachability (it can suggest moves that need to cross
-    // existing puyos). Filter out moves the player can't physically reach.
-    const mask = legalActionMask(state.field, state.current);
+    const n = Math.min(ret, MAX_CANDIDATES, topK);
     const heap = this.module!.HEAPU8;
     const moves: Move[] = [];
-    for (let i = 0; i < ret; i++) {
+    for (let i = 0; i < n; i++) {
       const p = this.outBuf + i * 8;
-      const m: Move = {
+      moves.push({
         axisCol: heap[p + 0]!,
         rotation: heap[p + 1]! as Rotation,
-      };
-      const idx = moveToActionIndex(m);
-      if (mask[idx]) moves.push(m);
-      if (moves.length >= topK) break;
+      });
     }
     return moves;
   }

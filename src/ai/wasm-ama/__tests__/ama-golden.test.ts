@@ -60,8 +60,11 @@ function rowToState(row: GoldenRow): GameState {
 }
 
 const hasGolden = existsSync(GOLDEN_PATH);
+// Each WASM suggest takes ~3s (6 BRANCH sequential), so 8k+ rows would
+// take hours. Opt-in only: run with `AMA_GOLDEN_TEST=1 npm test`.
+const enabled = hasGolden && process.env.AMA_GOLDEN_TEST === '1';
 
-describe.skipIf(!hasGolden)('ama WASM matches native ama (golden file)', () => {
+describe.skipIf(!enabled)('ama WASM matches native ama (golden file)', () => {
   const ai = new WasmAmaAI();
   let rows: GoldenRow[] = [];
 

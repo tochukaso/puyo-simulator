@@ -29,7 +29,11 @@ async function loadFactoryAndPaths(): Promise<{
   nodeWasmPath: string | null;
 }> {
   if (isBrowser()) {
-    const mod = (await import('./_glue/ama.js')) as {
+    // Use ?url so Vite serves the glue as a raw asset instead of pre-bundling
+    // it through esbuild — emscripten glue uses Function/eval patterns that
+    // esbuild rewrites incorrectly, leaving the dynamic import pending forever.
+    const amaJsUrlMod = (await import('./_glue/ama.js?url')) as { default: string };
+    const mod = (await import(/* @vite-ignore */ amaJsUrlMod.default)) as {
       default: AmaModuleFactory;
     };
     return { factory: mod.default, nodeWasmPath: null };

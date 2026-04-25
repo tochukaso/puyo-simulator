@@ -7,7 +7,7 @@ import { createNodeMlAI } from './ml-ai-node';
 import type { PuyoAI } from '../src/ai/types';
 import { moveToActionIndex } from '../src/game/action';
 
-type AiKind = 'heuristic' | 'ml-v1' | 'ml-ama-v1' | 'ama';
+type AiKind = 'heuristic' | 'ml-v1' | 'ml-ama-v1' | 'ama' | 'ama-wasm';
 
 const AMA_REPO = process.env.AMA_REPO ?? '/Users/yasumitsuomori/git/ama';
 const AMA_BIN = join(AMA_REPO, 'bin/dump_selfplay/dump_selfplay.exe');
@@ -16,7 +16,13 @@ async function makeAi(kind: AiKind): Promise<PuyoAI | null> {
   if (kind === 'heuristic') return new HeuristicAI();
   if (kind === 'ml-v1') return await createNodeMlAI('public/models/policy-v1/model.json');
   if (kind === 'ml-ama-v1') return await createNodeMlAI('public/models/policy-ama-v1/model.json');
-  if (kind === 'ama') return null; // sentinel — handled separately
+  if (kind === 'ama') return null; // sentinel — handled separately (subprocess)
+  if (kind === 'ama-wasm') {
+    const { WasmAmaAI } = await import('../src/ai/wasm-ama/wasm-ama-ai');
+    const ai = new WasmAmaAI();
+    await ai.init();
+    return ai;
+  }
   throw new Error(`unknown kind: ${kind}`);
 }
 

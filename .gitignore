@@ -30,6 +30,7 @@ playwright/.cache/
 
 # ML artifacts
 data/selfplay/
+data/ama-selfplay/
 python/checkpoints/
 python/.venv/
 python/__pycache__/

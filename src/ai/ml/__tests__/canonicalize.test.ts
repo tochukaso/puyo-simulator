@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { canonicalizeColors } from '../encoding';
 import { ROWS, COLS } from '../../../game/constants';
-import type { Color } from '../../../game/types';
+import type { Color, GameState } from '../../../game/types';
 
 function emptyField(): (Color | null)[][] {
   return Array.from({ length: ROWS }, () => Array<Color | null>(COLS).fill(null));
@@ -14,7 +14,7 @@ describe('canonicalizeColors', () => {
       current: null,
       nextQueue: [],
     };
-    const { canonical, perm } = canonicalizeColors(state as any);
+    const { canonical, perm } = canonicalizeColors(state as unknown as GameState);
     expect(perm).toEqual({});
     expect(canonical.field.cells).toEqual(state.field.cells);
   });
@@ -28,7 +28,7 @@ describe('canonicalizeColors', () => {
       current: null,
       nextQueue: [],
     };
-    const { canonical, perm } = canonicalizeColors(state as any);
+    const { canonical, perm } = canonicalizeColors(state as unknown as GameState);
     expect(perm).toEqual({ Y: 0, R: 1 });
     expect(canonical.field.cells[12]![0]).toBe('R');
     expect(canonical.field.cells[12]![1]).toBe('B');
@@ -42,7 +42,7 @@ describe('canonicalizeColors', () => {
       current: { pair: { axis: 'Y', child: 'P' }, axisRow: 1, axisCol: 2, rotation: 0 },
       nextQueue: [{ axis: 'R', child: 'B' }],
     };
-    const { canonical, perm } = canonicalizeColors(state as any);
+    const { canonical, perm } = canonicalizeColors(state as unknown as GameState);
     expect(perm).toEqual({ B: 0, Y: 1, P: 2, R: 3 });
     expect(canonical.current!.pair.axis).toBe('B'); // Y → B
     expect(canonical.current!.pair.child).toBe('Y'); // P → Y

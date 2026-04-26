@@ -36,13 +36,14 @@ def run_distillation(
     val_fraction: float,
     seed: int = 0,
     alpha: float = 1.0,
-    temperature: float = 100.0,
+    temperature: float = 20.0,
+    augment: bool = True,
 ) -> list[dict]:
     torch.manual_seed(seed)
     random.seed(seed)
     np.random.seed(seed)
 
-    ds = load_all(data_dir, temperature=temperature)
+    ds = load_all(data_dir, temperature=temperature, augment=augment)
     n = len(ds)
     idx = list(range(n))
     random.shuffle(idx)

@@ -7,7 +7,7 @@ import math
 import random
 from itertools import permutations
 from pathlib import Path
-from typing import Sequence
+from typing import Literal, Sequence
 
 import numpy as np
 import torch
@@ -18,6 +18,7 @@ from .augmentation import apply_lr_flip, apply_color_permutation
 from .encoding import encode_state
 
 VALUE_SCALE = 50000.0
+VALUE_SCALE_TOPK = 200000.0
 _COLOR_PERMS = list(permutations((0, 1, 2, 3)))
 
 
@@ -65,12 +66,23 @@ def _row_to_state(row: dict) -> dict:
 
 
 class AmaDataset(Dataset):
+    """Dataset for ama distillation with optional augmentation and value-source switch.
+
+    Args:
+        files: list of JSONL paths to read.
+        temperature: soft-policy temperature for top-K teacher candidates.
+        augment: when True, apply random LR-flip + color permutation per sample.
+        value_source: 'final_score' (default, v2 reproducibility) uses the
+            per-game final score; 'topk_score' (v3) uses the per-position ama
+            beam search top1 score with scale=200000.
+    """
+
     def __init__(
         self,
         files: list[Path],
         temperature: float = 100.0,
         augment: bool = False,
-        value_source: str = "final_score",
+        value_source: Literal["final_score", "topk_score"] = "final_score",
     ):
         rows: list[dict] = []
         skipped = 0
@@ -89,6 +101,10 @@ class AmaDataset(Dataset):
         self.rows = rows
         self.temperature = temperature
         self.augment = augment
+        if value_source not in ("final_score", "topk_score"):
+            raise ValueError(
+                f"value_source must be 'final_score' or 'topk_score', got {value_source!r}"
+            )
         self.value_source = value_source
 
     def __len__(self) -> int:
@@ -103,9 +119,8 @@ class AmaDataset(Dataset):
         indices = [move_to_action_index(c["axisCol"], c["rotation"]) for c in topk]
         soft_policy = make_soft_policy(scores, indices, self.temperature)
         if self.value_source == "topk_score":
-            topk = row.get("topk") or []
             top_score = float(topk[0].get("score", 0.0)) if topk else 0.0
-            value = value_target_from_score(top_score, scale=200000.0)
+            value = value_target_from_score(top_score, scale=VALUE_SCALE_TOPK)
         else:
             value = value_target_from_score(float(row.get("final_score", 0.0)))
         if self.augment:
@@ -125,8 +140,21 @@ def load_all(
     data_dir: Path,
     temperature: float = 100.0,
     augment: bool = False,
-    value_source: str = "final_score",
+    value_source: Literal["final_score", "topk_score"] = "final_score",
 ) -> AmaDataset:
+    """Load all JSONL files from a directory and return an AmaDataset.
+
+    Args:
+        data_dir: directory containing JSONL files.
+        temperature: soft-policy temperature for top-K teacher candidates.
+        augment: when True, apply random LR-flip + color permutation per sample.
+        value_source: 'final_score' (default, v2 reproducibility) uses the
+            per-game final score; 'topk_score' (v3) uses the per-position ama
+            beam search top1 score with scale=200000.
+
+    Raises:
+        FileNotFoundError: if no JSONL files are found in data_dir.
+    """
     files = sorted(Path(data_dir).glob("*.jsonl"))
     if not files:
         raise FileNotFoundError(f"no JSONL files in {data_dir}")

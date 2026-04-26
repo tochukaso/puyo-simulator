@@ -10,14 +10,15 @@
     "gen:ama-golden": "tsx scripts/gen-ama-golden.ts",
     "lint": "eslint . --ext ts,tsx",
     "format": "prettier --write .",
-    "preview": "vite preview",
+    "preview": "npm run build && wrangler dev",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "e2e": "playwright test",
     "selfplay": "tsx scripts/selfplay.ts",
     "ama-selfplay": "tsx scripts/ama-selfplay.ts",
-    "eval": "tsx scripts/eval-ai.ts"
+    "eval": "tsx scripts/eval-ai.ts",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "@tensorflow/tfjs": "^4.22.0",
@@ -26,6 +27,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.33.2",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.59.1",
     "@tensorflow/tfjs-node": "^4.22.0",
@@ -53,6 +55,7 @@
     "typescript-eslint": "^8.58.2",
     "vite": "^8.0.10",
     "vite-plugin-pwa": "^1.2.0",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.5",
+    "wrangler": "^4.85.0"
   }
 }

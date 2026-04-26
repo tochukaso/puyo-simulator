@@ -1,0 +1,9 @@
+torch>=2.2,<3
+numpy>=1.26,<3
+tqdm>=4.66
+onnx>=1.16,<1.19
+onnx2tf>=1.21
+tensorflow>=2.16,<3
+tensorflowjs>=4.19
+pytest>=8.2
+ruff>=0.5

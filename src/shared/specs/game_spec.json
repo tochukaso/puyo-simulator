@@ -1,0 +1,12 @@
+{
+  "cases": [
+    {
+      "name": "single puyo placement no chain",
+      "seed": 1,
+      "moves": [{ "axisCol": 0, "rotation": 0 }],
+      "expected": {
+        "gameover": false
+      }
+    }
+  ]
+}

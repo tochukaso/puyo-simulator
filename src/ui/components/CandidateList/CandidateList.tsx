@@ -1,0 +1,60 @@
+import { useState } from 'react';
+import { useAiSuggestion } from '../../hooks/useAiSuggestion';
+import { useGameStore } from '../../store';
+
+export function CandidateList() {
+  const { moves, loading, aiKind, aiReady } = useAiSuggestion(5);
+  const commit = useGameStore((s) => s.commit);
+  const [open, setOpen] = useState(false);
+
+  const status = !aiReady
+    ? `(${aiKind} 読み込み中…)`
+    : loading
+      ? '(思考中)'
+      : `(${moves.length})`;
+
+  // 候補内のトップ手を 100% として相対表示。各 AI でスコアのスケール
+  // (期待連鎖点 / heuristic 評価値 / softmax 確率)が違うので、絶対値より
+  // 「最善手と比べてどれだけ良いか」のほうが横断的に読みやすい。
+  const top = moves.reduce((m, x) => Math.max(m, x.score ?? 0), 0);
+
+  return (
+    <div className="w-full bg-slate-900 border-t border-slate-700">
+      <button
+        className="w-full p-2 text-sm text-slate-300 flex justify-between items-center"
+        onClick={() => setOpen(!open)}
+      >
+        <span>AI候補 {status}</span>
+        <span>{open ? '▼' : '▲'}</span>
+      </button>
+      {open && (
+        <ul className="p-2 space-y-1 max-h-60 overflow-y-auto">
+          {moves.map((m, i) => {
+            const pct = top > 0 ? Math.max(0, Math.round(((m.score ?? 0) / top) * 100)) : 0;
+            return (
+              <li
+                key={`${m.axisCol}-${m.rotation}`}
+                className="flex items-center justify-between p-2 bg-slate-800 rounded text-sm"
+              >
+                <div>
+                  <span className="text-slate-400 mr-2">{i + 1}.</span>
+                  <span>列{m.axisCol + 1} / 回転{m.rotation}</span>
+                  <div className="text-xs text-slate-400">{m.reason}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-300 tabular-nums">{pct}%</span>
+                  <button
+                    className="px-2 py-1 bg-blue-600 rounded text-xs"
+                    onClick={() => commit(m)}
+                  >
+                    実行
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}

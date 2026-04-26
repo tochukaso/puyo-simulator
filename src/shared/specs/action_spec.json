@@ -1,0 +1,27 @@
+{
+  "action_count": 22,
+  "entries": [
+    { "index": 0,  "axisCol": 0, "rotation": 0 },
+    { "index": 1,  "axisCol": 1, "rotation": 0 },
+    { "index": 2,  "axisCol": 2, "rotation": 0 },
+    { "index": 3,  "axisCol": 3, "rotation": 0 },
+    { "index": 4,  "axisCol": 4, "rotation": 0 },
+    { "index": 5,  "axisCol": 5, "rotation": 0 },
+    { "index": 6,  "axisCol": 0, "rotation": 2 },
+    { "index": 7,  "axisCol": 1, "rotation": 2 },
+    { "index": 8,  "axisCol": 2, "rotation": 2 },
+    { "index": 9,  "axisCol": 3, "rotation": 2 },
+    { "index": 10, "axisCol": 4, "rotation": 2 },
+    { "index": 11, "axisCol": 5, "rotation": 2 },
+    { "index": 12, "axisCol": 0, "rotation": 1 },
+    { "index": 13, "axisCol": 1, "rotation": 1 },
+    { "index": 14, "axisCol": 2, "rotation": 1 },
+    { "index": 15, "axisCol": 3, "rotation": 1 },
+    { "index": 16, "axisCol": 4, "rotation": 1 },
+    { "index": 17, "axisCol": 1, "rotation": 3 },
+    { "index": 18, "axisCol": 2, "rotation": 3 },
+    { "index": 19, "axisCol": 3, "rotation": 3 },
+    { "index": 20, "axisCol": 4, "rotation": 3 },
+    { "index": 21, "axisCol": 5, "rotation": 3 }
+  ]
+}

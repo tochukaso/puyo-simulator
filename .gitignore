@@ -43,3 +43,10 @@ data/eval-runs/
 # type stub and stays in git so the loader typechecks even before a build.
 src/ai/wasm-ama/_glue/ama.js
 src/ai/wasm-ama/_glue/ama-gtr.js
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example

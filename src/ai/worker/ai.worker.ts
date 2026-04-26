@@ -34,6 +34,19 @@ async function getOrInitMlSearch(): Promise<MlSearchAI> {
   return mlSearchInstance;
 }
 
+let mlSearchInstanceV3: MlSearchAI | null = null;
+
+async function getOrInitMlSearchV3(): Promise<MlSearchAI> {
+  if (!mlSearchInstanceV3) {
+    mlSearchInstanceV3 = new MlSearchAI({
+      modelUrl: '/models/policy-ama-v3/model.json',
+      K: 6,
+    });
+  }
+  await mlSearchInstanceV3.init();
+  return mlSearchInstanceV3;
+}
+
 async function getOrInitMl(kind: 'ml-v1' | 'ml-ama-v1'): Promise<MlAI> {
   let inst = mlInstances[kind];
   if (!inst) {
@@ -84,6 +97,11 @@ export async function handleMessage(
       if (msg.kind === 'ml-ama-v2-search') {
         active = await getOrInitMlSearch();
         send({ type: 'set-ai', kind: 'ml-ama-v2-search', ok: true });
+        return;
+      }
+      if (msg.kind === 'ml-ama-v3-search') {
+        active = await getOrInitMlSearchV3();
+        send({ type: 'set-ai', kind: 'ml-ama-v3-search', ok: true });
         return;
       }
       const ml = await getOrInitMl(msg.kind);

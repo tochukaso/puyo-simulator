@@ -14,7 +14,7 @@ import {
 import type { AiKind as Kind } from '../../../ai/types';
 
 const STORAGE_KEY = 'puyo.ai.kind';
-const VALID: readonly Kind[] = ['heuristic', 'ml-v1', 'ml-ama-v1', 'ml-ama-v2-search', 'ama-wasm'] as const;
+const VALID: readonly Kind[] = ['heuristic', 'ml-v1', 'ml-ama-v1', 'ml-ama-v2-search', 'ml-ama-v3-search', 'ama-wasm'] as const;
 
 function readInitialKind(): Kind {
   const v =
@@ -93,6 +93,7 @@ export function Header() {
             <option value="ml-v1">ML (policy-v1)</option>
             <option value="ml-ama-v1">ML (ama-distilled-v1)</option>
             <option value="ml-ama-v2-search">ML (ama-v2 + search)</option>
+            <option value="ml-ama-v3-search">ML (ama-v3 + search)</option>
             <option value="ama-wasm">ama (WASM)</option>
           </select>
         </label>

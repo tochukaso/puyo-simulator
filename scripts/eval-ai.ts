@@ -21,6 +21,10 @@ async function makeAi(kindOrPath: string): Promise<PuyoAI | null> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return await (createNodeMlSearchAI as any)('public/models/policy-ama-v2/model.json');
   }
+  if (kindOrPath === 'ml-ama-v3-search') {
+    const { createNodeMlSearchAI } = await import('./ml-ai-node');
+    return await createNodeMlSearchAI('public/models/policy-ama-v3/model.json');
+  }
   if (kindOrPath === 'ama') return null; // sentinel — handled by evalAmaGames subprocess
   if (kindOrPath === 'ama-wasm') {
     const { WasmAmaAI } = await import('../src/ai/wasm-ama/wasm-ama-ai');

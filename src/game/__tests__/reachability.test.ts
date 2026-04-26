@@ -26,12 +26,12 @@ const spawnPair = (axisRow: number, axisCol: number): ActivePair => ({
 });
 
 describe('reachableTargets', () => {
-  it('空盤面では全 22 手に到達できる', () => {
+  it('reaches all 22 moves on an empty board', () => {
     const field = createEmptyField();
     const current = spawnPair(1, 2);
     const targets = reachableTargets(field, current);
-    // 6列×4回転(対称性で削減せず、壁外の rot=1 col=5 と rot=3 col=0 のみ除外)= 22
-    // ここでは「出現可能」な 22 セット (col 0-5, rot 0-3 から壁外除外) が含まれているか
+    // 6 columns × 4 rotations, excluding only off-wall (rot=1 col=5 and rot=3 col=0) = 22.
+    // Here we check that the 22 viable (col 0-5, rot 0-3, minus off-wall) targets are all reached.
     const expectedTargets = new Set<string>();
     for (let col = 0; col < 6; col++) {
       for (const rot of [0, 1, 2, 3]) {
@@ -45,35 +45,35 @@ describe('reachableTargets', () => {
     }
   });
 
-  it('天井段に障害物があると跨いだ先の列には到達できない', () => {
-    // 左から3列目(spawn列 col=2)にツモ。col=4 の row=0 と row=1 を R で塞ぐ。
-    // col=5 には物理的に到達できない。
+  it('cannot reach columns past an obstacle in the ceiling row', () => {
+    // Pair starts at the third column from the left (spawn column col=2).
+    // Block col=4 row=0 and row=1 with R so that col=5 is physically unreachable.
     let field = createEmptyField();
-    // col 4 の一番上2段を塞ぐ
+    // Block the top 2 rows of col 4.
     field = withCell(field, 0, 4, 'R');
     field = withCell(field, 1, 4, 'R');
-    // col 4 の下の方も塞いでおかないと softDrop で下から回り込まれる
+    // Also block the lower rows of col 4, otherwise softDrop could go around from below.
     for (let r = 2; r <= 12; r++) {
       field = withCell(field, r, 4, 'R');
     }
     const current = spawnPair(1, 2);
 
     const targets = reachableTargets(field, current);
-    // col 5 への到達は不可のはず
+    // col 5 must not be reachable.
     expect(targets.has('5-0')).toBe(false);
-    // col 0,1,2,3 は普通に到達可能
+    // col 0,1,2,3 are normally reachable.
     expect(targets.has('0-0')).toBe(true);
     expect(targets.has('3-0')).toBe(true);
   });
 });
 
 describe('isMoveReachable', () => {
-  it('到達可能な手は true', () => {
+  it('returns true for a reachable move', () => {
     const state = makeState(createEmptyField(), spawnPair(1, 2));
     expect(isMoveReachable(state, { axisCol: 0, rotation: 0 })).toBe(true);
   });
 
-  it('current が null なら false', () => {
+  it('returns false when current is null', () => {
     const field = createEmptyField();
     const state: GameState = {
       field,

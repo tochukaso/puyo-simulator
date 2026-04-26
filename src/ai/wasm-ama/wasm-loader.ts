@@ -14,15 +14,16 @@ type AmaModuleFactory = (config?: {
   locateFile?: (path: string) => string;
 }) => Promise<AmaModule>;
 
-// バリアント = どの WASM バイナリをロードするか。
-//   'default'  : ama.wasm — 通常 ama(form::list = { GTR, FRON, SGTR })
-//   'gtr-only' : ama-gtr.wasm — 訓練用(form::list = { GTR } のみ。GTR を作る AI)
+// Variant = which WASM binary to load.
+//   'default'  : ama.wasm — standard ama (form::list = { GTR, FRON, SGTR })
+//   'gtr-only' : ama-gtr.wasm — training build (form::list = { GTR } only;
+//                a GTR-building AI)
 export type AmaVariant = 'default' | 'gtr-only';
 
 interface VariantPaths {
-  // browser fetch 用の URL(public/wasm/...)
+  // URL for browser fetch (public/wasm/...)
   glueUrl: string;
-  // node 用の絶対パス
+  // Absolute path for node
   glueRel: string; // src/ai/wasm-ama/_glue/<file>
   wasmRel: string; // public/wasm/<file>
 }
@@ -63,7 +64,7 @@ async function loadFactoryAndPaths(variant: AmaVariant): Promise<{
 }> {
   const paths = VARIANT_PATHS[variant];
   if (isBrowser()) {
-    // Fetch the glue from public/wasm/ 直接(Vite import path を経由しない)。
+    // Fetch the glue from public/wasm/ directly (without going through the Vite import path).
     // Any Vite-aware import (even ?url) hangs in worker context. fetch +
     // Blob URL bypasses Vite entirely.
     console.log(`[ama-wasm:${variant}] step 1: fetching ${paths.glueUrl}`);

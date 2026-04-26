@@ -17,8 +17,8 @@ export type WorkerResponse =
 const heuristic = new HeuristicAI();
 let active: PuyoAI = heuristic;
 const mlInstances: Partial<Record<'ml-v1' | 'ml-ama-v1', MlAI>> = {};
-// バリアント別にインスタンスを持つ。各 WasmAmaAI は固定の variant に紐付く
-// (heap 上のバッファが variant 固有なため使い回せない)。
+// One instance per variant. Each WasmAmaAI is tied to a fixed variant
+// (its heap buffers are variant-specific and cannot be reused).
 const amaWasmInstances: Partial<Record<AmaVariant, WasmAmaAI>> = {};
 
 let mlSearchInstance: MlSearchAI | null = null;

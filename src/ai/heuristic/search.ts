@@ -31,9 +31,10 @@ interface Node {
   nodeValue: number;
 }
 
-// depth 先まで、既知の nextQueue を使って beam search で評価する。
-// 各ノードの価値 = `evaluateField(final state)` + Σ 経路上の連鎖獲得点(小連鎖はダンプ)
-// これで「今小さく発火」より「N手かけて大連鎖を仕込む」経路を優先できる。
+// Beam-search up to `depth` plies using the known nextQueue.
+// Per-node value = `evaluateField(final state)` + Σ chain reward along the path
+// (small chains are damped). This biases toward paths that "spend N moves to
+// build a big chain" instead of "trigger a small chain right now".
 export function beamSearch(
   initial: GameState,
   weights: Weights,
@@ -45,7 +46,7 @@ export function beamSearch(
 
   const initialScore = initial.score;
 
-  // Depth 1: current tsumo の全合法手を展開
+  // Depth 1: expand all legal moves for the current pair.
   let frontier: Node[] = legal.map((m) => {
     const next = commitMove(initial, m);
     const chainGain = next.score - initialScore;
@@ -64,8 +65,8 @@ export function beamSearch(
     };
   });
 
-  // ルート手ごとに「その手を選んだ場合の最良経路の価値」を残す。
-  // UI は各ルート手のベスト経路値を使って上位候補を並べる。
+  // For each root move, keep "the best path value if you choose that move".
+  // The UI uses each root move's best-path value to rank top candidates.
   const bestByRoot = new Map<string, Node>();
   const rootKey = (m: Move) => `${m.axisCol}-${m.rotation}`;
   const updateBest = (n: Node) => {
@@ -76,14 +77,14 @@ export function beamSearch(
   frontier.forEach(updateBest);
 
   for (let d = 2; d <= depth; d++) {
-    // Beam 幅でプルーニング
+    // Prune by beam width.
     frontier.sort((a, b) => b.nodeValue - a.nodeValue);
     const beam = frontier.slice(0, beamWidth);
 
     const nextFrontier: Node[] = [];
     for (const n of beam) {
       if (n.state.status === 'gameover' || !n.state.current) {
-        // 終端ノード。そのまま残す。
+        // Terminal node — keep as is.
         nextFrontier.push(n);
         continue;
       }

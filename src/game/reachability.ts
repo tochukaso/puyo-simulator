@@ -6,10 +6,12 @@ const stateKey = (p: ActivePair): string => `${p.axisRow},${p.axisCol},${p.rotat
 const targetKey = (col: number, rot: number): string => `${col}-${rot}`;
 
 /**
- * `start` 位置から moveLeft / moveRight / softDrop / rotateCW / rotateCCW だけで到達できる
- * (axisCol, rotation) の集合を BFS で求める。返り値のキー形式は "col-rot"。
+ * BFS over the set of (axisCol, rotation) targets reachable from `start` using
+ * only moveLeft / moveRight / softDrop / rotateCW / rotateCCW. Keys are
+ * formatted as "col-rot".
  *
- * これにより「天井段のぷよを跨いで別列に行く」ような物理的に不可能な移動を排除できる。
+ * This rules out physically impossible moves like "cross over a puyo in the
+ * ceiling row to reach another column".
  */
 export function reachableTargets(field: Field, start: ActivePair): Set<string> {
   const visited = new Set<string>();

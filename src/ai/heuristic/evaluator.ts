@@ -30,9 +30,11 @@ export function dangerPenalty(heights: number[]): number {
   return Math.max(0, spawnHeight - 8) ** 2;
 }
 
-// 「今すぐ発火したら何点か」ではなく、「仮想的に 1 手足したら最大何連鎖の種になるか」を返す。
-// 各列の最上空マスに 4 色それぞれを仮置きし、そのときに起こる連鎖の totalScore + chainLength^2 * 100
-// の最大値を取る。発火可能な種がない盤面は 0。
+// Returns "if I virtually add one move, what is the largest chain seed I get?",
+// not "how many points if I trigger right now".
+// For each column, virtually place each of the 4 colors at the topmost empty
+// row and take the maximum of totalScore + chainLength^2 * 100 over the
+// resulting chain. Boards with no triggerable seed return 0.
 export function chainPotential(field: Field): number {
   const heights = columnHeights(field);
   let best = 0;
@@ -99,8 +101,10 @@ export interface Weights {
   connection: number;
 }
 
-// 建設(将来の連鎖の種を仕込む) を「目先の発火」より強く評価するようバランス調整。
-// chainPotential をさらに重視、連結ボーナスも強めて「2〜3連の土台」作りを促進。
+// Tuned so that "construction" (planting a future chain seed) is valued more
+// strongly than "triggering right now". chainPotential is weighted higher and
+// the connection bonus is also boosted, encouraging the building of a
+// "2-3 chain base".
 export const DEFAULT_WEIGHTS: Weights = {
   chainPotential: 5.0,
   heightBalance: 0.5,

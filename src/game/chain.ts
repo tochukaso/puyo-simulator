@@ -14,7 +14,7 @@ export interface ConnectedGroup {
   cells: PoppedCell[];
 }
 
-// Standard Puyo rules: row 0 (ceiling, 13段目) puyos exist for stacking but
+// Standard Puyo rules: row 0 (ceiling, the 13th row) puyos exist for stacking but
 // do NOT participate in 4-connection pops. Restricting the search to
 // VISIBLE_ROW_START..ROWS keeps clusters that cross the ceiling row from
 // counting that ceiling cell, matching native ama / Puyo eSports behavior.

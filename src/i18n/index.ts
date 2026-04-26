@@ -15,7 +15,7 @@ function detectInitial(): Lang {
     const v = localStorage.getItem(STORAGE_KEY);
     if (isLang(v)) return v;
   } catch {
-    // localStorage 未対応環境ではフォールバックへ。
+    // Fall through to the default in environments without localStorage.
   }
   return 'en';
 }
@@ -33,7 +33,7 @@ export function setLang(v: Lang): void {
   try {
     localStorage.setItem(STORAGE_KEY, v);
   } catch {
-    // 永続化スキップ。
+    // Skip persistence.
   }
   for (const h of listeners) h(v);
 }

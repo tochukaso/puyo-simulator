@@ -1,6 +1,6 @@
 export type Color = 'R' | 'B' | 'Y' | 'P';
 export type Cell = Color | null;
-export type Rotation = 0 | 1 | 2 | 3; // 0:上 1:右 2:下 3:左
+export type Rotation = 0 | 1 | 2 | 3; // 0: up, 1: right, 2: down, 3: left
 
 export interface Field {
   readonly cells: ReadonlyArray<ReadonlyArray<Cell>>;

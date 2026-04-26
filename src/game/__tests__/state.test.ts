@@ -3,7 +3,7 @@ import { createInitialState, spawnNext, commitMove } from '../state';
 import { SPAWN_COL, SPAWN_AXIS_ROW } from '../constants';
 
 describe('createInitialState', () => {
-  it('最初のツモが出現位置にいる', () => {
+  it('the first pair appears at the spawn position', () => {
     const s = createInitialState(1);
     expect(s.current).not.toBeNull();
     expect(s.current!.axisCol).toBe(SPAWN_COL);
@@ -12,7 +12,7 @@ describe('createInitialState', () => {
     expect(s.status).toBe('playing');
   });
 
-  it('同じシードは同じ初期状態', () => {
+  it('the same seed yields the same initial state', () => {
     const a = createInitialState(42);
     const b = createInitialState(42);
     expect(a.current!.pair).toEqual(b.current!.pair);
@@ -21,7 +21,7 @@ describe('createInitialState', () => {
 });
 
 describe('spawnNext', () => {
-  it('次のペアが current になる', () => {
+  it('the next pair becomes current', () => {
     const s = createInitialState(1);
     const next = s.nextQueue[0]!;
     const s2 = spawnNext(s);
@@ -30,13 +30,13 @@ describe('spawnNext', () => {
 });
 
 describe('commitMove', () => {
-  it('ムーブ後に current が null でなく status が playing', () => {
+  it('after a move, current is non-null and status is playing', () => {
     const s = createInitialState(1);
     const s2 = commitMove(s, { axisCol: 0, rotation: 0 });
     expect(s2.status).toBe('playing');
   });
 
-  it('current が null なら state そのまま', () => {
+  it('returns the state unchanged when current is null', () => {
     const s = { ...createInitialState(1), current: null };
     const s2 = commitMove(s, { axisCol: 0, rotation: 0 });
     expect(s2).toBe(s);

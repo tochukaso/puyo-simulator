@@ -37,8 +37,9 @@ export function applyInput(state: GameState, input: Input): GameState {
   }
 }
 
-// 現在位置からツモを物理的に動かして到達できる (col, rotation) の手だけ返す。
-// 天井段のぷよで道が塞がれていると、その先の列は候補に入らない。
+// Returns only the (col, rotation) moves physically reachable by moving the
+// current pair. If a puyo in the ceiling row blocks the path, columns beyond
+// it are excluded from the candidate list.
 export function enumerateLegalMoves(state: GameState): Move[] {
   if (!state.current) return [];
   const reachable = reachableTargets(state.field, state.current);

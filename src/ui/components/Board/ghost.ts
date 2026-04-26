@@ -23,7 +23,7 @@ export function ghostCells(
   };
   const { axisPos, childPos } = pairCells(placed);
 
-  // 各列の「次に積める一番下の空き行」を field から初期化。
+  // For each column, initialize "the lowest empty row that can be stacked next" from the field.
   const colTop: number[] = new Array(COLS);
   for (let c = 0; c < COLS; c++) {
     let r = ROWS - 1;
@@ -31,8 +31,9 @@ export function ghostCells(
     colTop[c] = r;
   }
 
-  // lockActive と同じ落下順(開始 row が大きい = 下にあるピース)で処理。
-  // 同じ列に2つ落ちる(rot 0/2)ケースで上のピースが下のピースの上に積まれる。
+  // Process pieces in the same drop order as lockActive (larger startRow =
+  // lower piece first). This ensures that when both pieces fall into the same
+  // column (rot 0/2), the upper piece stacks on top of the lower one.
   const pieces = [
     { kind: 'axis' as const, col: axisPos.col, startRow: axisPos.row },
     { kind: 'child' as const, col: childPos.col, startRow: childPos.row },
@@ -41,8 +42,9 @@ export function ghostCells(
   const result: GhostPos[] = [];
   for (const p of pieces) {
     const r = colTop[p.col]!;
-    // 列が天井まで埋まっていてピースが入らない場合は lockActive 同様に
-    // 静かに破棄する(本家挙動)。残るピースのゴーストはそのまま見せる。
+    // If the column is filled up to the ceiling and the piece can't fit,
+    // silently drop it just like lockActive does (matching the original
+    // game's behavior). Still display the ghost of the remaining piece.
     if (r < 0) continue;
     result.push({ row: r, col: p.col, kind: p.kind });
     colTop[p.col] = r - 1;

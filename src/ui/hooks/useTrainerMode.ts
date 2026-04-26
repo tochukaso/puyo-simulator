@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 
-// 訓練モード。'gtr' のとき Header の「AI 選択」を上書きして ama-wasm + gtr プリセットを使い、
-// Board に GTR テンプレを薄く重ね、Stats 周辺に達成度メーターを出す。
-// 複数コンポーネントで共有するシングルトン + listener(useUiPrefs と同じ流儀)。
+// Trainer mode. When 'gtr', the Header's "AI selection" is overridden to use
+// ama-wasm with the gtr preset, the Board lightly overlays the GTR template,
+// and a progress meter is displayed near the Stats.
+// Shared across components via a singleton + listener (same approach as useUiPrefs).
 
 export type TrainerMode = 'off' | 'gtr';
 
@@ -27,7 +28,7 @@ export function setTrainerMode(v: TrainerMode): void {
   try {
     localStorage.setItem(STORAGE_KEY, v);
   } catch {
-    // localStorage 未対応環境では永続化をスキップ。
+    // Skip persistence when localStorage is unsupported.
   }
   for (const h of listeners) h(v);
 }

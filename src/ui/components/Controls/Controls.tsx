@@ -12,7 +12,8 @@ export function Controls() {
   const t = useT();
   const canUndo = historyLength > 0 && !animating;
   const aiBest = moves[0] ?? null;
-  // 思考中・未ロード・候補なし・連鎖アニメ中は AI 確定ボタンを押せない。
+  // The AI commit button is disabled while thinking, while not yet loaded,
+  // when there are no candidates, and during the chain animation.
   const canAiCommit = aiReady && !loading && !animating && aiBest !== null;
 
   const cellBase =

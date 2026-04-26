@@ -3,7 +3,7 @@ import { createEmptyField, getCell, withCell, applyGravity } from '../field';
 import { ROWS, COLS } from '../constants';
 
 describe('createEmptyField', () => {
-  it('全マスが null の ROWS x COLS を作る', () => {
+  it('creates a ROWS x COLS field with every cell null', () => {
     const f = createEmptyField();
     expect(f.cells.length).toBe(ROWS);
     expect(f.cells[0]!.length).toBe(COLS);
@@ -16,14 +16,14 @@ describe('createEmptyField', () => {
 });
 
 describe('withCell', () => {
-  it('元の Field を変更せず、新しい Field を返す', () => {
+  it('does not mutate the original Field; returns a new one', () => {
     const f0 = createEmptyField();
     const f1 = withCell(f0, 5, 3, 'R');
     expect(getCell(f0, 5, 3)).toBeNull();
     expect(getCell(f1, 5, 3)).toBe('R');
   });
 
-  it('範囲外は例外', () => {
+  it('throws when out of range', () => {
     const f0 = createEmptyField();
     expect(() => withCell(f0, -1, 0, 'R')).toThrow();
     expect(() => withCell(f0, 0, COLS, 'R')).toThrow();
@@ -31,7 +31,7 @@ describe('withCell', () => {
 });
 
 describe('applyGravity', () => {
-  it('浮いているぷよが下に落ちる', () => {
+  it('floating puyos fall down', () => {
     let f = createEmptyField();
     f = withCell(f, 0, 0, 'R');
     f = withCell(f, 12, 0, 'B');
@@ -41,7 +41,7 @@ describe('applyGravity', () => {
     expect(getCell(g, 12, 0)).toBe('B');
   });
 
-  it('隙間のある縦列を詰める', () => {
+  it('packs a column with gaps so puyos stack at the bottom', () => {
     let f = createEmptyField();
     f = withCell(f, 5, 2, 'R');
     f = withCell(f, 7, 2, 'B');

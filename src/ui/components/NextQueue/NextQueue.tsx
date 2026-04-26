@@ -2,9 +2,10 @@ import { useGameStore } from '../../store';
 import { PUYO_COLORS, PUYO_LIGHT, PUYO_DARK } from '../Board/colors';
 import type { Color } from '../../../game/types';
 
-// 本家ぷよぷよと同じく、盤面の右側に NEXT(直近)を上、NEXT-NEXT(その次)を
-// 下に縦並びで表示する。NEXT-NEXT は本家どおりひとまわり小さく表示して
-// 視線の優先順位を示す。
+// Following the original Puyo Puyo, show NEXT (the upcoming pair) on top
+// and NEXT-NEXT (the one after) below it, stacked vertically to the right
+// of the board. NEXT-NEXT is rendered slightly smaller, as in the original,
+// to convey visual priority.
 export function NextQueue() {
   const queue = useGameStore((s) => s.game.nextQueue);
   const next = queue[0];
@@ -36,8 +37,9 @@ function Dot({ color, size }: { color: Color | undefined; size: number }) {
   const style: React.CSSProperties = { width: size, height: size };
   if (!color) return <div className="rounded-full bg-slate-700" style={style} />;
 
-  // Board.tsx の drawPuyo と同じ見た目。CSS radial-gradient + 暗色 border +
-  // 中央に頭文字。光源は左上に置いて canvas 側と揃える。
+  // Same look as drawPuyo in Board.tsx: CSS radial-gradient + dark border +
+  // initial letter in the center. Light source is at the upper-left to
+  // match the canvas rendering.
   const fontSize = Math.round(size * 0.5);
   const borderWidth = Math.max(1, Math.round(size * 0.08));
   return (

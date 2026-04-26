@@ -2,15 +2,16 @@ import { useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
 import { useGameStore } from '../store';
 
-// 本家ぷよぷよ(モバイル)準拠:
-//  - 右フリック / 左フリック → 1 列ずつ右/左移動
-//  - 下フリック             → 高速移動(softDrop)
-//  - 画面右側タップ          → 右回転
-//  - 画面左側タップ          → 左回転
+// Mirroring the original Puyo Puyo (mobile):
+//  - Right flick / left flick → move one column right/left
+//  - Down flick               → fast drop (softDrop)
+//  - Tap on the right half     → rotate CW
+//  - Tap on the left half      → rotate CCW
 //
-// targetRef は「タップ判定の領域」。盤面ではなく画面本体に張ると、画面の左右端まで
-// タップで回転できるようになる。ボタン等のインタラクティブ要素のクリックは
-// gesture を発火させないように `target.closest` で除外する。
+// targetRef defines the "tap-detection area". Attaching it to the screen body
+// rather than the board lets taps near the screen edges still trigger rotation.
+// Clicks on interactive elements (buttons, etc.) are excluded via
+// `target.closest` so they don't trigger gestures.
 const SWIPE_COL_PX = 32;
 const TAP_MAX_MS = 200;
 const INTERACTIVE_SELECTOR =
@@ -43,7 +44,7 @@ export function useGestures(targetRef: RefObject<HTMLElement | null>) {
       const dy = e.clientY - start.y;
       const dt = Date.now() - start.t;
 
-      // フリック(横/下)。上方向は未割当。
+      // Flick (horizontal/down). The upward direction is unassigned.
       if (Math.abs(dx) > SWIPE_COL_PX || Math.abs(dy) > SWIPE_COL_PX) {
         if (Math.abs(dx) > Math.abs(dy)) {
           const cols = Math.round(dx / SWIPE_COL_PX);
@@ -52,7 +53,7 @@ export function useGestures(targetRef: RefObject<HTMLElement | null>) {
             useGameStore.getState().dispatch({ type: dir });
           }
         } else if (dy > 0) {
-          // 下フリックは「高速移動」=softDrop。フリック量(行数)ぶんだけ落とす。
+          // Down flick = "fast move" = softDrop. Drop by the flick distance (in rows).
           const rows = Math.round(dy / SWIPE_COL_PX);
           for (let i = 0; i < Math.max(1, rows); i++) {
             useGameStore.getState().dispatch({ type: 'softDrop' });
@@ -61,9 +62,10 @@ export function useGestures(targetRef: RefObject<HTMLElement | null>) {
         return;
       }
 
-      // タップ:画面の左半分=左回転、右半分=右回転。中心はビューポート幅で判定
-      // (targetRef の rect ではなく window.innerWidth)。これにより画面右端まで
-      // 確実に右回転、左端まで左回転として効く。
+      // Tap: left half of the screen = rotate CCW, right half = rotate CW. The
+      // center is computed from the viewport width (window.innerWidth) rather
+      // than targetRef's rect, so taps all the way at the right edge still
+      // rotate CW and all the way at the left edge rotate CCW.
       if (dt < TAP_MAX_MS) {
         const centerX = window.innerWidth / 2;
         const type = e.clientX < centerX ? 'rotateCCW' : 'rotateCW';

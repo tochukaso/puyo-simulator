@@ -11,8 +11,9 @@ export function CandidateList() {
   const previewMove = usePreviewMove();
   const t = useT();
 
-  // 新しいツモになる(= moves が再計算される)タイミングで preview をクリア。
-  // 古い手のゴーストが新しいぷよ色で描かれる紛らわしさを避ける。
+  // Clear the preview when a new pair arrives (= moves is recomputed). This
+  // avoids the confusing case where an old move's ghost is drawn with the new
+  // pair's colors.
   useEffect(() => {
     setPreviewMove(null);
   }, [moves]);
@@ -23,8 +24,9 @@ export function CandidateList() {
       ? t('candidates.thinking')
       : `(${moves.length})`;
 
-  // 候補内のトップ手を 100% として相対表示。各 AI でスコアのスケールが違うため、
-  // 絶対値より「最善手と比べてどれだけ良いか」のほうが横断的に読みやすい。
+  // Display values relative to the top candidate (taken as 100%). Each AI has
+  // a different score scale, so "how good compared to the best move" reads
+  // more uniformly than absolute scores.
   const top = moves.reduce((m, x) => Math.max(m, x.score ?? 0), 0);
 
   const isSelected = (m: Move): boolean =>
@@ -47,8 +49,9 @@ export function CandidateList() {
               className={`flex items-center justify-between gap-1 p-1 rounded cursor-pointer transition-colors ${
                 selected ? 'bg-slate-700 ring-2 ring-blue-400' : 'bg-slate-800'
               }`}
-              // マウスはホバーで一時的にプレビュー、離れたら戻す。タッチでは
-              // hover 概念がないので enter/leave は無視し、onClick で選択を保持する。
+              // Mouse: hover previews temporarily and reverts on leave. Touch
+              // has no hover concept, so we ignore enter/leave and use onClick
+              // to persist selection.
               onPointerEnter={(e) => {
                 if (e.pointerType === 'mouse') setPreviewMove(m);
               }}
@@ -60,7 +63,7 @@ export function CandidateList() {
               <span className="text-slate-300 tabular-nums">{pct}%</span>
               <button
                 className="px-2 py-0.5 bg-blue-600 rounded text-xs hover:bg-blue-500"
-                // 行の onClick(選択トグル)に伝播させない。実行は別アクション。
+                // Don't bubble to the row's onClick (selection toggle); execute is a separate action.
                 onClick={(e) => {
                   e.stopPropagation();
                   setPreviewMove(null);

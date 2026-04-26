@@ -3,7 +3,7 @@ import { HeuristicAI } from '../heuristic';
 import { createInitialState } from '../../game/state';
 
 describe('HeuristicAI (placeholder)', () => {
-  it('合法手の topK を返す', async () => {
+  it('returns the topK legal moves', async () => {
     const ai = new HeuristicAI();
     await ai.init();
     const s = createInitialState(1);
@@ -14,7 +14,7 @@ describe('HeuristicAI (placeholder)', () => {
 });
 
 describe('HeuristicAI suggest', () => {
-  it('合理的な手を上位に置く(空盤面)', async () => {
+  it('places reasonable moves at the top (empty board)', async () => {
     const ai = new HeuristicAI();
     await ai.init();
     const s = createInitialState(1);
@@ -22,7 +22,7 @@ describe('HeuristicAI suggest', () => {
     expect(moves[0]!.score!).toBeGreaterThanOrEqual(moves[21]!.score!);
   });
 
-  it('連鎖できる盤面では発火手が上位に', async () => {
+  it('on a board where a chain is available, the triggering move is at the top', async () => {
     const ai = new HeuristicAI();
     await ai.init();
     const s = createInitialState(1);

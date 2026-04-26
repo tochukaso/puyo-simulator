@@ -44,6 +44,55 @@ def encode_state(state: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     return board, queue, legal
 
 
+def canonicalize_colors(state: dict) -> tuple[dict, dict[str, int]]:
+    """Renames colors so that they appear in canonical order (R, B, Y, P) by
+    first-appearance scan: field bottom→top + left→right, then current.axis,
+    current.child, next1.axis, next1.child, next2.axis, next2.child.
+
+    Returns (canonical_state, perm) where perm maps original color → canonical id.
+    """
+    perm: dict[str, int] = {}
+
+    def _see(c):
+        if c is None or c not in ("R", "B", "Y", "P"):
+            return
+        if c not in perm and len(perm) < 4:
+            perm[c] = len(perm)
+
+    field = state["field"]
+    for r in range(12, -1, -1):
+        for c in range(6):
+            _see(field[r][c])
+
+    cur = state.get("current")
+    if cur is not None:
+        _see(cur.get("axis"))
+        _see(cur.get("child"))
+    for pair in state.get("next_queue", []):
+        _see(pair.get("axis"))
+        _see(pair.get("child"))
+
+    def _remap(c):
+        if c is None or c not in perm:
+            return c
+        return COLOR_ORDER[perm[c]]
+
+    canon_field = [[_remap(c) for c in row] for row in field]
+    canon_state = {
+        "field": canon_field,
+        "current": (
+            None
+            if cur is None
+            else {**cur, "axis": _remap(cur.get("axis")), "child": _remap(cur.get("child"))}
+        ),
+        "next_queue": [
+            {**p, "axis": _remap(p.get("axis")), "child": _remap(p.get("child"))}
+            for p in state.get("next_queue", [])
+        ],
+    }
+    return canon_state, perm
+
+
 def _legal_mask(field, current) -> np.ndarray:
     from .action import ACTION_COUNT, action_index_to_move
 

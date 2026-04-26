@@ -9,6 +9,13 @@ import type { AmaVariant } from '../../ai/wasm-ama/wasm-loader';
 let workerSingleton: Worker | null = null;
 const suggestHandlers = new Set<(msg: { id: number; moves: Move[] }) => void>();
 
+// suggest リクエスト ID はモジュールグローバルで採番する。
+// useAiSuggestion は同じツモに対して 3 か所(Board / CandidateList / Controls)
+// から並行して呼ばれることがあり、各 hook インスタンスの idRef を別カウンタで
+// 持つと ID が衝突して別 topK の応答を取り違える(5 件欲しい側が 1 件で
+// 上書きされる現象が起きる)。
+let nextSuggestId = 0;
+
 type AiReadyHandler = (kind: Kind, ok: boolean) => void;
 const aiReadyHandlers = new Set<AiReadyHandler>();
 let currentAiKind: Kind = 'ml-ama-v1';
@@ -92,7 +99,8 @@ export function useAiSuggestion(topK = 5) {
       setLoading(false);
       return;
     }
-    const id = ++idRef.current;
+    const id = ++nextSuggestId;
+    idRef.current = id;
     // Clear stale moves so the candidate list and board ghost don't display
     // the previous turn's suggestion while ama recomputes.
     setMoves([]);

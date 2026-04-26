@@ -17,6 +17,17 @@ npm run build    # 本番ビルド
 npm run lint     # Lint
 ```
 
+## サプライチェーンセキュリティ (Takumi Guard)
+
+NPM と PyPI のインストールを [Takumi Guard](https://flatt.tech/takumi/features/guard)
+レジストリプロキシ経由にすることで、既知の悪性パッケージをブロックします。
+
+- NPM: ルートの `.npmrc` で `registry=https://npm.flatt.tech/` を指定
+- Python: `python/requirements.txt` の `--index-url` および `python/pip.conf`
+  で `https://pypi.flatt.tech/simple/` を指定
+- CI: `.github/workflows/ci.yml` で `flatt-security/setup-takumi-guard-npm@v1`
+  を使用 (OIDC 経由で短命トークンを取得)
+
 ## ドキュメント
 
 - 設計書: `docs/superpowers/specs/2026-04-24-puyo-simulator-design.md`

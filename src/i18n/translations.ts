@@ -32,8 +32,6 @@ export interface Dict {
   'controls.aiThinking': string;
   'controls.undo': string;
   'controls.undoAria': string;
-  'controls.undoStepsLabel': string;
-  'controls.stepsOption': string;
   'controls.reset': string;
   'controls.resetConfirm': string;
   'candidates.title': string;
@@ -68,8 +66,6 @@ export const translations: Record<Lang, Dict> = {
     'controls.aiThinking': 'AI 思考中…',
     'controls.undo': '↶ 戻る',
     'controls.undoAria': '{n} 手戻る',
-    'controls.undoStepsLabel': '戻る手数',
-    'controls.stepsOption': '{n} 手',
     'controls.reset': 'リセット',
     'controls.resetConfirm': 'リセットしますか?',
     'candidates.title': 'AI候補',
@@ -102,8 +98,6 @@ export const translations: Record<Lang, Dict> = {
     'controls.aiThinking': 'AI thinking…',
     'controls.undo': '↶ Undo',
     'controls.undoAria': 'Undo {n} step(s)',
-    'controls.undoStepsLabel': 'Undo steps',
-    'controls.stepsOption': '{n}',
     'controls.reset': 'Reset',
     'controls.resetConfirm': 'Reset?',
     'candidates.title': 'AI candidates',
@@ -136,8 +130,6 @@ export const translations: Record<Lang, Dict> = {
     'controls.aiThinking': 'AI 思考中…',
     'controls.undo': '↶ 撤销',
     'controls.undoAria': '撤销 {n} 步',
-    'controls.undoStepsLabel': '撤销步数',
-    'controls.stepsOption': '{n} 步',
     'controls.reset': '重置',
     'controls.resetConfirm': '确定要重置吗?',
     'candidates.title': 'AI候选',
@@ -170,8 +162,6 @@ export const translations: Record<Lang, Dict> = {
     'controls.aiThinking': 'AI 생각 중…',
     'controls.undo': '↶ 되돌리기',
     'controls.undoAria': '{n}수 되돌리기',
-    'controls.undoStepsLabel': '되돌릴 수',
-    'controls.stepsOption': '{n}수',
     'controls.reset': '초기화',
     'controls.resetConfirm': '초기화하시겠습니까?',
     'candidates.title': 'AI 후보',

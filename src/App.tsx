@@ -22,12 +22,16 @@ export default function App() {
       >
         <div className="flex flex-col items-center gap-3 w-full max-w-sm">
           <Stats />
-          <div className="flex gap-3 items-start justify-center w-full">
+          <div className="flex gap-3 items-stretch justify-center w-full">
             <Board />
-            <NextQueue />
+            <div className="flex flex-col gap-2 w-24 shrink-0">
+              <NextQueue />
+              <div className="mt-auto">
+                <CandidateList />
+              </div>
+            </div>
           </div>
           <Controls />
-          <CandidateList />
         </div>
       </div>
     </div>

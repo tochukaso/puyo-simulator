@@ -3,6 +3,7 @@ import { useGameStore, type PoppingCell, type LandedCell, LANDING_BOUNCE_MS } fr
 import { useGestures } from '../../hooks/useGestures';
 import { useAiSuggestion } from '../../hooks/useAiSuggestion';
 import { useGhostEnabled } from '../../hooks/useUiPrefs';
+import { usePreviewMove } from '../../hooks/useAiPreview';
 import { ROWS, COLS, SPAWN_COL, VISIBLE_ROW_START } from '../../../game/constants';
 import { PUYO_COLORS, BG_COLOR, GRID_COLOR, DANGER_COLOR } from './colors';
 import type { Field, ActivePair, Move } from '../../../game/types';
@@ -18,7 +19,10 @@ export function Board() {
   const landedCells = useGameStore((s) => s.landedCells);
   const { moves } = useAiSuggestion(5);
   const ghostEnabled = useGhostEnabled();
-  const bestMove = ghostEnabled ? (moves[0] ?? null) : null;
+  const previewMove = usePreviewMove();
+  // CandidateList で hover/選択している候補があればそれを優先表示。なければ
+  // トップ候補にフォールバック。
+  const bestMove = ghostEnabled ? (previewMove ?? moves[0] ?? null) : null;
 
   useGestures(wrapperRef);
 

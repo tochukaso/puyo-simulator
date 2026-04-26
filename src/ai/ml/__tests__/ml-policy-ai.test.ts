@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createEmptyField } from '../../../game/field';
 import type { GameState } from '../../../game/types';
-import { MlAI } from '../ml-ai';
+import { MlAI } from '../ml-policy-ai';
 
 function makeState(): GameState {
   return {

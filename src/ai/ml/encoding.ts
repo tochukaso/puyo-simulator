@@ -4,7 +4,7 @@ import { ACTION_COUNT, actionIndexToMove } from '../../game/action';
 
 export const BOARD_CHANNELS = 11;
 export const QUEUE_DIM = 16;
-export const COLOR_ORDER: Color[] = ['R', 'B', 'Y', 'P'];
+export const COLOR_ORDER: readonly Color[] = ['R', 'B', 'Y', 'P'];
 const COLOR_INDEX: Record<Color, number> = { R: 0, B: 1, Y: 2, P: 3 };
 
 export interface EncodedState {

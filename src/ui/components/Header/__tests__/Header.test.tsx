@@ -40,6 +40,7 @@ describe('Header AI selector (3-way)', () => {
     render(<Header />);
     await userEvent.selectOptions(screen.getByLabelText('AI'), 'ml-v1');
     expect(localStorage.getItem('puyo.ai.kind')).toBe('ml-v1');
-    expect(setAiKind).toHaveBeenCalledWith('ml-v1');
+    // 訓練 off の通常時は default バリアント + preset='build' で AI が反映される
+    expect(setAiKind).toHaveBeenCalledWith('ml-v1', 'build', 'default');
   });
 });

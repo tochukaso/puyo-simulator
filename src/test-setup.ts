@@ -1,8 +1,9 @@
+import { beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 
-// Node 22+ exposes a partial native `localStorage` on globalThis that shadows
-// jsdom's Storage (missing `.clear()`, `.key()`, `length`). Replace it with a
-// minimal in-memory Storage implementation so tests behave like a browser.
+// jsdom 同梱 / Node 22+ 内蔵の localStorage は一部メソッド (.clear, .key, length) を
+// 欠くため、テスト用に Map ベースの完全な Storage シムを毎テスト差し替える。
+// beforeEach で再生成してテスト間の状態リセットを保証する。
 class MemoryStorage implements Storage {
   private store = new Map<string, string>();
   get length() {
@@ -25,10 +26,20 @@ class MemoryStorage implements Storage {
   }
 }
 
-for (const name of ['localStorage', 'sessionStorage'] as const) {
-  const storage = new MemoryStorage();
-  Object.defineProperty(globalThis, name, { configurable: true, value: storage });
-  if (typeof window !== 'undefined') {
-    Object.defineProperty(window, name, { configurable: true, value: storage });
+beforeEach(() => {
+  for (const name of ['localStorage', 'sessionStorage'] as const) {
+    const storage = new MemoryStorage();
+    Object.defineProperty(globalThis, name, {
+      configurable: true,
+      writable: true,
+      value: storage,
+    });
+    if (typeof window !== 'undefined') {
+      Object.defineProperty(window, name, {
+        configurable: true,
+        writable: true,
+        value: storage,
+      });
+    }
   }
-}
+});

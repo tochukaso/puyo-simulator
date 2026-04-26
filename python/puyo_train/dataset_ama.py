@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import math
+import random
+from itertools import permutations
 from pathlib import Path
 from typing import Sequence
 
@@ -12,9 +14,11 @@ import torch
 from torch.utils.data import Dataset
 
 from .action import move_to_action_index
+from .augmentation import apply_lr_flip, apply_color_permutation
 from .encoding import encode_state
 
 VALUE_SCALE = 50000.0
+_COLOR_PERMS = list(permutations((0, 1, 2, 3)))
 
 
 def value_target_from_score(score: float) -> float:
@@ -61,7 +65,7 @@ def _row_to_state(row: dict) -> dict:
 
 
 class AmaDataset(Dataset):
-    def __init__(self, files: list[Path], temperature: float = 100.0):
+    def __init__(self, files: list[Path], temperature: float = 100.0, augment: bool = False):
         rows: list[dict] = []
         skipped = 0
         for f in files:
@@ -78,6 +82,7 @@ class AmaDataset(Dataset):
             print(f"AmaDataset: skipped {skipped} malformed lines")
         self.rows = rows
         self.temperature = temperature
+        self.augment = augment
 
     def __len__(self) -> int:
         return len(self.rows)
@@ -89,18 +94,23 @@ class AmaDataset(Dataset):
         topk = row["topk"]
         scores = [c["score"] for c in topk]
         indices = [move_to_action_index(c["axisCol"], c["rotation"]) for c in topk]
-        policy = make_soft_policy(scores, indices, self.temperature)
-        value = value_target_from_score(float(row["final_score"]))
+        soft_policy = make_soft_policy(scores, indices, self.temperature)
+        value = value_target_from_score(float(row.get("final_score", 0.0)))
+        if self.augment:
+            if random.random() < 0.5:
+                board, queue, soft_policy = apply_lr_flip(board, queue, soft_policy)
+            perm = random.choice(_COLOR_PERMS)
+            board, queue, soft_policy = apply_color_permutation(board, queue, soft_policy, perm)
         return (
             torch.from_numpy(board),
             torch.from_numpy(queue),
-            torch.from_numpy(policy),
+            torch.from_numpy(soft_policy),
             torch.tensor(value, dtype=torch.float32),
         )
 
 
-def load_all(data_dir: Path, temperature: float = 100.0) -> AmaDataset:
+def load_all(data_dir: Path, temperature: float = 100.0, augment: bool = False) -> AmaDataset:
     files = sorted(Path(data_dir).glob("*.jsonl"))
     if not files:
         raise FileNotFoundError(f"no JSONL files in {data_dir}")
-    return AmaDataset(files, temperature=temperature)
+    return AmaDataset(files, temperature=temperature, augment=augment)

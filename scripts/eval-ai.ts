@@ -1,44 +1,37 @@
-import { spawnSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { spawnSync, execSync } from 'node:child_process';
+import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import { createInitialState, commitMove } from '../src/game/state';
 import { HeuristicAI } from '../src/ai/heuristic';
 import { createNodeMlAI } from './ml-ai-node';
 import type { PuyoAI } from '../src/ai/types';
-import { moveToActionIndex } from '../src/game/action';
-
-type AiKind = 'heuristic' | 'ml-v1' | 'ml-ama-v1' | 'ama' | 'ama-wasm';
+import { STANDARD, expandSeeds } from './eval-presets';
 
 const AMA_REPO = process.env.AMA_REPO ?? '/Users/yasumitsuomori/git/ama';
 const AMA_BIN = join(AMA_REPO, 'bin/dump_selfplay/dump_selfplay.exe');
 
-async function makeAi(kind: AiKind): Promise<PuyoAI | null> {
-  if (kind === 'heuristic') return new HeuristicAI();
-  if (kind === 'ml-v1') return await createNodeMlAI('public/models/policy-v1/model.json');
-  if (kind === 'ml-ama-v1') return await createNodeMlAI('public/models/policy-ama-v1/model.json');
-  if (kind === 'ama') return null; // sentinel — handled separately (subprocess)
-  if (kind === 'ama-wasm') {
+async function makeAi(kindOrPath: string): Promise<PuyoAI | null> {
+  if (kindOrPath === 'heuristic') return new HeuristicAI();
+  if (kindOrPath === 'ml-v1') return await createNodeMlAI('public/models/policy-v1/model.json');
+  if (kindOrPath === 'ml-ama-v1') return await createNodeMlAI('public/models/policy-ama-v1/model.json');
+  if (kindOrPath === 'ml-ama-v2-search') {
+    // createNodeMlSearchAI is added in P-13; the dynamic import lets earlier tasks compile.
+     
+    const { createNodeMlSearchAI } = await import('./ml-ai-node');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return await (createNodeMlSearchAI as any)('public/models/policy-ama-v2/model.json');
+  }
+  if (kindOrPath === 'ama') return null; // sentinel — handled by evalAmaGames subprocess
+  if (kindOrPath === 'ama-wasm') {
     const { WasmAmaAI } = await import('../src/ai/wasm-ama/wasm-ama-ai');
     const ai = new WasmAmaAI();
     await ai.init();
     return ai;
   }
-  throw new Error(`unknown kind: ${kind}`);
-}
-
-async function playOne(
-  ai: PuyoAI,
-  seed: number,
-): Promise<{ score: number; maxChain: number }> {
-  let state = createInitialState(seed);
-  for (let t = 0; t < 500; t++) {
-    if (state.status === 'gameover' || !state.current) break;
-    const moves = await ai.suggest(state, 1);
-    const best = moves[0];
-    if (!best) break;
-    state = commitMove(state, best);
+  if (kindOrPath.endsWith('model.json')) {
+    return await createNodeMlAI(kindOrPath);
   }
-  return { score: state.score, maxChain: state.maxChain };
+  throw new Error(`unknown --ai value: ${kindOrPath}`);
 }
 
 function evalAmaGames(
@@ -74,67 +67,202 @@ function evalAmaGames(
   return Array.from(byGame.values());
 }
 
-async function topOneAgreement(
-  a: PuyoAI,
-  b: PuyoAI,
-  seeds: number[],
-): Promise<number> {
-  let same = 0;
-  let total = 0;
-  for (const seed of seeds.slice(0, 20)) {
-    let state = createInitialState(seed);
-    for (let t = 0; t < 30; t++) {
-      if (!state.current || state.status === 'gameover') break;
-      const [ma, mb] = await Promise.all([a.suggest(state, 1), b.suggest(state, 1)]);
-      if (ma[0] && mb[0]) {
-        total++;
-        if (moveToActionIndex(ma[0]) === moveToActionIndex(mb[0])) same++;
-      }
-      state = commitMove(state, ma[0]!);
-    }
+interface CliArgs {
+  ais: string[];
+  seeds: number[];
+  baseline: string | null;
+  out: string | null;
+  maxMoves: number;
+}
+
+function parseCli(): CliArgs {
+  const a = process.argv.slice(2);
+  const ais: string[] = [];
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] === '--ai') { ais.push(a[++i]!); }
   }
-  return total === 0 ? 0 : same / total;
+  const get = (k: string, d?: string): string | undefined => {
+    const i = a.indexOf(k);
+    return i >= 0 && i + 1 < a.length ? a[i + 1] : d;
+  };
+  const preset = get('--preset');
+  let seeds: number[];
+  const seedsFlag = get('--seeds');
+  if (seedsFlag) {
+    seeds = seedsFlag.split(',').map((s) => Number(s.trim()));
+  } else if (preset === 'standard') {
+    seeds = expandSeeds(STANDARD);
+  } else {
+    const base = Number(get('--seed-base', '0'));
+    const count = Number(get('--count', '20'));
+    seeds = expandSeeds({ base, count });
+  }
+  return {
+    ais,
+    seeds,
+    baseline: get('--baseline') ?? null,
+    out: get('--out') ?? null,
+    maxMoves: Number(get('--max-moves', String(STANDARD.maxMoves))),
+  };
+}
+
+interface GameResult {
+  seed: number;
+  score: number;
+  maxChain: number;
+  totalChains: number;
+  moves: number;
+  gameover: boolean;
+}
+
+async function playSeed(ai: PuyoAI, seed: number, maxMoves: number): Promise<GameResult> {
+  let state = createInitialState(seed);
+  let moves = 0;
+  for (let t = 0; t < maxMoves; t++) {
+    if (state.status === 'gameover' || !state.current) break;
+    const top = await ai.suggest(state, 1);
+    const best = top[0];
+    if (!best) break;
+    state = commitMove(state, best);
+    moves++;
+  }
+  return {
+    seed,
+    score: state.score,
+    maxChain: state.maxChain,
+    totalChains: state.totalChains,
+    moves,
+    gameover: state.status === 'gameover',
+  };
+}
+
+interface AggregateStats {
+  avgScore: number;
+  medianScore: number;
+  avgMaxChain: number;
+  maxScore: number;
+}
+
+function aggregate(games: GameResult[]): AggregateStats {
+  const scores = games.map((g) => g.score).sort((x, y) => x - y);
+  const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
+  const median = (xs: number[]) => {
+    if (xs.length === 0) return 0;
+    const mid = Math.floor(xs.length / 2);
+    return xs.length % 2 === 0 ? (xs[mid - 1]! + xs[mid]!) / 2 : xs[mid]!;
+  };
+  return {
+    avgScore: avg(games.map((g) => g.score)),
+    medianScore: median(scores),
+    avgMaxChain: avg(games.map((g) => g.maxChain)),
+    maxScore: scores[scores.length - 1] ?? 0,
+  };
+}
+
+function gitSha(): string {
+  try {
+    return execSync('git rev-parse --short HEAD').toString().trim();
+  } catch {
+    return 'unknown';
+  }
+}
+
+interface Comparison {
+  baseline: string;
+  ai: string;
+  avgScoreRatio: number | null;
+  perSeed: { seed: number; ratio: number | null }[];
+}
+
+interface AiResult {
+  kind: string;
+  model_url: string | null;
+  games: GameResult[];
+  aggregate: AggregateStats;
 }
 
 async function main() {
-  const args = process.argv.slice(2);
-  const get = (k: string, d: string) => {
-    const i = args.indexOf(k);
-    return i >= 0 && i + 1 < args.length ? args[i + 1]! : d;
-  };
-  const games = Number(get('--games', '100'));
-  const seed0 = Number(get('--seed', '1'));
-  const aKind = get('--a', 'heuristic') as AiKind;
-  const bKind = get('--b', 'ml-ama-v1') as AiKind;
+  const args = parseCli();
+  if (args.ais.length === 0) {
+    console.error('error: pass at least one --ai <kind|path>');
+    process.exit(2);
+  }
 
-  console.log(`Eval: ${games} games  seed0=${seed0}  A=${aKind}  B=${bKind}`);
+  const allResults: AiResult[] = [];
+  for (const aiSpec of args.ais) {
+    console.log(`\n=== AI: ${aiSpec} ===`);
+    const games: GameResult[] = [];
+    if (aiSpec === 'ama') {
+      if (args.seeds.some((s, i) => i > 0 && s !== args.seeds[i - 1]! + 1)) {
+        throw new Error('--ai ama requires contiguous --seeds (the ama subprocess only accepts seed0 + count)');
+      }
+      const out = evalAmaGames(args.seeds[0]!, args.seeds.length);
+      for (let i = 0; i < args.seeds.length; i++) {
+        games.push({
+          seed: args.seeds[i]!,
+          score: out[i]!.score,
+          maxChain: out[i]!.maxChain,
+          totalChains: 0,
+          moves: 0,
+          gameover: true,
+        });
+      }
+    } else {
+      const ai = await makeAi(aiSpec);
+      if (!ai) throw new Error(`makeAi returned null for ${aiSpec}`);
+      for (const seed of args.seeds) {
+        const g = await playSeed(ai, seed, args.maxMoves);
+        console.log(`  seed=${seed} score=${g.score} maxChain=${g.maxChain} moves=${g.moves}`);
+        games.push(g);
+      }
+    }
+    const agg = aggregate(games);
+    console.log(`  avgScore=${agg.avgScore.toFixed(0)} avgMaxChain=${agg.avgMaxChain.toFixed(2)}`);
+    allResults.push({
+      kind: aiSpec,
+      model_url: aiSpec.endsWith('model.json') ? aiSpec : null,
+      games,
+      aggregate: agg,
+    });
+  }
 
-  const seeds = Array.from({ length: games }, (_, i) => (seed0 + i) >>> 0);
+  const comparisons: Comparison[] = [];
+  if (args.baseline) {
+    const base = allResults.find((r) => r.kind === args.baseline);
+    if (!base) {
+      console.warn(`warning: --baseline ${args.baseline} not found in --ai list, skipping comparisons`);
+    } else {
+      for (const r of allResults) {
+        if (r.kind === args.baseline) continue;
+        const perSeed = r.games.map((g, i) => ({
+          seed: g.seed,
+          ratio:
+            base.games[i] && base.games[i]!.score > 0
+              ? g.score / base.games[i]!.score
+              : null,
+        }));
+        const ratios = perSeed.map((p) => p.ratio).filter((x): x is number => x !== null);
+        const avgRatio =
+          ratios.length === 0
+            ? null
+            : ratios.reduce((a, b) => a + b, 0) / ratios.length;
+        comparisons.push({ baseline: args.baseline, ai: r.kind, avgScoreRatio: avgRatio, perSeed });
+        console.log(`  vs ${args.baseline}: avgScoreRatio=${avgRatio?.toFixed(3) ?? 'n/a'}`);
+      }
+    }
+  }
 
-  const playMany = async (kind: AiKind) => {
-    if (kind === 'ama') return evalAmaGames(seed0, games);
-    const ai = (await makeAi(kind))!;
-    const out: { score: number; maxChain: number }[] = [];
-    for (const s of seeds) out.push(await playOne(ai, s));
-    return out;
-  };
-
-  const [aRes, bRes] = await Promise.all([playMany(aKind), playMany(bKind)]);
-
-  const avg = (arr: number[]) => arr.reduce((x, y) => x + y, 0) / arr.length;
-  const avgA = avg(aRes.map((r) => r.score));
-  const avgB = avg(bRes.map((r) => r.score));
-  const chA = avg(aRes.map((r) => r.maxChain));
-  const chB = avg(bRes.map((r) => r.maxChain));
-  console.log(`${aKind} avg score: ${avgA.toFixed(0)}  max-chain mean: ${chA.toFixed(2)}`);
-  console.log(`${bKind} avg score: ${avgB.toFixed(0)}  max-chain mean: ${chB.toFixed(2)}`);
-  console.log(`Ratio (B/A): ${(avgB / avgA).toFixed(3)}`);
-
-  if (aKind !== 'ama' && bKind !== 'ama') {
-    const ai_a = (await makeAi(aKind))!;
-    const ai_b = (await makeAi(bKind))!;
-    const t1 = await topOneAgreement(ai_a, ai_b, seeds);
-    console.log(`Top-1 agreement: ${t1.toFixed(3)}`);
+  if (args.out) {
+    const payload = {
+      timestamp: new Date().toISOString(),
+      git_sha: gitSha(),
+      seeds: args.seeds,
+      ais: allResults,
+      comparisons,
+    };
+    mkdirSync(dirname(args.out), { recursive: true });
+    writeFileSync(args.out, JSON.stringify(payload, null, 2));
+    console.log(`\nwrote ${args.out}`);
   }
 }
 

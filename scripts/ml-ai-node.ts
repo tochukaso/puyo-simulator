@@ -3,6 +3,7 @@ import type { PuyoAI } from '../src/ai/types';
 import type { GameState, Move } from '../src/game/types';
 import { encodeState } from '../src/ai/ml/encoding';
 import { actionIndexToMove } from '../src/game/action';
+import { MlSearchAI } from '../src/ai/ml/ml-search-ai';
 
 // Node 24 removed util.isNullOrUndefined which tfjs-node 4.22 still uses.
 // Restore it on the CJS util module before tfjs-node's transitive import runs.
@@ -24,7 +25,8 @@ export async function createNodeMlAI(modelPath: string): Promise<PuyoAI> {
       const { board, queue, legalMask } = encodeState(state);
       const b = tf.tensor(board, [1, 13, 6, 7]);
       const q = tf.tensor(queue, [1, 16]);
-      const outs = model.predict([b, q]) as tf.Tensor[];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const outs = model.predict([b, q]) as any[];
       // Output order from onnx2tf is not guaranteed; policy has 22 elements,
       // value has 1. Identify by size.
       const policyOut = outs.find((t) => t.size === 22)!;
@@ -37,6 +39,24 @@ export async function createNodeMlAI(modelPath: string): Promise<PuyoAI> {
       return pickTopK(logits as Float32Array, v, legalMask, topK);
     },
   };
+}
+
+export async function createNodeMlSearchAI(modelJsonPath: string) {
+  const tf = await import('@tensorflow/tfjs-node');
+  const { resolve } = await import('node:path');
+  const { pathToFileURL } = await import('node:url');
+  const url = pathToFileURL(resolve(modelJsonPath)).href;
+  const ai = new MlSearchAI({
+    modelUrl: url,
+    K: 6,
+    tf: tf,
+    modelLoader: async (u) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (await (tf as any).loadGraphModel(u)) as any;
+    },
+  });
+  await ai.init();
+  return ai;
 }
 
 function pickTopK(

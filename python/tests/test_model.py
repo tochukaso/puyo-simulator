@@ -5,7 +5,7 @@ from puyo_train.model import PolicyValueNet
 
 def test_forward_shapes():
     net = PolicyValueNet()
-    board = torch.zeros(4, 13, 6, 7)
+    board = torch.zeros(4, 13, 6, 11)
     queue = torch.zeros(4, 16)
     policy, value = net(board, queue)
     assert policy.shape == (4, 22)
@@ -20,7 +20,7 @@ def test_param_count_reasonable():
 
 def test_loss_finite():
     net = PolicyValueNet()
-    board = torch.zeros(2, 13, 6, 7)
+    board = torch.zeros(2, 13, 6, 11)
     queue = torch.zeros(2, 16)
     action = torch.tensor([0, 5], dtype=torch.int64)
     value_target = torch.tensor([0.1, -0.2], dtype=torch.float32)

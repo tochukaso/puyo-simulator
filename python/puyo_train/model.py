@@ -15,7 +15,7 @@ class PolicyValueNet(nn.Module):
       value:         (B,)      tanh in [-1, 1]
     """
 
-    BOARD_C = 7
+    BOARD_C = 11
     BOARD_H = 13
     BOARD_W = 6
 

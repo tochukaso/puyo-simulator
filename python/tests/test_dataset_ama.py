@@ -61,7 +61,7 @@ def test_dataset_loads(tmp_path: Path):
     ds = AmaDataset([p])
     assert len(ds) == 8
     board, queue, policy, value = ds[3]
-    assert board.shape == (13, 6, 7)
+    assert board.shape == (13, 6, 11)
     assert queue.shape == (16,)
     assert policy.shape == (22,)
     assert abs(float(policy.sum()) - 1.0) < 1e-5
@@ -76,7 +76,59 @@ def test_dataloader_batches(tmp_path: Path):
     batches = list(loader)
     assert len(batches) == 4
     b, q, pol, v = batches[0]
-    assert b.shape == (4, 13, 6, 7)
+    assert b.shape == (4, 13, 6, 11)
     assert q.shape == (4, 16)
     assert pol.shape == (4, 22)
     assert v.shape == (4,)
+
+
+def test_dataset_augmentation_preserves_shapes(tmp_path):
+    """Smoke test: with augment=True, every sample still returns the right
+    tensor shapes."""
+    import json
+    from puyo_train.dataset_ama import load_all
+
+    sample = {
+        "field": ["......"] * 13,
+        "current_axis": "R", "current_child": "B",
+        "next1_axis": "Y", "next1_child": "P",
+        "next2_axis": "R", "next2_child": "R",
+        "topk": [
+            {"axisCol": 0, "rotation": 0, "score": 1000},
+            {"axisCol": 1, "rotation": 0, "score": 500},
+        ],
+    }
+    p = tmp_path / "x.jsonl"
+    p.write_text(json.dumps(sample) + "\n")
+    ds = load_all(tmp_path, temperature=20.0, augment=True)
+    for _ in range(20):  # repeat to stress the random branches
+        board, queue, policy, value = ds[0]
+        assert board.shape == (13, 6, 11)
+        assert queue.shape == (16,)
+        assert policy.shape == (22,)
+        assert value.shape == ()
+
+
+def test_dataset_augmentation_disabled_yields_deterministic_samples(tmp_path):
+    """augment=False (default) should produce identical samples on repeat access."""
+    import json
+    from puyo_train.dataset_ama import load_all
+
+    sample = {
+        "field": ["......"] * 13,
+        "current_axis": "R", "current_child": "B",
+        "next1_axis": "Y", "next1_child": "P",
+        "next2_axis": "R", "next2_child": "R",
+        "topk": [
+            {"axisCol": 0, "rotation": 0, "score": 1000},
+        ],
+    }
+    p = tmp_path / "x.jsonl"
+    p.write_text(json.dumps(sample) + "\n")
+    ds = load_all(tmp_path, temperature=20.0)  # augment defaults to False
+    b1, q1, p1, v1 = ds[0]
+    b2, q2, p2, v2 = ds[0]
+    assert torch.equal(b1, b2)
+    assert torch.equal(q1, q2)
+    assert torch.equal(p1, p2)
+    assert float(v1) == float(v2)

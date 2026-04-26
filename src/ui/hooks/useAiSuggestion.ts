@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useGameStore } from '../store';
 import type { Move } from '../../game/types';
 import type { AiKind as Kind } from '../../ai/types';
+import type { AmaVariant } from '../../ai/wasm-ama/wasm-loader';
 
 // シングルトン Worker: Header のセレクタと Suggestion Hook が同じ Worker を
 // 共有し、set-ai で AI を切り替えると次の suggest からそれが使われる。
@@ -36,11 +37,11 @@ function getWorker(): Worker {
   return w;
 }
 
-export function setAiKind(kind: Kind): void {
+export function setAiKind(kind: Kind, preset?: string, variant?: AmaVariant): void {
   currentAiKind = kind;
   currentAiReady = false;
   for (const h of aiReadyHandlers) h(kind, false);
-  getWorker().postMessage({ type: 'set-ai', kind });
+  getWorker().postMessage({ type: 'set-ai', kind, preset, variant });
 }
 
 export function useAiSuggestion(topK = 5) {

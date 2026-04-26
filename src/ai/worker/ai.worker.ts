@@ -1,12 +1,14 @@
 import { HeuristicAI } from '../heuristic';
-import { MlAI } from '../ml/ml-ai';
+import { MlAI } from '../ml/ml-policy-ai';
+import { MlSearchAI } from '../ml/ml-search-ai';
 import { WasmAmaAI } from '../wasm-ama/wasm-ama-ai';
+import type { AmaVariant } from '../wasm-ama/wasm-loader';
 import type { AiKind as Kind, PuyoAI } from '../types';
 import type { GameState, Move } from '../../game/types';
 
 export type WorkerMessage =
   | { type: 'suggest'; id: number; state: GameState; topK: number }
-  | { type: 'set-ai'; kind: Kind };
+  | { type: 'set-ai'; kind: Kind; preset?: string; variant?: AmaVariant };
 
 export type WorkerResponse =
   | { type: 'suggest'; id: number; moves: Move[] }
@@ -15,7 +17,22 @@ export type WorkerResponse =
 const heuristic = new HeuristicAI();
 let active: PuyoAI = heuristic;
 const mlInstances: Partial<Record<'ml-v1' | 'ml-ama-v1', MlAI>> = {};
-let amaWasmInstance: WasmAmaAI | null = null;
+// バリアント別にインスタンスを持つ。各 WasmAmaAI は固定の variant に紐付く
+// (heap 上のバッファが variant 固有なため使い回せない)。
+const amaWasmInstances: Partial<Record<AmaVariant, WasmAmaAI>> = {};
+
+let mlSearchInstance: MlSearchAI | null = null;
+
+async function getOrInitMlSearch(): Promise<MlSearchAI> {
+  if (!mlSearchInstance) {
+    mlSearchInstance = new MlSearchAI({
+      modelUrl: '/models/policy-ama-v2/model.json',
+      K: 6,
+    });
+  }
+  await mlSearchInstance.init();
+  return mlSearchInstance;
+}
 
 async function getOrInitMl(kind: 'ml-v1' | 'ml-ama-v1'): Promise<MlAI> {
   let inst = mlInstances[kind];
@@ -27,16 +44,24 @@ async function getOrInitMl(kind: 'ml-v1' | 'ml-ama-v1'): Promise<MlAI> {
   return inst;
 }
 
-async function getOrInitAmaWasm(): Promise<WasmAmaAI> {
-  if (!amaWasmInstance) {
-    console.log('[ama-wasm worker] creating WasmAmaAI instance');
-    amaWasmInstance = new WasmAmaAI();
+async function getOrInitAmaWasm(
+  preset: string = 'build',
+  variant: AmaVariant = 'default',
+): Promise<WasmAmaAI> {
+  let inst = amaWasmInstances[variant];
+  if (!inst) {
+    console.log(`[ama-wasm worker] creating WasmAmaAI variant=${variant} preset=${preset}`);
+    inst = new WasmAmaAI(preset, variant);
+    amaWasmInstances[variant] = inst;
+  } else if (inst.preset !== preset) {
+    console.log(`[ama-wasm worker] switching preset ${inst.preset} -> ${preset} on variant=${variant}`);
+    await inst.setPreset(preset);
   }
-  console.log('[ama-wasm worker] init() start');
+  console.log(`[ama-wasm worker] init() start variant=${variant}`);
   const t0 = performance.now();
-  await amaWasmInstance.init();
+  await inst.init();
   console.log(`[ama-wasm worker] init() done in ${(performance.now() - t0).toFixed(0)}ms`);
-  return amaWasmInstance;
+  return inst;
 }
 
 export async function handleMessage(
@@ -51,9 +76,14 @@ export async function handleMessage(
         return;
       }
       if (msg.kind === 'ama-wasm') {
-        active = await getOrInitAmaWasm();
+        active = await getOrInitAmaWasm(msg.preset ?? 'build', msg.variant ?? 'default');
         console.log('[ama-wasm worker] active set, sending set-ai ok=true');
         send({ type: 'set-ai', kind: 'ama-wasm', ok: true });
+        return;
+      }
+      if (msg.kind === 'ml-ama-v2-search') {
+        active = await getOrInitMlSearch();
+        send({ type: 'set-ai', kind: 'ml-ama-v2-search', ok: true });
         return;
       }
       const ml = await getOrInitMl(msg.kind);

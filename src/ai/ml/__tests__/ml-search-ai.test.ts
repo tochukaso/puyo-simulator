@@ -23,7 +23,7 @@ describe.runIf(MODEL_OK)('MlSearchAI (via Node factory)', () => {
     const state = createInitialState(7);
     const moves = await ai.suggest(state, 1);
     expect(moves.length).toBe(1);
-    expect(moves[0].axisCol).toBeGreaterThanOrEqual(0);
-    expect(moves[0].axisCol).toBeLessThanOrEqual(5);
+    expect(moves[0]!.axisCol).toBeGreaterThanOrEqual(0);
+    expect(moves[0]!.axisCol).toBeLessThanOrEqual(5);
   }, 60_000);
 });

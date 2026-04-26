@@ -6,8 +6,8 @@ import { useGhostEnabled, useCeilingVisible } from '../../hooks/useUiPrefs';
 import { usePreviewMove } from '../../hooks/useAiPreview';
 import { useT } from '../../../i18n';
 import { ROWS, COLS, SPAWN_COL, VISIBLE_ROW_START } from '../../../game/constants';
-import { PUYO_COLORS, BG_COLOR, GRID_COLOR, DANGER_COLOR } from './colors';
-import type { Field, ActivePair, Move } from '../../../game/types';
+import { PUYO_COLORS, PUYO_LIGHT, PUYO_DARK, BG_COLOR, GRID_COLOR, DANGER_COLOR } from './colors';
+import type { Color, Field, ActivePair, Move } from '../../../game/types';
 import { ghostCells } from './ghost';
 
 export function Board() {
@@ -173,7 +173,7 @@ function draw(
       const landedAt = landedAtMap.get(k);
       const scale =
         landedAt !== undefined ? landingScale(now - landedAt) : ONE_SCALE;
-      drawPuyo(ctx, r, c, PUYO_COLORS[color], baseAlpha, cell, scale);
+      drawPuyo(ctx, r, c, color, baseAlpha, cell, scale);
       if (poppingSet.has(k)) {
         drawPopHighlight(ctx, r, c, cell, popPulse);
       }
@@ -198,16 +198,16 @@ function draw(
     const axisAlpha = axisRow < VISIBLE_ROW_START ? 0.5 : 1;
     const childRow = axisRow + dr;
     const childAlpha = childRow < VISIBLE_ROW_START ? 0.5 : 1;
-    drawPuyo(ctx, axisRow, axisCol, PUYO_COLORS[pair.axis], axisAlpha, cell);
-    drawPuyo(ctx, childRow, axisCol + dc, PUYO_COLORS[pair.child], childAlpha, cell);
+    drawPuyo(ctx, axisRow, axisCol, pair.axis, axisAlpha, cell);
+    drawPuyo(ctx, childRow, axisCol + dc, pair.child, childAlpha, cell);
   }
 
   const ghost = ghostCells(field, current as ActivePair | null, bestMove);
   if (ghost && current) {
-    const { pair } = current as { pair: { axis: string; child: string } };
+    const { pair } = current as { pair: { axis: Color; child: Color } };
     for (const p of ghost) {
       const color = p.kind === 'axis' ? pair.axis : pair.child;
-      drawPuyoGhost(ctx, p.row, p.col, PUYO_COLORS[color as keyof typeof PUYO_COLORS], cell);
+      drawPuyoGhost(ctx, p.row, p.col, color, cell);
     }
   }
 
@@ -244,6 +244,33 @@ function drawConnectors(ctx: CanvasRenderingContext2D, field: Field, cell: numbe
   }
 }
 
+// セル中央に「色の頭文字記号」を描画。fontSize はセルの 45%、
+// 白文字 + 暗色シャドウでコントラストを確保する。scale で squash 中も変形する。
+function drawSymbol(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  letter: Color,
+  cell: number,
+  scale: PuyoScale,
+  alpha: number,
+) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(cx, cy);
+  ctx.scale(scale.sx, scale.sy);
+  const size = Math.round(cell * 0.45);
+  ctx.font = `bold ${size}px ui-sans-serif, system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = Math.max(2, cell * 0.08);
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
+  ctx.strokeText(letter, 0, 0);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(letter, 0, 0);
+  ctx.restore();
+}
+
 interface PuyoScale {
   sx: number;
   sy: number;
@@ -267,7 +294,7 @@ function drawPuyo(
   ctx: CanvasRenderingContext2D,
   row: number,
   col: number,
-  color: string,
+  color: Color,
   alpha: number,
   cell: number,
   scale: PuyoScale = ONE_SCALE,
@@ -279,13 +306,35 @@ function drawPuyo(
   const r = cell / 2 - 2;
   const ry = r * scale.sy;
   const rx = r * scale.sx;
+  const centerY = baseY - ry;
+
+  // ラジアルグラデで本体に立体感。中心を少し上にオフセットして光が上から
+  // 当たっているように見せる(本家ぷよ寄り)。
+  const grad = ctx.createRadialGradient(
+    cx - rx * 0.25,
+    centerY - ry * 0.35,
+    Math.max(1, rx * 0.1),
+    cx,
+    centerY,
+    Math.max(rx, ry),
+  );
+  grad.addColorStop(0, PUYO_LIGHT[color]);
+  grad.addColorStop(0.55, PUYO_COLORS[color]);
+  grad.addColorStop(1, PUYO_DARK[color]);
+
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.fillStyle = color;
+  ctx.fillStyle = grad;
   ctx.beginPath();
-  ctx.ellipse(cx, baseY - ry, rx, ry, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, centerY, rx, ry, 0, 0, Math.PI * 2);
   ctx.fill();
+  // 暗色アウトライン
+  ctx.lineWidth = Math.max(1, cell * 0.04);
+  ctx.strokeStyle = PUYO_DARK[color];
+  ctx.stroke();
   ctx.restore();
+
+  drawSymbol(ctx, cx, centerY, color, cell, scale, alpha);
 }
 
 function drawPopHighlight(
@@ -322,17 +371,22 @@ function drawPuyoGhost(
   ctx: CanvasRenderingContext2D,
   row: number,
   col: number,
-  color: string,
+  color: Color,
   cell: number,
 ) {
   if (row < 0) return;
+  const cx = col * cell + cell / 2;
+  const cy = row * cell + cell / 2;
   ctx.save();
   ctx.globalAlpha = 0.35;
-  ctx.strokeStyle = color;
+  ctx.strokeStyle = PUYO_COLORS[color];
   ctx.lineWidth = 2;
   ctx.setLineDash([4, 3]);
   ctx.beginPath();
-  ctx.arc(col * cell + cell / 2, row * cell + cell / 2, cell / 2 - 2, 0, Math.PI * 2);
+  ctx.arc(cx, cy, cell / 2 - 2, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
+  // ゴーストにも色の頭文字を表示(本体より薄く)。setLineDash の影響を
+  // drawSymbol は受けない(restore してから呼ぶ + drawSymbol 内部で save)。
+  drawSymbol(ctx, cx, cy, color, cell, ONE_SCALE, 0.55);
 }

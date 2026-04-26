@@ -24,10 +24,12 @@ export default function App() {
           <Stats />
           <div className="flex gap-3 items-start justify-center w-full">
             <Board />
-            <NextQueue />
+            <div className="flex flex-col gap-2 items-stretch w-24 shrink-0">
+              <NextQueue />
+              <CandidateList />
+            </div>
           </div>
           <Controls />
-          <CandidateList />
         </div>
       </div>
     </div>

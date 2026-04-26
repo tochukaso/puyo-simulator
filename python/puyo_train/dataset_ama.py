@@ -21,8 +21,8 @@ VALUE_SCALE = 50000.0
 _COLOR_PERMS = list(permutations((0, 1, 2, 3)))
 
 
-def value_target_from_score(score: float) -> float:
-    return float(math.tanh(score / VALUE_SCALE))
+def value_target_from_score(score: float, scale: float = VALUE_SCALE) -> float:
+    return float(math.tanh(score / scale))
 
 
 def make_soft_policy(

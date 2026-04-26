@@ -132,3 +132,23 @@ def test_dataset_augmentation_disabled_yields_deterministic_samples(tmp_path):
     assert torch.equal(q1, q2)
     assert torch.equal(p1, p2)
     assert float(v1) == float(v2)
+
+
+def test_value_target_from_score_uses_scale():
+    """value_target_from_score must accept a scale parameter; default
+    scale=50000 preserves backward compat (v2 reproducibility)."""
+    from puyo_train.dataset_ama import value_target_from_score
+    import math
+
+    # Default scale = 50000
+    assert math.isclose(value_target_from_score(50000.0), math.tanh(1.0), abs_tol=1e-6)
+    # Custom scale = 200000 (used by v3 with topk score)
+    assert math.isclose(
+        value_target_from_score(200000.0, scale=200000.0),
+        math.tanh(1.0),
+        abs_tol=1e-6,
+    )
+    # Same input, different scale → different output
+    a = value_target_from_score(100000.0)  # default 50000
+    b = value_target_from_score(100000.0, scale=200000.0)
+    assert a != b

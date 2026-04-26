@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useGameStore } from '../../store';
 import { useAiSuggestion } from '../../hooks/useAiSuggestion';
+import { useT } from '../../../i18n';
 
 const UNDO_OPTIONS = [1, 2, 3, 5, 10] as const;
 
@@ -12,6 +13,7 @@ export function Controls() {
   const undo = useGameStore((s) => s.undo);
   const { moves, loading, aiReady } = useAiSuggestion(1);
   const [undoSteps, setUndoSteps] = useState(1);
+  const t = useT();
   const canUndo = historyLength > 0 && !animating;
   const effectiveSteps = Math.min(undoSteps, historyLength);
   const aiBest = moves[0] ?? null;
@@ -24,7 +26,7 @@ export function Controls() {
         className="px-3 py-1 bg-slate-700 rounded hover:bg-slate-600"
         onClick={() => dispatch({ type: 'rotateCCW' })}
       >
-        ↻ CCW
+        {t('controls.rotateCcw')}
       </button>
       <button
         className="px-3 py-1 bg-blue-600 rounded hover:bg-blue-500"
@@ -34,7 +36,7 @@ export function Controls() {
           commit({ axisCol: game.current.axisCol, rotation: game.current.rotation });
         }}
       >
-        ↓ 確定
+        {t('controls.commit')}
       </button>
       <button
         className="px-3 py-1 bg-emerald-600 rounded hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed"
@@ -43,28 +45,35 @@ export function Controls() {
           if (!aiBest) return;
           useGameStore.getState().commit(aiBest);
         }}
-        title={canAiCommit ? `AI最善手: 列${aiBest!.axisCol + 1} / 回転${aiBest!.rotation}` : 'AI 思考中…'}
+        title={
+          canAiCommit
+            ? t('controls.aiBestTitle', {
+                col: aiBest!.axisCol + 1,
+                rot: aiBest!.rotation,
+              })
+            : t('controls.aiThinking')
+        }
       >
-        ★ AI最善
+        {t('controls.aiBest')}
       </button>
       <div className="flex items-center gap-1 bg-slate-800 rounded px-1">
         <button
           className="px-2 py-1 bg-amber-600 rounded hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed"
           disabled={!canUndo}
           onClick={() => undo(effectiveSteps)}
-          aria-label={`${effectiveSteps} 手戻る`}
+          aria-label={t('controls.undoAria', { n: effectiveSteps })}
         >
-          ↶ 戻る
+          {t('controls.undo')}
         </button>
         <select
           className="bg-slate-900 text-xs rounded px-1 py-0.5"
           value={undoSteps}
           onChange={(e) => setUndoSteps(Number(e.target.value))}
-          aria-label="戻る手数"
+          aria-label={t('controls.undoStepsLabel')}
         >
           {UNDO_OPTIONS.map((n) => (
             <option key={n} value={n}>
-              {n} 手
+              {t('controls.stepsOption', { n })}
             </option>
           ))}
         </select>
@@ -73,10 +82,10 @@ export function Controls() {
       <button
         className="px-3 py-1 bg-red-600 rounded hover:bg-red-500"
         onClick={() => {
-          if (confirm('リセットしますか?')) reset();
+          if (confirm(t('controls.resetConfirm'))) reset();
         }}
       >
-        Reset
+        {t('controls.reset')}
       </button>
     </div>
   );

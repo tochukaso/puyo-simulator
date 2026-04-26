@@ -1,38 +1,45 @@
 import { beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 
-// jsdom 同梱の localStorage が一部メソッド(.clear, .key)を欠くケースが
-// あるため、テスト用に Map ベースの完全な Storage シムを毎テスト差し替える。
+// jsdom 同梱 / Node 22+ 内蔵の localStorage は一部メソッド (.clear, .key, length) を
+// 欠くため、テスト用に Map ベースの完全な Storage シムを毎テスト差し替える。
+// beforeEach で再生成してテスト間の状態リセットを保証する。
+class MemoryStorage implements Storage {
+  private store = new Map<string, string>();
+  get length() {
+    return this.store.size;
+  }
+  clear() {
+    this.store.clear();
+  }
+  getItem(key: string) {
+    return this.store.has(key) ? this.store.get(key)! : null;
+  }
+  key(index: number) {
+    return Array.from(this.store.keys())[index] ?? null;
+  }
+  removeItem(key: string) {
+    this.store.delete(key);
+  }
+  setItem(key: string, value: string) {
+    this.store.set(key, String(value));
+  }
+}
+
 beforeEach(() => {
-  const map = new Map<string, string>();
-  const storage: Storage = {
-    get length() {
-      return map.size;
-    },
-    key(i: number) {
-      return Array.from(map.keys())[i] ?? null;
-    },
-    getItem(k: string) {
-      return map.get(k) ?? null;
-    },
-    setItem(k: string, v: string) {
-      map.set(k, String(v));
-    },
-    removeItem(k: string) {
-      map.delete(k);
-    },
-    clear() {
-      map.clear();
-    },
-  };
-  Object.defineProperty(globalThis, 'localStorage', {
-    value: storage,
-    writable: true,
-    configurable: true,
-  });
-  Object.defineProperty(globalThis, 'sessionStorage', {
-    value: storage,
-    writable: true,
-    configurable: true,
-  });
+  for (const name of ['localStorage', 'sessionStorage'] as const) {
+    const storage = new MemoryStorage();
+    Object.defineProperty(globalThis, name, {
+      configurable: true,
+      writable: true,
+      value: storage,
+    });
+    if (typeof window !== 'undefined') {
+      Object.defineProperty(window, name, {
+        configurable: true,
+        writable: true,
+        value: storage,
+      });
+    }
+  }
 });

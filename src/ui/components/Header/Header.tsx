@@ -11,6 +11,14 @@ import {
   setTrainerMode,
   type TrainerMode,
 } from '../../hooks/useTrainerMode';
+import {
+  LANGUAGES,
+  LANGUAGE_LABELS,
+  setLang,
+  useLang,
+  useT,
+  type Lang,
+} from '../../../i18n';
 import type { AiKind as Kind } from '../../../ai/types';
 
 const STORAGE_KEY = 'puyo.ai.kind';
@@ -27,6 +35,8 @@ export function Header() {
   const ghost = useGhostEnabled();
   const ceiling = useCeilingVisible();
   const trainer = useTrainerMode();
+  const lang = useLang();
+  const t = useT();
 
   // 訓練モードが gtr のときは GTR 専用ビルドの ama-wasm(gtr プリセット)を強制使用する。
   // 専用ビルドは form::list を { GTR } に絞ってあるので、AI が GTR を作る方向にしか
@@ -41,17 +51,17 @@ export function Header() {
 
   return (
     <header className="p-3 border-b border-slate-800 flex justify-between items-center gap-3">
-      <span className="text-lg">Puyo Training</span>
+      <span className="text-lg">{t('app.title')}</span>
       <div className="flex items-center gap-3">
         <label className="text-sm flex items-center gap-1 select-none">
           <input
             type="checkbox"
-            aria-label="ゴースト"
+            aria-label={t('header.ghost')}
             checked={ghost}
             onChange={(e) => setGhostEnabled(e.target.checked)}
             className="accent-blue-500"
           />
-          ゴースト
+          {t('header.ghost')}
         </label>
         <label className="text-sm flex items-center gap-1 select-none">
           <input
@@ -76,7 +86,7 @@ export function Header() {
           </select>
         </label>
         <label className="text-sm flex items-center gap-2">
-          AI
+          {t('header.ai')}
           <select
             aria-label="AI"
             value={kind}
@@ -94,6 +104,21 @@ export function Header() {
             <option value="ml-ama-v1">ML (ama-distilled-v1)</option>
             <option value="ml-ama-v2-search">ML (ama-v2 + search)</option>
             <option value="ama-wasm">ama (WASM)</option>
+          </select>
+        </label>
+        <label className="text-sm flex items-center gap-2">
+          <span className="sr-only">{t('header.language')}</span>
+          <select
+            aria-label={t('header.language')}
+            value={lang}
+            onChange={(e) => setLang(e.target.value as Lang)}
+            className="bg-slate-800 text-slate-100 border border-slate-700 rounded px-2 py-1"
+          >
+            {LANGUAGES.map((code) => (
+              <option key={code} value={code}>
+                {LANGUAGE_LABELS[code]}
+              </option>
+            ))}
           </select>
         </label>
       </div>

@@ -4,6 +4,7 @@ import { useGestures } from '../../hooks/useGestures';
 import { useAiSuggestion } from '../../hooks/useAiSuggestion';
 import { useGhostEnabled } from '../../hooks/useUiPrefs';
 import { usePreviewMove } from '../../hooks/useAiPreview';
+import { useT } from '../../../i18n';
 import { ROWS, COLS, SPAWN_COL, VISIBLE_ROW_START } from '../../../game/constants';
 import { PUYO_COLORS, BG_COLOR, GRID_COLOR, DANGER_COLOR } from './colors';
 import type { Field, ActivePair, Move } from '../../../game/types';
@@ -20,6 +21,7 @@ export function Board() {
   const { moves } = useAiSuggestion(5);
   const ghostEnabled = useGhostEnabled();
   const previewMove = usePreviewMove();
+  const t = useT();
   // CandidateList で hover/選択している候補があればそれを優先表示。なければ
   // トップ候補にフォールバック。
   const bestMove = ghostEnabled ? (previewMove ?? moves[0] ?? null) : null;
@@ -73,13 +75,13 @@ export function Board() {
           height={ROWS * cell}
           className="bg-slate-900 block"
         />
-        {chainTexts.map((t) => (
+        {chainTexts.map((entry) => (
           <div
-            key={t.id}
+            key={entry.id}
             className="chain-text-overlay"
-            style={{ left: (t.col + 0.5) * cell, top: (t.row - 0.5) * cell }}
+            style={{ left: (entry.col + 0.5) * cell, top: (entry.row - 0.5) * cell }}
           >
-            {t.chainIndex}れんさ!
+            {t('board.chain', { n: entry.chainIndex })}
           </div>
         ))}
       </div>

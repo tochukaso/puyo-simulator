@@ -51,7 +51,10 @@ def apply_color_permutation(
     perm: tuple[int, int, int, int],
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """perm[i] = new index that color i should be mapped to."""
-    assert len(perm) == 4 and sorted(perm) == [0, 1, 2, 3]
+    if len(perm) != 4:
+        raise ValueError(f"perm must have length 4, got {len(perm)}")
+    if sorted(perm) != [0, 1, 2, 3]:
+        raise ValueError(f"perm must be a permutation of [0,1,2,3], got {perm}")
     new = np.zeros_like(board)
     # Permute color channels 0..3, leave 4..10 alone.
     for old in range(4):

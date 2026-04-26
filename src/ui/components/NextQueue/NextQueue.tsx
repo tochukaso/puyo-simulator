@@ -1,5 +1,6 @@
 import { useGameStore } from '../../store';
-import { PUYO_COLORS } from '../Board/colors';
+import { PUYO_COLORS, PUYO_LIGHT, PUYO_DARK } from '../Board/colors';
+import type { Color } from '../../../game/types';
 
 // 本家ぷよぷよと同じく、盤面の右側に NEXT(直近)を上、NEXT-NEXT(その次)を
 // 下に縦並びで表示する。NEXT-NEXT は本家どおりひとまわり小さく表示して
@@ -20,7 +21,7 @@ function PairDisplay({
   pair,
   dotSize,
 }: {
-  pair: { axis: string; child: string } | undefined;
+  pair: { axis: Color; child: Color } | undefined;
   dotSize: number;
 }) {
   return (
@@ -31,9 +32,27 @@ function PairDisplay({
   );
 }
 
-function Dot({ color, size }: { color: string | undefined; size: number }) {
-  const style = { width: size, height: size };
+function Dot({ color, size }: { color: Color | undefined; size: number }) {
+  const style: React.CSSProperties = { width: size, height: size };
   if (!color) return <div className="rounded-full bg-slate-700" style={style} />;
-  const hex = PUYO_COLORS[color as keyof typeof PUYO_COLORS];
-  return <div className="rounded-full" style={{ ...style, backgroundColor: hex }} />;
+
+  // Board.tsx の drawPuyo と同じ見た目。CSS radial-gradient + 暗色 border +
+  // 中央に頭文字。光源は左上に置いて canvas 側と揃える。
+  const fontSize = Math.round(size * 0.5);
+  const borderWidth = Math.max(1, Math.round(size * 0.08));
+  return (
+    <div
+      className="rounded-full flex items-center justify-center font-bold text-white select-none"
+      style={{
+        ...style,
+        background: `radial-gradient(circle at 30% 25%, ${PUYO_LIGHT[color]} 0%, ${PUYO_COLORS[color]} 55%, ${PUYO_DARK[color]} 100%)`,
+        border: `${borderWidth}px solid ${PUYO_DARK[color]}`,
+        fontSize,
+        lineHeight: 1,
+        textShadow: '0 0 2px rgba(0,0,0,0.85), 0 1px 1px rgba(0,0,0,0.6)',
+      }}
+    >
+      {color}
+    </div>
+  );
 }

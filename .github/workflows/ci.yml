@@ -1,18 +1,43 @@
 name: CI
+
 on:
-  push: { branches: [main] }
+  push:
+    branches: [main]
   pull_request:
+
+# 同じブランチで新しい push が来たら走行中のジョブをキャンセル(古い結果を待たない)。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # Pin third-party actions by full commit SHA. タグ書き換えによるサプライ
+      # チェーン攻撃を避けるため、必ず SHA を使い、隣に検証済みのバージョンを
+      # コメントしておく。
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 20
           cache: npm
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run test
-      - run: npm run build
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test
+
+      # build は内部で `tsc -b && vite build` を実行するため、型検査も同時に走る。
+      - name: Build
+        run: npm run build

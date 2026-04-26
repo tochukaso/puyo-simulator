@@ -5,7 +5,7 @@ from puyo_train.model_v2 import PolicyValueNetV2
 
 def test_forward_shapes():
     net = PolicyValueNetV2()
-    board = torch.zeros(4, 13, 6, 7)
+    board = torch.zeros(4, 13, 6, 11)
     queue = torch.zeros(4, 16)
     policy, value = net(board, queue)
     assert policy.shape == (4, 22)
@@ -20,7 +20,7 @@ def test_param_count_around_1m():
 
 def test_loss_finite_and_grad():
     net = PolicyValueNetV2()
-    board = torch.zeros(2, 13, 6, 7)
+    board = torch.zeros(2, 13, 6, 11)
     queue = torch.zeros(2, 16)
     policy_target = torch.zeros(2, 22)
     policy_target[:, 5] = 1.0

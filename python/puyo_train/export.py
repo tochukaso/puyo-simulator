@@ -60,8 +60,8 @@ def export_to_onnx(ckpt_path: Path, onnx_path: Path) -> None:
     net.eval()
     wrapped = _NCHWExport(net).eval()
 
-    # NCHW dummy input: [B, C=7, H=13, W=6]
-    dummy_board = torch.zeros(1, 7, 13, 6)
+    # NCHW dummy input: [B, C=BOARD_C, H=13, W=6]
+    dummy_board = torch.zeros(1, cls.BOARD_C, 13, 6)
     dummy_queue = torch.zeros(1, 16)
 
     onnx_path.parent.mkdir(parents=True, exist_ok=True)

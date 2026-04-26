@@ -152,3 +152,58 @@ def test_value_target_from_score_uses_scale():
     a = value_target_from_score(100000.0)  # default 50000
     b = value_target_from_score(100000.0, scale=200000.0)
     assert a != b
+
+
+def test_dataset_value_source_topk_uses_topk_score(tmp_path):
+    """When value_source='topk_score', value_target is derived from
+    row['topk'][0]['score'] with scale=200000 (not from final_score)."""
+    import json
+    import math
+    from puyo_train.dataset_ama import load_all
+
+    sample = {
+        "field": ["......"] * 13,
+        "current_axis": "R", "current_child": "B",
+        "next1_axis": "Y", "next1_child": "P",
+        "next2_axis": "R", "next2_child": "R",
+        "topk": [
+            {"axisCol": 0, "rotation": 0, "score": 100000},
+            {"axisCol": 1, "rotation": 0, "score": 50000},
+        ],
+        "final_score": 0,  # final_score is zero — would yield value 0 under default
+    }
+    p = tmp_path / "x.jsonl"
+    p.write_text(json.dumps(sample) + "\n")
+
+    # Default (value_source='final_score'): final_score=0 → tanh(0)=0
+    ds_final = load_all(tmp_path, temperature=20.0, value_source="final_score")
+    _, _, _, v_final = ds_final[0]
+    assert float(v_final) == 0.0
+
+    # value_source='topk_score': topk[0].score=100000, scale=200000 → tanh(0.5)
+    ds_topk = load_all(tmp_path, temperature=20.0, value_source="topk_score")
+    _, _, _, v_topk = ds_topk[0]
+    assert math.isclose(float(v_topk), math.tanh(0.5), abs_tol=1e-5)
+
+
+def test_dataset_value_source_default_is_final_score(tmp_path):
+    """Without value_source argument, behavior matches v2 (final_score-based)."""
+    import json
+    import math
+    from puyo_train.dataset_ama import load_all
+
+    sample = {
+        "field": ["......"] * 13,
+        "current_axis": "R", "current_child": "B",
+        "next1_axis": "Y", "next1_child": "P",
+        "next2_axis": "R", "next2_child": "R",
+        "topk": [{"axisCol": 0, "rotation": 0, "score": 999999}],
+        "final_score": 50000,
+    }
+    p = tmp_path / "x.jsonl"
+    p.write_text(json.dumps(sample) + "\n")
+
+    ds = load_all(tmp_path, temperature=20.0)  # no value_source
+    _, _, _, v = ds[0]
+    # final_score=50000, default scale=50000 → tanh(1.0)
+    assert math.isclose(float(v), math.tanh(1.0), abs_tol=1e-5)

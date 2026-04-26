@@ -65,7 +65,13 @@ def _row_to_state(row: dict) -> dict:
 
 
 class AmaDataset(Dataset):
-    def __init__(self, files: list[Path], temperature: float = 100.0, augment: bool = False):
+    def __init__(
+        self,
+        files: list[Path],
+        temperature: float = 100.0,
+        augment: bool = False,
+        value_source: str = "final_score",
+    ):
         rows: list[dict] = []
         skipped = 0
         for f in files:
@@ -83,6 +89,7 @@ class AmaDataset(Dataset):
         self.rows = rows
         self.temperature = temperature
         self.augment = augment
+        self.value_source = value_source
 
     def __len__(self) -> int:
         return len(self.rows)
@@ -95,7 +102,12 @@ class AmaDataset(Dataset):
         scores = [c["score"] for c in topk]
         indices = [move_to_action_index(c["axisCol"], c["rotation"]) for c in topk]
         soft_policy = make_soft_policy(scores, indices, self.temperature)
-        value = value_target_from_score(float(row.get("final_score", 0.0)))
+        if self.value_source == "topk_score":
+            topk = row.get("topk") or []
+            top_score = float(topk[0].get("score", 0.0)) if topk else 0.0
+            value = value_target_from_score(top_score, scale=200000.0)
+        else:
+            value = value_target_from_score(float(row.get("final_score", 0.0)))
         if self.augment:
             if random.random() < 0.5:
                 board, queue, soft_policy = apply_lr_flip(board, queue, soft_policy)
@@ -109,8 +121,13 @@ class AmaDataset(Dataset):
         )
 
 
-def load_all(data_dir: Path, temperature: float = 100.0, augment: bool = False) -> AmaDataset:
+def load_all(
+    data_dir: Path,
+    temperature: float = 100.0,
+    augment: bool = False,
+    value_source: str = "final_score",
+) -> AmaDataset:
     files = sorted(Path(data_dir).glob("*.jsonl"))
     if not files:
         raise FileNotFoundError(f"no JSONL files in {data_dir}")
-    return AmaDataset(files, temperature=temperature, augment=augment)
+    return AmaDataset(files, temperature=temperature, augment=augment, value_source=value_source)

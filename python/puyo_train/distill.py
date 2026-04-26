@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 import torch
@@ -38,12 +39,13 @@ def run_distillation(
     alpha: float = 1.0,
     temperature: float = 20.0,
     augment: bool = True,
+    value_source: Literal["final_score", "topk_score"] = "final_score",
 ) -> list[dict]:
     torch.manual_seed(seed)
     random.seed(seed)
     np.random.seed(seed)
 
-    ds = load_all(data_dir, temperature=temperature, augment=augment)
+    ds = load_all(data_dir, temperature=temperature, augment=augment, value_source=value_source)
     n = len(ds)
     idx = list(range(n))
     random.shuffle(idx)

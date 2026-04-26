@@ -17,6 +17,11 @@ def main() -> None:
     p.add_argument("--device", type=str, default="mps")
     p.add_argument("--temperature", type=float, default=20.0)
     p.add_argument("--no-augment", action="store_true")
+    p.add_argument(
+        "--value-source",
+        choices=["final_score", "topk_score"],
+        default="final_score",
+    )
     args = p.parse_args()
 
     run_distillation(
@@ -29,6 +34,7 @@ def main() -> None:
         val_fraction=args.val,
         temperature=args.temperature,
         augment=not args.no_augment,
+        value_source=args.value_source,
     )
 
 

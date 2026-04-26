@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useGameStore, type PoppingCell, type LandedCell, LANDING_BOUNCE_MS } from '../../store';
 import { useGestures } from '../../hooks/useGestures';
 import { useAiSuggestion } from '../../hooks/useAiSuggestion';
-import { useGhostEnabled } from '../../hooks/useUiPrefs';
+import { useGhostEnabled, useCeilingVisible } from '../../hooks/useUiPrefs';
 import { ROWS, COLS, SPAWN_COL, VISIBLE_ROW_START } from '../../../game/constants';
 import { PUYO_COLORS, BG_COLOR, GRID_COLOR, DANGER_COLOR } from './colors';
 import type { Field, ActivePair, Move } from '../../../game/types';
@@ -18,7 +18,16 @@ export function Board() {
   const landedCells = useGameStore((s) => s.landedCells);
   const { moves } = useAiSuggestion(5);
   const ghostEnabled = useGhostEnabled();
+  const ceilingVisible = useCeilingVisible();
   const bestMove = ghostEnabled ? (moves[0] ?? null) : null;
+
+  // 天井(row 0)を隠すときは描画全体を 1 セル分上にずらして、
+  // canvas / wrapper の高さも 1 セル縮める。row 0 由来の描画(背景帯・
+  // DANGER 枠・天井段に居る軸ぷよなど)はクリップで自然に切れる。
+  const visibleRows = ceilingVisible ? ROWS : ROWS - 1;
+  const yOffset = ceilingVisible ? 0 : -cell;
+  const boardWidth = COLS * cell;
+  const boardHeight = visibleRows * cell;
 
   useGestures(wrapperRef);
 
@@ -42,7 +51,17 @@ export function Board() {
     let rafId = 0;
     const render = () => {
       const now = Date.now();
-      draw(ctx, game.field, game.current, cell, bestMove, poppingCells, landedCells, now);
+      draw(
+        ctx,
+        game.field,
+        game.current,
+        cell,
+        bestMove,
+        poppingCells,
+        landedCells,
+        yOffset,
+        now,
+      );
       // 着地アニメ・点滅アニメのどちらかが進行中なら次フレームを予約。
       const hasLandingActive = landedCells.some(
         (c) => now - c.landedAt < LANDING_BOUNCE_MS,
@@ -55,25 +74,25 @@ export function Board() {
     return () => {
       if (rafId) cancelAnimationFrame(rafId);
     };
-  }, [game, cell, bestMove, poppingCells, landedCells]);
+  }, [game, cell, bestMove, poppingCells, landedCells, yOffset]);
 
   return (
     <div ref={wrapperRef} className="w-full max-w-sm">
       <div
         className="relative mx-auto"
-        style={{ width: COLS * cell, height: ROWS * cell }}
+        style={{ width: boardWidth, height: boardHeight }}
       >
         <canvas
           ref={canvasRef}
-          width={COLS * cell}
-          height={ROWS * cell}
+          width={boardWidth}
+          height={boardHeight}
           className="bg-slate-900 block"
         />
         {chainTexts.map((t) => (
           <div
             key={t.id}
             className="chain-text-overlay"
-            style={{ left: (t.col + 0.5) * cell, top: (t.row - 0.5) * cell }}
+            style={{ left: (t.col + 0.5) * cell, top: (t.row - 0.5) * cell + yOffset }}
           >
             {t.chainIndex}れんさ!
           </div>
@@ -91,8 +110,14 @@ function draw(
   bestMove: Move | null,
   poppingCells: readonly PoppingCell[],
   landedCells: readonly LandedCell[],
+  yOffset: number,
   now: number,
 ) {
+  // 全体を yOffset (0 or -cell) ずらす。天井隠し時は row 0 由来の描画が
+  // canvas 上端より上に逃げ、自動的にクリップされる。
+  ctx.save();
+  ctx.translate(0, yOffset);
+
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, COLS * cell, ROWS * cell);
 
@@ -179,6 +204,8 @@ function draw(
       drawPuyoGhost(ctx, p.row, p.col, PUYO_COLORS[color as keyof typeof PUYO_COLORS], cell);
     }
   }
+
+  ctx.restore();
 }
 
 // 隣接する同色ぷよ同士を太いバーで繋ぐ(本家ぷよぷよの「連結表現」)。

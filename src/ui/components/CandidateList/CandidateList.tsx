@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAiSuggestion } from '../../hooks/useAiSuggestion';
 import { useGameStore } from '../../store';
 import { setPreviewMove, usePreviewMove } from '../../hooks/useAiPreview';
+import { useT } from '../../../i18n';
 import type { Move } from '../../../game/types';
 
 export function CandidateList() {
@@ -9,6 +10,7 @@ export function CandidateList() {
   const commit = useGameStore((s) => s.commit);
   const previewMove = usePreviewMove();
   const [open, setOpen] = useState(false);
+  const t = useT();
 
   // 新しいツモになる(= moves が再計算される)タイミングで preview をクリア。
   // 古い手のゴーストが新しいぷよ色で描かれる紛らわしさを避ける。
@@ -17,9 +19,9 @@ export function CandidateList() {
   }, [moves]);
 
   const status = !aiReady
-    ? `(${aiKind} 読み込み中…)`
+    ? `(${t('candidates.loading', { aiKind })})`
     : loading
-      ? '(思考中)'
+      ? t('candidates.thinking')
       : `(${moves.length})`;
 
   // 候補内のトップ手を 100% として相対表示。各 AI でスコアのスケール
@@ -38,7 +40,9 @@ export function CandidateList() {
         className="w-full p-2 text-sm text-slate-300 flex justify-between items-center"
         onClick={() => setOpen(!open)}
       >
-        <span>AI候補 {status}</span>
+        <span>
+          {t('candidates.title')} {status}
+        </span>
         <span>{open ? '▼' : '▲'}</span>
       </button>
       {open && (
@@ -64,7 +68,9 @@ export function CandidateList() {
               >
                 <div>
                   <span className="text-slate-400 mr-2">{i + 1}.</span>
-                  <span>列{m.axisCol + 1} / 回転{m.rotation}</span>
+                  <span>
+                    {t('candidates.colRot', { col: m.axisCol + 1, rot: m.rotation })}
+                  </span>
                   <div className="text-xs text-slate-400">{m.reason}</div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -78,7 +84,7 @@ export function CandidateList() {
                       commit(m);
                     }}
                   >
-                    実行
+                    {t('candidates.execute')}
                   </button>
                 </div>
               </li>

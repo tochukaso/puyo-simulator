@@ -12,13 +12,19 @@ export const LANGUAGE_LABELS: Record<Lang, string> = {
 export interface Dict {
   'app.title': string;
   'header.ghost': string;
-  'header.ai': string;
+  'header.ceiling': string;
+  'header.trainer': string;
+  'header.trainerOff': string;
+  'header.trainerGtr': string;
   'header.language': string;
   'stats.score': string;
   'stats.chain': string;
   'stats.max': string;
   'stats.total': string;
   'stats.gameOver': string;
+  'controls.moveLeft': string;
+  'controls.moveRight': string;
+  'controls.softDrop': string;
   'controls.rotateCcw': string;
   'controls.commit': string;
   'controls.aiBest': string;
@@ -42,13 +48,19 @@ export const translations: Record<Lang, Dict> = {
   ja: {
     'app.title': 'ぷよトレーニング',
     'header.ghost': 'ゴースト',
-    'header.ai': 'AI',
+    'header.ceiling': '天井',
+    'header.trainer': 'テンプレ',
+    'header.trainerOff': 'なし',
+    'header.trainerGtr': 'GTR',
     'header.language': '言語',
     'stats.score': 'スコア',
     'stats.chain': '連鎖',
     'stats.max': '最大',
     'stats.total': '合計',
     'stats.gameOver': 'ゲームオーバー',
+    'controls.moveLeft': '← 左',
+    'controls.moveRight': '右 →',
+    'controls.softDrop': '↓ 1段下',
     'controls.rotateCcw': '↻ 左回転',
     'controls.commit': '↓ 確定',
     'controls.aiBest': '★ AI最善',
@@ -70,13 +82,19 @@ export const translations: Record<Lang, Dict> = {
   en: {
     'app.title': 'Puyo Training',
     'header.ghost': 'Ghost',
-    'header.ai': 'AI',
+    'header.ceiling': 'Ceiling',
+    'header.trainer': 'Template',
+    'header.trainerOff': 'None',
+    'header.trainerGtr': 'GTR',
     'header.language': 'Language',
     'stats.score': 'Score',
     'stats.chain': 'Chain',
     'stats.max': 'Max',
     'stats.total': 'Total',
     'stats.gameOver': 'GAME OVER',
+    'controls.moveLeft': '← Left',
+    'controls.moveRight': 'Right →',
+    'controls.softDrop': '↓ Down',
     'controls.rotateCcw': '↻ CCW',
     'controls.commit': '↓ Drop',
     'controls.aiBest': '★ AI Best',
@@ -98,13 +116,19 @@ export const translations: Record<Lang, Dict> = {
   zh: {
     'app.title': '噗哟训练',
     'header.ghost': '幽灵预览',
-    'header.ai': 'AI',
+    'header.ceiling': '顶部',
+    'header.trainer': '模板',
+    'header.trainerOff': '无',
+    'header.trainerGtr': 'GTR',
     'header.language': '语言',
     'stats.score': '得分',
     'stats.chain': '连锁',
     'stats.max': '最大',
     'stats.total': '合计',
     'stats.gameOver': '游戏结束',
+    'controls.moveLeft': '← 左移',
+    'controls.moveRight': '右移 →',
+    'controls.softDrop': '↓ 下移',
     'controls.rotateCcw': '↻ 左旋',
     'controls.commit': '↓ 确定',
     'controls.aiBest': '★ AI最佳',
@@ -126,13 +150,19 @@ export const translations: Record<Lang, Dict> = {
   ko: {
     'app.title': '뿌요 트레이닝',
     'header.ghost': '고스트',
-    'header.ai': 'AI',
+    'header.ceiling': '천장',
+    'header.trainer': '템플릿',
+    'header.trainerOff': '없음',
+    'header.trainerGtr': 'GTR',
     'header.language': '언어',
     'stats.score': '점수',
     'stats.chain': '연쇄',
     'stats.max': '최대',
     'stats.total': '합계',
     'stats.gameOver': '게임 오버',
+    'controls.moveLeft': '← 좌',
+    'controls.moveRight': '우 →',
+    'controls.softDrop': '↓ 한칸',
     'controls.rotateCcw': '↻ 좌회전',
     'controls.commit': '↓ 확정',
     'controls.aiBest': '★ AI 최선',

@@ -2,45 +2,47 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Header } from '../Header';
+import { setTrainerMode } from '../../../hooks/useTrainerMode';
 
 vi.mock('../../../hooks/useAiSuggestion', () => ({
   setAiKind: vi.fn(),
   useAiSuggestion: () => ({ moves: [], loading: false }),
 }));
 
-describe('Header AI selector (3-way)', () => {
+describe('Header', () => {
   beforeEach(() => {
     localStorage.clear();
+    setTrainerMode('gtr');
   });
 
-  it('defaults to ml-ama-v1 when localStorage is empty', () => {
+  it('does not render an AI model selector', () => {
     render(<Header />);
-    const select = screen.getByLabelText('AI') as HTMLSelectElement;
-    expect(select.value).toBe('ml-ama-v1');
+    // 訓練ラベルも AI 選択もないので、AI / 訓練 という aria-label の <select> は存在しない
+    expect(screen.queryByLabelText('AI')).toBeNull();
+    expect(screen.queryByLabelText('訓練')).toBeNull();
   });
 
-  it('reads ml-v1 from localStorage', () => {
-    localStorage.setItem('puyo.ai.kind', 'ml-v1');
+  it('renders Ghost and Ceiling checkboxes', () => {
     render(<Header />);
-    const select = screen.getByLabelText('AI') as HTMLSelectElement;
-    expect(select.value).toBe('ml-v1');
+    expect(screen.getByLabelText('Ghost')).toBeInTheDocument();
+    expect(screen.getByLabelText('Ceiling')).toBeInTheDocument();
   });
 
-  it('reads heuristic from localStorage', () => {
-    localStorage.setItem('puyo.ai.kind', 'heuristic');
+  it('defaults trainer template select to GTR', () => {
     render(<Header />);
-    const select = screen.getByLabelText('AI') as HTMLSelectElement;
-    expect(select.value).toBe('heuristic');
+    const select = screen.getByLabelText('Template') as HTMLSelectElement;
+    expect(select.value).toBe('gtr');
   });
 
-  it('persists change to localStorage and calls setAiKind', async () => {
+  it('switches AI engine variant when trainer template changes', async () => {
     const { setAiKind } = (await import('../../../hooks/useAiSuggestion')) as unknown as {
       setAiKind: ReturnType<typeof vi.fn>;
     };
+    setAiKind.mockClear();
     render(<Header />);
-    await userEvent.selectOptions(screen.getByLabelText('AI'), 'ml-v1');
-    expect(localStorage.getItem('puyo.ai.kind')).toBe('ml-v1');
-    // 訓練 off の通常時は default バリアント + preset='build' で AI が反映される
-    expect(setAiKind).toHaveBeenCalledWith('ml-v1', 'build', 'default');
+    // 初回 effect で gtr-only が呼ばれる
+    expect(setAiKind).toHaveBeenLastCalledWith('ama-wasm', 'gtr', 'gtr-only');
+    await userEvent.selectOptions(screen.getByLabelText('Template'), 'off');
+    expect(setAiKind).toHaveBeenLastCalledWith('ama-wasm', 'build', 'default');
   });
 });

@@ -21,7 +21,31 @@ export function Controls() {
   const canAiCommit = aiReady && !loading && !animating && aiBest !== null;
 
   return (
-    <div className="flex flex-wrap gap-2 items-center">
+    <div className="flex flex-col gap-2 w-full">
+      <div className="grid grid-cols-3 gap-2 w-full sm:max-w-md sm:mx-auto">
+        <button
+          className="py-3 bg-slate-700 rounded hover:bg-slate-600 active:bg-slate-500 text-base touch-manipulation select-none"
+          onClick={() => dispatch({ type: 'moveLeft' })}
+          aria-label={t('controls.moveLeft')}
+        >
+          {t('controls.moveLeft')}
+        </button>
+        <button
+          className="py-3 bg-slate-700 rounded hover:bg-slate-600 active:bg-slate-500 text-base touch-manipulation select-none"
+          onClick={() => dispatch({ type: 'softDrop' })}
+          aria-label={t('controls.softDrop')}
+        >
+          {t('controls.softDrop')}
+        </button>
+        <button
+          className="py-3 bg-slate-700 rounded hover:bg-slate-600 active:bg-slate-500 text-base touch-manipulation select-none"
+          onClick={() => dispatch({ type: 'moveRight' })}
+          aria-label={t('controls.moveRight')}
+        >
+          {t('controls.moveRight')}
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-2 items-center">
       <button
         className="px-3 py-1 bg-slate-700 rounded hover:bg-slate-600"
         onClick={() => dispatch({ type: 'rotateCCW' })}
@@ -87,6 +111,7 @@ export function Controls() {
       >
         {t('controls.reset')}
       </button>
+      </div>
     </div>
   );
 }

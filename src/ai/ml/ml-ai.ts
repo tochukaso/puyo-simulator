@@ -47,7 +47,7 @@ export class MlAI implements PuyoAI {
     const tf = await import('@tensorflow/tfjs');
     const model = await tf.loadGraphModel(this.modelUrl);
     this.model = model as unknown as TfModel;
-    const board = tf.zeros([1, 13, 6, 7]);
+    const board = tf.zeros([1, 13, 6, 11]);
     const queue = tf.zeros([1, 16]);
     const warm = model.predict([board, queue]) as unknown as { dispose: () => void }[];
     for (const t of warm) t.dispose();
@@ -60,7 +60,7 @@ export class MlAI implements PuyoAI {
     if (state.current === null) return [];
     const { board, queue, legalMask } = encodeState(state);
     const tf = await import('@tensorflow/tfjs');
-    const boardT = tf.tensor(board, [1, 13, 6, 7]);
+    const boardT = tf.tensor(board, [1, 13, 6, 11]);
     const queueT = tf.tensor(queue, [1, 16]);
     const outs = this.model.predict([boardT, queueT]) as unknown as Array<{
       size: number;

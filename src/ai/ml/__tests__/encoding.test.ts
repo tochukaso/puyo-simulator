@@ -28,20 +28,20 @@ function makeState(overrides: Partial<GameState> = {}): GameState {
 }
 
 describe('encodeState', () => {
-  it('BOARD_CHANNELS is 7, COLOR_ORDER has 4 colors', () => {
-    expect(BOARD_CHANNELS).toBe(7);
+  it('BOARD_CHANNELS is 11, COLOR_ORDER has 4 colors', () => {
+    expect(BOARD_CHANNELS).toBe(11);
     expect(COLOR_ORDER).toEqual(['R', 'B', 'Y', 'P']);
   });
 
   it('空盤面: empty チャンネルが全マス 1、色チャンネルは 0', () => {
     const e = encodeState(makeState());
-    expect(e.board.length).toBe(13 * 6 * 7);
+    expect(e.board.length).toBe(13 * 6 * 11);
     for (let r = 0; r < 13; r++) {
       for (let c = 0; c < 6; c++) {
         for (let ch = 0; ch < 4; ch++) {
-          expect(e.board[r * 42 + c * 7 + ch]).toBe(0);
+          expect(e.board[r * 66 + c * 11 + ch]).toBe(0);
         }
-        expect(e.board[r * 42 + c * 7 + 4]).toBe(1);
+        expect(e.board[r * 66 + c * 11 + 4]).toBe(1);
       }
     }
   });
@@ -49,7 +49,7 @@ describe('encodeState', () => {
   it('R を (5,3) に置くと R チャンネルが立ち、空チャンネルが落ちる', () => {
     const field = withCell(createEmptyField(), 5, 3, 'R');
     const e = encodeState(makeState({ field }));
-    const off = 5 * 42 + 3 * 7;
+    const off = 5 * 66 + 3 * 11;
     expect(e.board[off + 0]).toBe(1);
     expect(e.board[off + 4]).toBe(0);
   });
@@ -58,8 +58,8 @@ describe('encodeState', () => {
     const e = encodeState(makeState());
     for (let r = 0; r < 13; r++) {
       for (let c = 0; c < 6; c++) {
-        expect(e.board[r * 42 + c * 7 + 5]).toBe(0);
-        expect(e.board[r * 42 + c * 7 + 6]).toBeCloseTo(1 / 3);
+        expect(e.board[r * 66 + c * 11 + 5]).toBe(0);
+        expect(e.board[r * 66 + c * 11 + 6]).toBeCloseTo(1 / 3);
       }
     }
   });

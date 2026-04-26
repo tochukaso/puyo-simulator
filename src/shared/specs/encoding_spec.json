@@ -11,7 +11,7 @@
         ]
       },
       "expected": {
-        "board_shape": [13, 6, 7],
+        "board_shape": [13, 6, 11],
         "queue_shape": [16],
         "board_samples": [
           { "r": 0, "c": 0, "ch": 4, "value": 1.0 },
@@ -39,7 +39,7 @@
         ]
       },
       "expected": {
-        "board_shape": [13, 6, 7],
+        "board_shape": [13, 6, 11],
         "queue_shape": [16],
         "board_samples": [
           { "r": 5, "c": 3, "ch": 0, "value": 1.0 },

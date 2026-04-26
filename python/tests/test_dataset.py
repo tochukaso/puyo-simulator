@@ -46,7 +46,7 @@ def test_dataset_loads_jsonl(tmp_path: Path):
     ds = SelfPlayDataset([path])
     assert len(ds) == 5
     board, queue, action, value = ds[3]
-    assert board.shape == (13, 6, 7)
+    assert board.shape == (13, 6, 11)
     assert queue.shape == (16,)
     assert isinstance(action.item(), int)
     assert action.item() == 3
@@ -62,7 +62,7 @@ def test_dataloader_batches(tmp_path: Path):
     batches = list(loader)
     assert len(batches) == 5
     b, q, a, v = batches[0]
-    assert b.shape == (4, 13, 6, 7)
+    assert b.shape == (4, 13, 6, 11)
     assert q.shape == (4, 16)
     assert a.shape == (4,)
     assert v.shape == (4,)

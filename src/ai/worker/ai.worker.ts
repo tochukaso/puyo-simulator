@@ -1,5 +1,6 @@
 import { HeuristicAI } from '../heuristic';
-import { MlAI } from '../ml/ml-ai';
+import { MlAI } from '../ml/ml-policy-ai';
+import { MlSearchAI } from '../ml/ml-search-ai';
 import { WasmAmaAI } from '../wasm-ama/wasm-ama-ai';
 import type { AmaVariant } from '../wasm-ama/wasm-loader';
 import type { AiKind as Kind, PuyoAI } from '../types';
@@ -19,6 +20,19 @@ const mlInstances: Partial<Record<'ml-v1' | 'ml-ama-v1', MlAI>> = {};
 // バリアント別にインスタンスを持つ。各 WasmAmaAI は固定の variant に紐付く
 // (heap 上のバッファが variant 固有なため使い回せない)。
 const amaWasmInstances: Partial<Record<AmaVariant, WasmAmaAI>> = {};
+
+let mlSearchInstance: MlSearchAI | null = null;
+
+async function getOrInitMlSearch(): Promise<MlSearchAI> {
+  if (!mlSearchInstance) {
+    mlSearchInstance = new MlSearchAI({
+      modelUrl: '/models/policy-ama-v2/model.json',
+      K: 6,
+    });
+  }
+  await mlSearchInstance.init();
+  return mlSearchInstance;
+}
 
 async function getOrInitMl(kind: 'ml-v1' | 'ml-ama-v1'): Promise<MlAI> {
   let inst = mlInstances[kind];
@@ -65,6 +79,11 @@ export async function handleMessage(
         active = await getOrInitAmaWasm(msg.preset ?? 'build', msg.variant ?? 'default');
         console.log('[ama-wasm worker] active set, sending set-ai ok=true');
         send({ type: 'set-ai', kind: 'ama-wasm', ok: true });
+        return;
+      }
+      if (msg.kind === 'ml-ama-v2-search') {
+        active = await getOrInitMlSearch();
+        send({ type: 'set-ai', kind: 'ml-ama-v2-search', ok: true });
         return;
       }
       const ml = await getOrInitMl(msg.kind);

@@ -19,16 +19,16 @@ class ResBlock(nn.Module):
 
 
 class PolicyValueNetV2(nn.Module):
-    """ResNet 8 blocks × 64ch dual-head (policy 22 + value scalar).
+    """ResNet 10 blocks × 64ch dual-head (policy 22 + value scalar).
 
-    Input:  board (B, 13, 6, 7) NHWC, queue (B, 16)
+    Input:  board (B, 13, 6, 11) NHWC, queue (B, 16)
     Output: policy_logits (B, 22), value (B,) tanh
     """
 
-    BOARD_C = 7
+    BOARD_C = 11
     BOARD_H = 13
     BOARD_W = 6
-    BLOCKS = 8
+    BLOCKS = 10
     CHANNELS = 64
 
     def __init__(self) -> None:

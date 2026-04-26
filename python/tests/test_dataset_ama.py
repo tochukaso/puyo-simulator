@@ -107,3 +107,28 @@ def test_dataset_augmentation_preserves_shapes(tmp_path):
         assert queue.shape == (16,)
         assert policy.shape == (22,)
         assert value.shape == ()
+
+
+def test_dataset_augmentation_disabled_yields_deterministic_samples(tmp_path):
+    """augment=False (default) should produce identical samples on repeat access."""
+    import json
+    from puyo_train.dataset_ama import load_all
+
+    sample = {
+        "field": ["......"] * 13,
+        "current_axis": "R", "current_child": "B",
+        "next1_axis": "Y", "next1_child": "P",
+        "next2_axis": "R", "next2_child": "R",
+        "topk": [
+            {"axisCol": 0, "rotation": 0, "score": 1000},
+        ],
+    }
+    p = tmp_path / "x.jsonl"
+    p.write_text(json.dumps(sample) + "\n")
+    ds = load_all(tmp_path, temperature=20.0)  # augment defaults to False
+    b1, q1, p1, v1 = ds[0]
+    b2, q2, p2, v2 = ds[0]
+    assert torch.equal(b1, b2)
+    assert torch.equal(q1, q2)
+    assert torch.equal(p1, p2)
+    assert float(v1) == float(v2)

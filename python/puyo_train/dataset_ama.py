@@ -18,6 +18,7 @@ from .augmentation import apply_lr_flip, apply_color_permutation
 from .encoding import encode_state
 
 VALUE_SCALE = 50000.0
+_COLOR_PERMS = list(permutations((0, 1, 2, 3)))
 
 
 def value_target_from_score(score: float) -> float:
@@ -98,7 +99,7 @@ class AmaDataset(Dataset):
         if self.augment:
             if random.random() < 0.5:
                 board, queue, soft_policy = apply_lr_flip(board, queue, soft_policy)
-            perm = random.choice(list(permutations((0, 1, 2, 3))))
+            perm = random.choice(_COLOR_PERMS)
             board, queue, soft_policy = apply_color_permutation(board, queue, soft_policy, perm)
         return (
             torch.from_numpy(board),

@@ -7,8 +7,13 @@ import { useGameStore } from '../store';
 //  - 下フリック             → 高速移動(softDrop)
 //  - 画面右側タップ          → 右回転
 //  - 画面左側タップ          → 左回転
+//
+// targetRef は「タップ判定の領域」。盤面ではなく画面本体に張ると、画面の左右端まで
+// タップで回転できるようになる。ボタン等のインタラクティブ要素のクリックは
+// gesture を発火させないように `target.closest` で除外する。
 const SWIPE_COL_PX = 32;
 const TAP_MAX_MS = 200;
+const INTERACTIVE_SELECTOR = 'button, a, input, select, textarea, label, [role="button"]';
 
 export function useGestures(targetRef: RefObject<HTMLElement | null>) {
   const pressStart = useRef<{ x: number; y: number; t: number } | null>(null);
@@ -17,16 +22,22 @@ export function useGestures(targetRef: RefObject<HTMLElement | null>) {
     const el = targetRef.current;
     if (!el) return;
 
+    const isInteractive = (target: EventTarget | null) =>
+      target instanceof Element && target.closest(INTERACTIVE_SELECTOR) !== null;
+
     const onDown = (e: PointerEvent) => {
-      e.preventDefault();
+      if (isInteractive(e.target)) {
+        pressStart.current = null;
+        return;
+      }
       pressStart.current = { x: e.clientX, y: e.clientY, t: Date.now() };
     };
 
     const onUp = (e: PointerEvent) => {
-      e.preventDefault();
       const start = pressStart.current;
       pressStart.current = null;
       if (!start) return;
+      if (isInteractive(e.target)) return;
       const dx = e.clientX - start.x;
       const dy = e.clientY - start.y;
       const dt = Date.now() - start.t;
@@ -49,10 +60,11 @@ export function useGestures(targetRef: RefObject<HTMLElement | null>) {
         return;
       }
 
-      // タップ:左半分=左回転、右半分=右回転。
+      // タップ:画面の左半分=左回転、右半分=右回転。中心はビューポート幅で判定
+      // (targetRef の rect ではなく window.innerWidth)。これにより画面右端まで
+      // 確実に右回転、左端まで左回転として効く。
       if (dt < TAP_MAX_MS) {
-        const rect = el.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
+        const centerX = window.innerWidth / 2;
         const type = e.clientX < centerX ? 'rotateCCW' : 'rotateCW';
         useGameStore.getState().dispatch({ type });
       }

@@ -15,17 +15,9 @@ function detectInitial(): Lang {
     const v = localStorage.getItem(STORAGE_KEY);
     if (isLang(v)) return v;
   } catch {
-    // localStorage 未対応環境(jsdom など)はスキップしてブラウザ判定へ。
+    // localStorage 未対応環境ではフォールバックへ。
   }
-  try {
-    const nav = typeof navigator !== 'undefined' ? navigator.language : '';
-    if (nav.startsWith('en')) return 'en';
-    if (nav.startsWith('zh')) return 'zh';
-    if (nav.startsWith('ko')) return 'ko';
-  } catch {
-    // navigator 未対応環境ではデフォルトへ。
-  }
-  return 'ja';
+  return 'en';
 }
 
 let currentLang: Lang = detectInitial();
@@ -72,7 +64,7 @@ export function translate(
   key: TKey,
   params?: Record<string, string | number>,
 ): string {
-  const tpl = translations[lang][key] ?? translations.ja[key] ?? key;
+  const tpl = translations[lang][key] ?? translations.en[key] ?? key;
   return format(tpl, params);
 }
 

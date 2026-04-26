@@ -83,7 +83,11 @@ export function Board() {
   }, [game, cell, bestMove, poppingCells, landedCells, yOffset]);
 
   return (
-    <div ref={wrapperRef} className="w-full max-w-sm">
+    <div
+      ref={wrapperRef}
+      className="w-full max-w-sm select-none"
+      style={{ touchAction: 'none' }}
+    >
       <div
         className="relative mx-auto"
         style={{ width: boardWidth, height: boardHeight }}

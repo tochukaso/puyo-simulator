@@ -12,9 +12,9 @@ const VALID: readonly TrainerMode[] = ['off', 'gtr'] as const;
 function readInitial(): TrainerMode {
   try {
     const v = localStorage.getItem(STORAGE_KEY);
-    return (VALID as readonly string[]).includes(v ?? '') ? (v as TrainerMode) : 'off';
+    return (VALID as readonly string[]).includes(v ?? '') ? (v as TrainerMode) : 'gtr';
   } catch {
-    return 'off';
+    return 'gtr';
   }
 }
 

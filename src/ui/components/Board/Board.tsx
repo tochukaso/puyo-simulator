@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useGameStore, type PoppingCell, type LandedCell, LANDING_BOUNCE_MS } from '../../store';
-import { useGestures } from '../../hooks/useGestures';
 import { useAiSuggestion } from '../../hooks/useAiSuggestion';
 import { useGhostEnabled, useCeilingVisible } from '../../hooks/useUiPrefs';
 import { usePreviewMove } from '../../hooks/useAiPreview';
@@ -34,8 +33,6 @@ export function Board() {
   const yOffset = ceilingVisible ? 0 : -cell;
   const boardWidth = COLS * cell;
   const boardHeight = visibleRows * cell;
-
-  useGestures(wrapperRef);
 
   useLayoutEffect(() => {
     const ro = new ResizeObserver((entries) => {

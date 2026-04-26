@@ -33,18 +33,18 @@ export function CandidateList() {
     previewMove.rotation === m.rotation;
 
   return (
-    <div className="bg-slate-900 border border-slate-700 rounded text-xs">
+    <div className="w-full bg-slate-900 border border-slate-700 rounded text-sm">
       <div className="px-2 py-1 text-slate-300 border-b border-slate-700">
         {t('candidates.title')} <span className="text-slate-500">{status}</span>
       </div>
-      <ul className="p-1 space-y-1">
+      <ul className="p-2 grid grid-cols-5 gap-1">
         {moves.map((m) => {
           const pct = top > 0 ? Math.max(0, Math.round(((m.score ?? 0) / top) * 100)) : 0;
           const selected = isSelected(m);
           return (
             <li
               key={`${m.axisCol}-${m.rotation}`}
-              className={`flex items-center justify-between gap-1 p-1 rounded cursor-pointer transition-colors ${
+              className={`flex flex-col items-center gap-1 p-1 rounded cursor-pointer transition-colors ${
                 selected ? 'bg-slate-700 ring-2 ring-blue-400' : 'bg-slate-800'
               }`}
               // マウスはホバーで一時的にプレビュー、離れたら戻す。タッチでは
@@ -57,9 +57,9 @@ export function CandidateList() {
               }}
               onClick={() => setPreviewMove(selected ? null : m)}
             >
-              <span className="text-slate-300 tabular-nums">{pct}%</span>
+              <span className="text-slate-300 tabular-nums text-xs">{pct}%</span>
               <button
-                className="px-2 py-0.5 bg-blue-600 rounded text-xs"
+                className="w-full px-2 py-1 bg-blue-600 rounded text-xs hover:bg-blue-500"
                 // 行の onClick(選択トグル)に伝播させない。実行は別アクション。
                 onClick={(e) => {
                   e.stopPropagation();

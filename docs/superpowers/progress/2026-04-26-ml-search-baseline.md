@@ -100,3 +100,68 @@ Likely root causes (ordered by suspected impact):
 - Defer spec rewrite until after these two — the headline failure
   pattern (KPI 0.056 with healthy non-regression floor) points at the
   value signal, not the search architecture.
+
+---
+
+## v3-search results (2026-04-26, partial — B 案: topk-score value target)
+
+`policy-ama-v3` uses `topk[0].score` (ama beam search top-1 evaluation
+per position) as the value-target source with scale 200,000.
+Architecture, augmentation, and policy training are identical to v2 —
+only the value-head training signal changed.
+
+20-seed eval stalled after seed 2 (same pattern as v2's eval). Killed
+and reporting partial. 3 seeds — same seeds as v2 partial — gives a
+direct apples-to-apples comparison.
+
+| AI | seeds run | avg score | avg maxChain | score / ama | maxChain / ama |
+| --- | --- | --- | --- | --- | --- |
+| ml-ama-v2-search | 3 (0..2) | 21,120 | 4.00 | 0.056 | 0.315 |
+| ml-ama-v3-search | 3 (0..2) | 26,410 | 4.33 | **0.070** | **0.341** |
+
+Per-seed (v3): seed 0=17,380 (chain=4), seed 1=24,140 (chain=4),
+seed 2=37,710 (chain=5). All games used the full 200 moves.
+
+Per-seed direct compare (v3 / v2):
+- seed 0: 17,380 / 17,060 = 1.02 (+2%)
+- seed 1: 24,140 / 22,280 = 1.08 (+8%)
+- seed 2: 37,710 / 24,020 = 1.57 (+57%)
+
+### KPI verdict (per value-target-rework-design.md §1.3)
+
+- score / ama ≥ 0.30 — ❌ **MISSED** (0.070)
+- (Reference) v2 score / ama = 0.056 → v3 = 0.070, **+25% relative
+  improvement** over v2 but still ~4× below the 0.30 pass line
+
+### Decision (per design §1.3)
+
+Result lands in the **"<0.10" bucket** → value target alone is
+insufficient. The B 案 hypothesis (positional value signal would close
+most of the KPI gap) is partially supported (real but small gain) but
+the bulk of the KPI gap is NOT in the value head.
+
+### Suggested next iteration (A 案 + multiple axes)
+
+The B 案 partial result reframes the problem: positional value signal
+helps a little, so A 案 (true N-step rollout teacher value) should help
+more — but not enough to close the gap to 0.50 alone. The next
+iteration must include:
+
+1. **A 案** (N-step rollout value target) — extend `dump_selfplay.cpp`
+   to dump per-position scores so the value head learns true rollout
+   returns, not single-step scoring evaluations.
+2. **Eval stall mitigation** — both v2 and v3 evals stalled after
+   seed 2. The `MlSearchAI.suggest()` does ~258 NN calls serially per
+   move; mid-game positions with denser fields trigger longer searches
+   (more cascading chains during `commitMove`). Either batch the NN
+   forwards or cap the search depth dynamically.
+3. **Search depth / beam** — K=6 may be too narrow at depth 3 when the
+   policy is uncertain (top1=19%). Could try K=8 with batched
+   inference, or adaptive K.
+4. **Model capacity** — 10-block ResNet × 64ch may not have the
+   capacity to learn both improved policy AND value when the value
+   signal is rich. After A 案 lands, consider 12 blocks or 96ch.
+
+The v2/v3 comparison gives a clear ordering for the next iteration:
+**A is the highest-leverage change**, but it must be paired with at
+least eval stall fix to be measurable.

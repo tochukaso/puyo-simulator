@@ -1,19 +1,20 @@
 import { useGameStore } from '../../store';
+import { useBoardCellSize } from '../../hooks/useUiPrefs';
 import { PUYO_COLORS, PUYO_LIGHT, PUYO_DARK } from '../Board/colors';
 import type { Color } from '../../../game/types';
 
-// Following the original Puyo Puyo, show NEXT (the upcoming pair) on top
-// and NEXT-NEXT (the one after) below it, stacked vertically to the right
-// of the board. NEXT-NEXT is rendered slightly smaller, as in the original,
-// to convey visual priority.
+// 盤面右側に NEXT(直近)を上、NEXT-NEXT(その次)を下に縦並びで表示する。
+// 両方とも盤面のセルと同じサイズで描画して、ユーザが「実際の大きさ」で
+// 次のツモを把握できるようにする。
 export function NextQueue() {
   const queue = useGameStore((s) => s.game.nextQueue);
   const next = queue[0];
   const nextNext = queue[1];
+  const cell = useBoardCellSize();
   return (
-    <div className="flex flex-col gap-3 items-center">
-      <PairDisplay pair={next} dotSize={28} />
-      <PairDisplay pair={nextNext} dotSize={20} />
+    <div className="flex flex-col gap-3 items-start">
+      <PairDisplay pair={next} dotSize={cell} />
+      <PairDisplay pair={nextNext} dotSize={cell} />
     </div>
   );
 }

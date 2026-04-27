@@ -13,7 +13,8 @@ import { useGameStore } from '../store';
 // gesture を発火させないように `target.closest` で除外する。
 const SWIPE_COL_PX = 32;
 const TAP_MAX_MS = 200;
-const INTERACTIVE_SELECTOR = 'button, a, input, select, textarea, label, [role="button"]';
+const INTERACTIVE_SELECTOR =
+  'button, a, input, select, textarea, label, [role="button"], [data-no-gesture]';
 
 export function useGestures(targetRef: RefObject<HTMLElement | null>) {
   const pressStart = useRef<{ x: number; y: number; t: number } | null>(null);

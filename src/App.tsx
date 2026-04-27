@@ -24,7 +24,7 @@ export default function App() {
           <Stats />
           <div className="flex gap-3 items-stretch justify-center w-full">
             <Board />
-            <div className="flex flex-col gap-2 w-32 shrink-0">
+            <div className="flex flex-col gap-2 w-32 shrink-0" data-no-gesture>
               <NextQueue />
               <div className="mt-auto">
                 <CandidateList />

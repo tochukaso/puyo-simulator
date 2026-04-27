@@ -33,7 +33,7 @@ export function CandidateList() {
     previewMove.rotation === m.rotation;
 
   return (
-    <div className="bg-slate-900 border border-slate-700 rounded text-xs">
+    <div className="bg-slate-900 border border-slate-700 rounded text-xs" data-no-gesture>
       <div className="px-2 py-1 text-slate-300 border-b border-slate-700">
         {t('candidates.title')} <span className="text-slate-500">{status}</span>
       </div>

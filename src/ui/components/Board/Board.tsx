@@ -1,7 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useGameStore, type PoppingCell, type LandedCell, LANDING_BOUNCE_MS } from '../../store';
 import { useAiSuggestion } from '../../hooks/useAiSuggestion';
-import { useGhostEnabled, useCeilingVisible } from '../../hooks/useUiPrefs';
+import {
+  useGhostEnabled,
+  useCeilingVisible,
+  useBoardCellSize,
+  setBoardCellSize,
+} from '../../hooks/useUiPrefs';
 import { usePreviewMove } from '../../hooks/useAiPreview';
 import { useT } from '../../../i18n';
 import { ROWS, COLS, SPAWN_COL, VISIBLE_ROW_START } from '../../../game/constants';
@@ -12,7 +17,7 @@ import { ghostCells } from './ghost';
 export function Board() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const [cell, setCell] = useState(32);
+  const cell = useBoardCellSize();
   const game = useGameStore((s) => s.game);
   const poppingCells = useGameStore((s) => s.poppingCells);
   const chainTexts = useGameStore((s) => s.chainTexts);
@@ -39,7 +44,7 @@ export function Board() {
       const w = entries[0]!.contentRect.width;
       const maxCellByWidth = Math.floor(w / COLS);
       const maxCellByHeight = Math.floor((window.innerHeight * 0.6) / ROWS);
-      setCell(Math.max(16, Math.min(maxCellByWidth, maxCellByHeight, 48)));
+      setBoardCellSize(Math.max(16, Math.min(maxCellByWidth, maxCellByHeight, 48)));
     });
     if (wrapperRef.current) ro.observe(wrapperRef.current);
     return () => ro.disconnect();

@@ -64,3 +64,27 @@ export function useCeilingVisible(): boolean {
   }, []);
   return v;
 }
+
+// 盤面のセルサイズ(px)。Board が ResizeObserver で計算した最新値を
+// 公開して、NextQueue など他の UI が「普通のぷよと同じサイズ」で
+// 描画できるようにする。useGhostEnabled / useCeilingVisible と同じ流儀。
+let boardCellSize = 32;
+const cellSizeListeners = new Set<(v: number) => void>();
+
+export function setBoardCellSize(v: number): void {
+  if (boardCellSize === v) return;
+  boardCellSize = v;
+  for (const h of cellSizeListeners) h(v);
+}
+
+export function useBoardCellSize(): number {
+  const [v, setV] = useState(boardCellSize);
+  useEffect(() => {
+    cellSizeListeners.add(setV);
+    if (v !== boardCellSize) setV(boardCellSize);
+    return () => {
+      cellSizeListeners.delete(setV);
+    };
+  }, [v]);
+  return v;
+}

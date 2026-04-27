@@ -104,7 +104,7 @@ export const translations: Record<Lang, Dict> = {
     'candidates.loading': 'Loading {aiKind}…',
     'candidates.thinking': '(thinking)',
     'candidates.colRot': 'col {col} / rot {rot}',
-    'candidates.execute': 'Apply',
+    'candidates.execute': 'Go',
     'board.chain': '{n} chain!',
   },
   zh: {

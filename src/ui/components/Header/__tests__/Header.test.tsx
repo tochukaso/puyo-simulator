@@ -17,7 +17,8 @@ describe('Header', () => {
 
   it('does not render an AI model selector', () => {
     render(<Header />);
-    // 訓練ラベルも AI 選択もないので、AI / 訓練 という aria-label の <select> は存在しない
+    // No "AI" or legacy "訓練" (training) label exists, so a <select> with
+    // either aria-label is not present.
     expect(screen.queryByLabelText('AI')).toBeNull();
     expect(screen.queryByLabelText('訓練')).toBeNull();
   });
@@ -40,7 +41,7 @@ describe('Header', () => {
     };
     setAiKind.mockClear();
     render(<Header />);
-    // 初回 effect で gtr-only が呼ばれる
+    // The initial effect should call setAiKind with the gtr-only variant.
     expect(setAiKind).toHaveBeenLastCalledWith('ama-wasm', 'gtr', 'gtr-only');
     await userEvent.selectOptions(screen.getByLabelText('Template'), 'off');
     expect(setAiKind).toHaveBeenLastCalledWith('ama-wasm', 'build', 'default');

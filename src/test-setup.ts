@@ -1,9 +1,10 @@
 import { beforeEach } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 
-// jsdom 同梱 / Node 22+ 内蔵の localStorage は一部メソッド (.clear, .key, length) を
-// 欠くため、テスト用に Map ベースの完全な Storage シムを毎テスト差し替える。
-// beforeEach で再生成してテスト間の状態リセットを保証する。
+// The localStorage shipped with jsdom / built into Node 22+ is missing some
+// methods (.clear, .key, length), so for tests we swap in a complete
+// Map-based Storage shim on every test. We recreate it in beforeEach to
+// guarantee state is reset between tests.
 class MemoryStorage implements Storage {
   private store = new Map<string, string>();
   get length() {

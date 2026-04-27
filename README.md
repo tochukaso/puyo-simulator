@@ -1,42 +1,43 @@
 # Puyo Training Simulator
 
-AIアドバイザ付きぷよぷよトレーニングWebアプリ(スマホ対応PWA)
+A Puyo Puyo training web app with an AI advisor (mobile-friendly PWA).
 
-## 状態
+## Status
 
-MVP(Phase 0-4 完了): ヒューリスティックAIによるアドバイス表示版。
+MVP (Phase 0-4 complete): heuristic-AI advice version.
 
-## 開発
+## Development
 
 ```
 npm install
-npm run dev      # 開発サーバ
-npm run test     # 単体テスト
-npm run e2e      # E2E スモークテスト
-npm run build    # 本番ビルド
+npm run dev      # Development server
+npm run test     # Unit tests
+npm run e2e      # E2E smoke tests
+npm run build    # Production build
 npm run lint     # Lint
 ```
 
-## サプライチェーンセキュリティ (Takumi Guard)
+## Supply chain security (Takumi Guard)
 
-NPM と PyPI のインストールを [Takumi Guard](https://flatt.tech/takumi/features/guard)
-レジストリプロキシ経由にすることで、既知の悪性パッケージをブロックします。
+NPM and PyPI installs are routed through the
+[Takumi Guard](https://flatt.tech/takumi/features/guard) registry proxy,
+which blocks known-malicious packages.
 
-- NPM: ルートの `.npmrc` で `registry=https://npm.flatt.tech/` を指定
-- Python: `python/requirements.txt` の `--index-url` および `python/pip.conf`
-  で `https://pypi.flatt.tech/simple/` を指定
-- CI: `.github/workflows/ci.yml` で `flatt-security/setup-takumi-guard-npm@v1`
-  を使用 (OIDC 経由で短命トークンを取得)
+- NPM: `.npmrc` at the repo root sets `registry=https://npm.flatt.tech/`
+- Python: `python/requirements.txt` (`--index-url`) and `python/pip.conf`
+  point to `https://pypi.flatt.tech/simple/`
+- CI: `.github/workflows/ci.yml` uses `flatt-security/setup-takumi-guard-npm@v1`
+  (acquires a short-lived token via OIDC)
 
-## ドキュメント
+## Documentation
 
-- 設計書: `docs/superpowers/specs/2026-04-24-puyo-simulator-design.md`
-- MVP 実装計画: `docs/superpowers/plans/2026-04-24-puyo-mvp.md`
+- Design spec: `docs/superpowers/specs/2026-04-24-puyo-simulator-design.md`
+- MVP implementation plan: `docs/superpowers/plans/2026-04-24-puyo-mvp.md`
 
-## 次のフェーズ
+## Next phases
 
-Phase 5-7: Python事前学習DQN
-Phase 8: デプロイと仕上げ
+Phase 5-7: Python pre-training DQN
+Phase 8: Deployment and polish
 
 ## Bundled software
 

@@ -27,8 +27,9 @@ export function Header() {
   const lang = useLang();
   const t = useT();
 
-  // AI は ama-wasm 固定。GTR テンプレ選択中は GTR 専用ビルド(form::list = { GTR })、
-  // それ以外は default ビルド + preset='build'。
+  // The AI is fixed to ama-wasm. While the GTR template is selected, use the
+  // GTR-only build (form::list = { GTR }); otherwise use the default build
+  // with preset='build'.
   useEffect(() => {
     if (trainer === 'gtr') {
       setAiKind('ama-wasm', 'gtr', 'gtr-only');

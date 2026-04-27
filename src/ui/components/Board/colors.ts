@@ -1,7 +1,8 @@
 import type { Color } from '../../../game/types';
 
-// ぷよ本体は本家寄りの彩度に微調整。中心はラジアルグラデーションで明るく、
-// 縁は暗く、アウトラインはさらに暗く落とす。
+// Puyo body saturation is fine-tuned to be close to the original game.
+// The center is brighter via a radial gradient; the edge is darker, and
+// the outline is darker still.
 export const PUYO_COLORS: Record<Color, string> = {
   R: '#ff5252',
   B: '#4ea4ff',
@@ -9,7 +10,7 @@ export const PUYO_COLORS: Record<Color, string> = {
   P: '#b66cff',
 };
 
-// グラデの中心(明るい側)。HSL の lightness を +18% 程度上げた値。
+// Gradient center (the bright side). HSL lightness raised by ~+18%.
 export const PUYO_LIGHT: Record<Color, string> = {
   R: '#ff8b8b',
   B: '#8ec6ff',
@@ -17,7 +18,7 @@ export const PUYO_LIGHT: Record<Color, string> = {
   P: '#d4a3ff',
 };
 
-// グラデの縁 / アウトライン(暗い側)。lightness を -25% 程度下げた値。
+// Gradient edge / outline (the dark side). HSL lightness reduced by ~-25%.
 export const PUYO_DARK: Record<Color, string> = {
   R: '#a01f1f',
   B: '#1f5fa8',

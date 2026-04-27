@@ -33,7 +33,7 @@ describe('encodeState', () => {
     expect(COLOR_ORDER).toEqual(['R', 'B', 'Y', 'P']);
   });
 
-  it('空盤面: empty チャンネルが全マス 1、色チャンネルは 0', () => {
+  it('empty board: empty channel is 1 for every cell, color channels are 0', () => {
     const e = encodeState(makeState());
     expect(e.board.length).toBe(13 * 6 * 11);
     for (let r = 0; r < 13; r++) {
@@ -46,7 +46,7 @@ describe('encodeState', () => {
     }
   });
 
-  it('R を (5,3) に置くと R チャンネルが立ち、空チャンネルが落ちる', () => {
+  it('placing R at (5,3) raises the R channel and clears the empty channel', () => {
     const field = withCell(createEmptyField(), 5, 3, 'R');
     const e = encodeState(makeState({ field }));
     const off = 5 * 66 + 3 * 11;
@@ -54,7 +54,7 @@ describe('encodeState', () => {
     expect(e.board[off + 4]).toBe(0);
   });
 
-  it('現ツモ R/B: ch=5 が全マス R=0/3、ch=6 が B=1/3', () => {
+  it('current pair R/B: ch=5 is R=0/3 over all cells, ch=6 is B=1/3', () => {
     const e = encodeState(makeState());
     for (let r = 0; r < 13; r++) {
       for (let c = 0; c < 6; c++) {
@@ -64,7 +64,7 @@ describe('encodeState', () => {
     }
   });
 
-  it('queue[16]: NEXT Y/P, NEXT2 R/R の one-hot', () => {
+  it('queue[16]: one-hot for NEXT Y/P and NEXT2 R/R', () => {
     const e = encodeState(makeState());
     expect(e.queue.length).toBe(16);
     expect(e.queue[0]).toBe(0);
@@ -76,7 +76,7 @@ describe('encodeState', () => {
     expect(e.queue[12 + 0]).toBe(1);
   });
 
-  it('legalMask の長さは 22、current=null なら全 0', () => {
+  it('legalMask has length 22; when current=null it is all zeros', () => {
     const e = encodeState(makeState());
     expect(e.legalMask.length).toBe(22);
     const e2 = encodeState(makeState({ current: null }));

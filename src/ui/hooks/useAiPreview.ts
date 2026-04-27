@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import type { Move } from '../../game/types';
 
-// AI 候補手のプレビュー状態。CandidateList で hover / 選択された手を Board の
-// ゴースト描画と共有するためのモジュールローカルなシングルトン + listener。
-// useUiPrefs と同じ流儀。永続化はしない(その場限りの UI 状態)。
+// Preview state for AI candidate moves. A module-local singleton + listener
+// pattern that lets CandidateList's hover/selection flow into the Board's
+// ghost rendering. Same approach as useUiPrefs. Not persisted (transient UI state).
 let previewMove: Move | null = null;
 const listeners = new Set<(v: Move | null) => void>();
 
 export function setPreviewMove(m: Move | null): void {
-  // 参照だけでなく中身でも比較。同じ手の繰り返し set で listener を煽らない。
+  // Compare by content, not just by reference, so repeated set() calls with
+  // the same move don't churn listeners.
   if (sameMove(previewMove, m)) return;
   previewMove = m;
   for (const h of listeners) h(m);

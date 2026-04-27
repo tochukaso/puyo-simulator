@@ -11,31 +11,31 @@ export interface PoppingCell {
   col: number;
 }
 
-/** 連鎖発生時に「Nれんさ!」と表示するためのオーバーレイエントリ。 */
+/** Overlay entry used to display the localized "N-chain!" label when a chain triggers. */
 export interface ChainTextEntry {
   id: number;
   chainIndex: number;
-  /** 消えたセル群の重心。Board が overlay を絶対座標で配置するのに使う。 */
+  /** Centroid of the cleared cell group. Board uses this to place the overlay in absolute coordinates. */
   row: number;
   col: number;
 }
 
-/** 着地直後にプヨっと弾むアニメーションを掛けるためのエントリ。 */
+/** Entry used to apply a squash-and-stretch bounce animation right after landing. */
 export interface LandedCell {
   row: number;
   col: number;
-  /** Date.now() 基準の着地時刻。Board の draw が経過時間からスケールを計算する。 */
+  /** Landing time based on Date.now(). Board's draw computes the scale from the elapsed time. */
   landedAt: number;
 }
 
 interface Store {
   game: GameState;
   animatingSteps: ChainStep[];
-  /** 今まさに消えようとしているセル(highlight phase で光らせる) */
+  /** Cells about to pop (lit up during the highlight phase). */
   poppingCells: PoppingCell[];
-  /** 連鎖テキスト("1れんさ!" 等)。CSS animation で 2 秒フェードアウト。 */
+  /** Chain text (e.g. "1-chain!"). Fades out over 2 seconds via CSS animation. */
   chainTexts: ChainTextEntry[];
-  /** 着地直後のぷよ。Board が squash-stretch で弾ませる。 */
+  /** Puyos that just landed. Board bounces them with a squash-and-stretch. */
   landedCells: LandedCell[];
   history: GameState[];
   reset(seed?: number): void;
@@ -49,11 +49,12 @@ const CHAIN_TEXT_LIFETIME_MS = 2000;
 export const LANDING_BOUNCE_MS = 280;
 let chainTextIdSeq = 1;
 
-// 連鎖ステップのタイミング。ユーザが「ぷよがだんだん消える」実感を得られる長さにしている。
-const LOCK_PAUSE_MS = 200; // ツモが着地してから最初の連鎖チェックまで
-const HIGHLIGHT_MS = 400; // 消えるぷよを点滅強調する時間
-const POP_MS = 150; // ぷよが盤面から消えた直後(重力落下前)を見せる時間
-const GRAVITY_MS = 300; // 重力落下後の余韻
+// Chain-step timing. Tuned so the user gets a sense of "the puyos are
+// gradually disappearing" rather than vanishing in a single frame.
+const LOCK_PAUSE_MS = 200; // From the pair landing until the first chain check.
+const HIGHLIGHT_MS = 400; // How long to flash-highlight the puyos that are about to pop.
+const POP_MS = 150; // Time spent showing the board right after the puyos vanish (before gravity).
+const GRAVITY_MS = 300; // Pause after gravity has settled the falling puyos.
 
 const MAX_HISTORY = 100;
 
@@ -77,8 +78,9 @@ export const useGameStore = create<Store>((set, get) => ({
   commit: async (move: Move) => {
     const s = get().game;
     if (!s.current) return;
-    // ぷよぷよ通信(eスポーツ)ルール:跨ぎ禁止は適用しない。任意の (axisCol,
-    // rotation) を直接配置できる(壁キック/瞬間移動相当)。
+    // Puyo Puyo Tsuu (eSport) rules: no "no-crossing" restriction. Any
+    // (axisCol, rotation) can be placed directly (equivalent to wall-kick
+    // and teleportation).
 
     const placed = {
       ...s.current,
@@ -92,8 +94,8 @@ export const useGameStore = create<Store>((set, get) => ({
     const priorHistory = get().history;
     const newHistory = [...priorHistory, s].slice(-MAX_HISTORY);
 
-    // 着地直後の盤面を表示。lockActive で増えたセル(=このツモの 2 つ)を bounce
-    // 対象として記録する。
+    // Show the board right after landing. Record the cells newly occupied by
+    // lockActive (= the two puyos of this pair) as bounce targets.
     const placedCells = diffNewlyOccupied(s.field, locked);
     pushLanded(set, placedCells);
     set({
@@ -110,7 +112,7 @@ export const useGameStore = create<Store>((set, get) => ({
     let score = s.score;
     let maxChain = s.maxChain;
     for (const step of steps) {
-      // Phase A: 消える直前(まだぷよはある)+ 点滅ハイライト + 連鎖テキスト出現
+      // Phase A: just before pop (puyos still on board) + flash highlight + chain text appears.
       const avgRow = step.popped.reduce((a, p) => a + p.row, 0) / step.popped.length;
       const avgCol = step.popped.reduce((a, p) => a + p.col, 0) / step.popped.length;
       const textId = chainTextIdSeq++;
@@ -122,8 +124,8 @@ export const useGameStore = create<Store>((set, get) => ({
           { id: textId, chainIndex: step.chainIndex, row: avgRow, col: avgCol },
         ],
       }));
-      // CSS の fade animation 完了に合わせて自動撤去。setTimeout が undo / reset と
-      // 競合しないよう、エントリが残っていれば消すだけにしておく。
+      // Auto-remove when the CSS fade animation finishes. The setTimeout must
+      // not conflict with undo / reset, so we just delete the entry if it still exists.
       setTimeout(() => {
         set((st) => ({
           chainTexts: st.chainTexts.filter((x) => x.id !== textId),
@@ -131,14 +133,14 @@ export const useGameStore = create<Store>((set, get) => ({
       }, CHAIN_TEXT_LIFETIME_MS);
       await sleep(HIGHLIGHT_MS);
 
-      // Phase B: ぷよが消えた直後(重力落下前)
+      // Phase B: right after the puyos vanish (before gravity).
       set((st) => ({
         game: { ...st.game, field: step.afterPop },
         poppingCells: [],
       }));
       await sleep(POP_MS);
 
-      // Phase C: 重力落下 + スコア反映 + 落ちて着地したセルを bounce 対象に
+      // Phase C: gravity drop + score update + record cells that fell-and-landed as bounce targets.
       score += step.scoreDelta;
       maxChain = Math.max(maxChain, step.chainIndex);
       const fallen = diffNewlyOccupied(step.afterPop, step.afterGravity);

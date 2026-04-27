@@ -1,10 +1,10 @@
 import type { Pair, Color } from './types';
 
-// Puyo eSport の本物 RNG をそのまま port(ama/core/cell.h::create_queue)
-// 1 seed → 128 ペアの確定的キュー。
+// A direct port of the real Puyo eSport RNG (ama/core/cell.h::create_queue).
+// 1 seed → a deterministic queue of 128 pairs.
 //
-// 色マッピング: ama 0=R, 1=Y, 2=G, 3=B → ours 0=R, 1=Y, 2=P, 3=B
-//   (Green が我々の Purple、見た目だけのラベル差)
+// Color mapping: ama 0=R, 1=Y, 2=G, 3=B → ours 0=R, 1=Y, 2=P, 3=B
+//   (their Green is our Purple — purely a label difference, same logic).
 
 const COLOR_MAP: readonly Color[] = ['R', 'Y', 'P', 'B'] as const;
 

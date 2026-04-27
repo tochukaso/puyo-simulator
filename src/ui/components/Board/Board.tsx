@@ -27,13 +27,14 @@ export function Board() {
   const ceilingVisible = useCeilingVisible();
   const previewMove = usePreviewMove();
   const t = useT();
-  // CandidateList で hover/選択している候補があればそれを優先表示。なければ
-  // トップ候補にフォールバック。
+  // If a candidate is hovered/selected in CandidateList, prefer it. Otherwise
+  // fall back to the top candidate.
   const bestMove = ghostEnabled ? (previewMove ?? moves[0] ?? null) : null;
 
-  // 天井(row 0)を隠すときは描画全体を 1 セル分上にずらして、
-  // canvas / wrapper の高さも 1 セル縮める。row 0 由来の描画(背景帯・
-  // DANGER 枠・天井段に居る軸ぷよなど)はクリップで自然に切れる。
+  // When hiding the ceiling (row 0), shift the entire drawing up by one cell
+  // and shrink the canvas/wrapper height by one cell. Anything originating in
+  // row 0 (background strip, DANGER frame, an axis puyo on the ceiling row) is
+  // naturally clipped out.
   const visibleRows = ceilingVisible ? ROWS : ROWS - 1;
   const yOffset = ceilingVisible ? 0 : -cell;
   const boardWidth = COLS * cell;
@@ -70,7 +71,8 @@ export function Board() {
         yOffset,
         now,
       );
-      // 着地アニメ・点滅アニメのどちらかが進行中なら次フレームを予約。
+      // If either the landing animation or the pop-flash animation is still
+      // running, schedule the next frame.
       const hasLandingActive = landedCells.some(
         (c) => now - c.landedAt < LANDING_BOUNCE_MS,
       );
@@ -125,8 +127,9 @@ function draw(
   yOffset: number,
   now: number,
 ) {
-  // 全体を yOffset (0 or -cell) ずらす。天井隠し時は row 0 由来の描画が
-  // canvas 上端より上に逃げ、自動的にクリップされる。
+  // Translate everything by yOffset (0 or -cell). When the ceiling is hidden,
+  // anything coming from row 0 escapes above the canvas top edge and is
+  // automatically clipped.
   ctx.save();
   ctx.translate(0, yOffset);
 
@@ -155,11 +158,12 @@ function draw(
   ctx.lineWidth = 2;
   ctx.strokeRect(SPAWN_COL * cell + 1, 1, cell - 2, cell - 2);
 
-  // Popping ハイライト用の点滅係数。`Date.now()` ベースで rAF から毎フレーム呼ばれる。
+  // Pulse coefficient for the popping highlight. Driven by `Date.now()` and
+  // called per frame from rAF.
   const popPulse = 0.55 + 0.45 * Math.sin(now / 80);
   const popKey = (r: number, c: number) => r * COLS + c;
   const poppingSet = new Set(poppingCells.map((p) => popKey(p.row, p.col)));
-  // (r,c) → 一番新しい着地時刻。複数候補があれば一番新しいものを採用。
+  // (r,c) → most recent landing time. If multiple candidates exist, take the latest.
   const landedAtMap = new Map<number, number>();
   for (const c of landedCells) {
     const k = popKey(c.row, c.col);
@@ -167,7 +171,7 @@ function draw(
     if (c.landedAt > prev) landedAtMap.set(k, c.landedAt);
   }
 
-  // 同色隣接の接続バーを先に描く(ぷよ円より下に置きたい)。
+  // Draw the same-color connection bars first (we want them under the puyo discs).
   drawConnectors(ctx, field, cell);
 
   for (let r = 0; r < ROWS; r++) {
@@ -200,7 +204,8 @@ function draw(
       3: [0, -1],
     };
     const [dr, dc] = offsets[rotation]!;
-    // row 0 (高さ13、天井段) は半透明で描画して「ここは実質見えない領域」を示す
+    // Row 0 (height 13, ceiling row) is drawn semi-transparent to indicate
+    // that "this is effectively invisible territory".
     const axisAlpha = axisRow < VISIBLE_ROW_START ? 0.5 : 1;
     const childRow = axisRow + dr;
     const childAlpha = childRow < VISIBLE_ROW_START ? 0.5 : 1;
@@ -220,10 +225,11 @@ function draw(
   ctx.restore();
 }
 
-// 隣接する同色ぷよ同士を太いバーで繋ぐ(本家ぷよぷよの「連結表現」)。
-// バーはぷよ円より下に重ねたいので drawPuyo より先に呼ぶ。
+// Connect adjacent same-color puyos with a thick bar (the "connection
+// expression" used in the original Puyo Puyo). Called before drawPuyo so the
+// bar layers underneath the discs.
 function drawConnectors(ctx: CanvasRenderingContext2D, field: Field, cell: number) {
-  const W = cell * 0.55; // バーの太さ。ぷよ円の直径より細くして「首」に見せる。
+  const W = cell * 0.55; // Bar thickness. Thinner than the puyo diameter so it reads as a "neck".
   const alphaOf = (r: number) => (r < VISIBLE_ROW_START ? 0.5 : 1);
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
@@ -250,8 +256,9 @@ function drawConnectors(ctx: CanvasRenderingContext2D, field: Field, cell: numbe
   }
 }
 
-// セル中央に「色の頭文字記号」を描画。fontSize はセルの 45%、
-// 白文字 + 暗色シャドウでコントラストを確保する。scale で squash 中も変形する。
+// Draw the color's initial letter in the center of the cell. fontSize is 45%
+// of the cell; we use white text with a dark shadow to keep contrast. scale
+// makes the symbol deform along with the puyo during squash.
 function drawSymbol(
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -283,13 +290,14 @@ interface PuyoScale {
 }
 const ONE_SCALE: PuyoScale = { sx: 1, sy: 1 };
 
-// 着地直後の squash-stretch。減衰サイン波で 0→0.6 (squish) →1.1 (rebound) →1。
-// セルの底に重心がある感じを出すため、変形は底辺基準。
+// Squash-and-stretch right after landing. Damped sine wave: 0 → 0.6 (squish)
+// → 1.1 (rebound) → 1. The deformation is anchored at the bottom edge so the
+// puyo feels weighted at the base of the cell.
 function landingScale(elapsedMs: number): PuyoScale {
   if (elapsedMs <= 0) return { sx: 1.2, sy: 0.65 };
   if (elapsedMs >= LANDING_BOUNCE_MS) return ONE_SCALE;
   const t = elapsedMs / LANDING_BOUNCE_MS;
-  // 減衰係数を強めにして「短く軽い弾み」にする。
+  // Stronger damping for a "short, light bounce".
   const offset = -0.35 * Math.exp(-4.5 * t) * Math.cos(8 * t);
   const sy = 1 + offset;
   const sx = 1 - offset * 0.6;
@@ -307,15 +315,16 @@ function drawPuyo(
 ) {
   if (row < 0) return;
   const cx = col * cell + cell / 2;
-  // 「弾むときも底辺は床に貼り付いている」見せ方:変形の中心をセル底にする。
+  // To convey that "even while bouncing, the bottom stays glued to the floor",
+  // anchor the deformation at the cell bottom.
   const baseY = row * cell + cell - 2;
   const r = cell / 2 - 2;
   const ry = r * scale.sy;
   const rx = r * scale.sx;
   const centerY = baseY - ry;
 
-  // ラジアルグラデで本体に立体感。中心を少し上にオフセットして光が上から
-  // 当たっているように見せる(本家ぷよ寄り)。
+  // Radial gradient for body shading. Offset the highlight slightly up to
+  // suggest light coming from above (matching the original Puyo Puyo style).
   const grad = ctx.createRadialGradient(
     cx - rx * 0.25,
     centerY - ry * 0.35,
@@ -334,7 +343,7 @@ function drawPuyo(
   ctx.beginPath();
   ctx.ellipse(cx, centerY, rx, ry, 0, 0, Math.PI * 2);
   ctx.fill();
-  // 暗色アウトライン
+  // Dark outline
   ctx.lineWidth = Math.max(1, cell * 0.04);
   ctx.strokeStyle = PUYO_DARK[color];
   ctx.stroke();
@@ -353,7 +362,7 @@ function drawPopHighlight(
   if (row < 0) return;
   const cx = col * cell + cell / 2;
   const cy = row * cell + cell / 2;
-  // 白い光をぷよの上に重ねて「いま消えるぞ」という視覚的強調
+  // Overlay a white glow on the puyo to visually emphasize "this is about to pop".
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   ctx.globalAlpha = pulse * 0.6;
@@ -363,7 +372,7 @@ function drawPopHighlight(
   ctx.fill();
   ctx.restore();
 
-  // 外側に広がるリング
+  // Ring expanding outward
   ctx.save();
   ctx.strokeStyle = `rgba(255, 255, 255, ${pulse})`;
   ctx.lineWidth = 2;
@@ -392,7 +401,8 @@ function drawPuyoGhost(
   ctx.arc(cx, cy, cell / 2 - 2, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
-  // ゴーストにも色の頭文字を表示(本体より薄く)。setLineDash の影響を
-  // drawSymbol は受けない(restore してから呼ぶ + drawSymbol 内部で save)。
+  // Show the color initial on ghosts too (more transparent than the body).
+  // drawSymbol is not affected by setLineDash because it is called after
+  // restore, and drawSymbol does its own save internally.
   drawSymbol(ctx, cx, cy, color, cell, ONE_SCALE, 0.55);
 }

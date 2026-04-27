@@ -1,55 +1,54 @@
-# ぷよぷよトレーニングシミュレータ 設計書
+# Puyo Puyo Training Simulator Design Document
 
-- 作成日: 2026-04-24
-- ステータス: ドラフト(ユーザレビュー待ち)
-- 対象: 個人開発によるぷよぷよ連鎖構築のトレーニング用Webアプリ
+- Created: 2026-04-24
+- Status: Draft (awaiting user review)
+- Scope: A personal-project web app for training Puyo Puyo chain-building skills
 
-## 1. 背景と目的
+## 1. Background and Purpose
 
-ぷよぷよの「どこに置くべきか」という判断力を鍛えるための練習ツールを作る。
-機械学習(DQN)で「賢く置く」戦略を獲得させ、ユーザがプレイ中にAIの
-推奨手をゴースト表示で参照できるようにする。
+The goal is to build a practice tool for sharpening the "where should I place this?" judgment in Puyo Puyo.
+We use machine learning (DQN) to acquire a "place wisely" strategy, and during play the user can refer to the AI's
+recommended moves shown as a ghost overlay.
 
-単なるゲームではなく、**ユーザ自身の上達を助ける教材としてのAI**という
-位置付け。
+This is not just a game; it is positioned as **an AI that serves as study material to help the user themselves
+improve**.
 
-## 2. ゴール / 非ゴール
+## 2. Goals / Non-Goals
 
-### ゴール
+### Goals
 
-- ぷよぷよ本家準拠の連鎖ルールをブラウザ上で再現
-- スマホで快適に操作できるタッチ操作UI
-- プレイ中、現在のツモに対するAIの推奨手をリアルタイムに可視化
-- 候補手を複数提示し、「なぜそこか」の理由もある程度伝える
-- フェーズ1としてヒューリスティックAI、フェーズ2としてDQNの両方を
-  同じインターフェイスの背後に差し替え可能な形で実装
+- Reproduce the official Puyo Puyo chain rules in the browser
+- A touch-friendly UI that is comfortable to operate on a smartphone
+- During play, visualize the AI's recommended move for the current pair in real time
+- Present multiple candidate moves and convey, to a degree, the rationale for "why there"
+- Implement Phase 1 with a heuristic AI and Phase 2 with a DQN, both swappable behind the same interface
 
-### 非ゴール
+### Non-Goals
 
-- 対人戦(おじゃまぷよ、相殺、ネットワーク対戦)は当面範囲外
-- なぞぷよ等のパズルモードは範囲外
-- モバイルネイティブアプリ化はしない(PWAで代替)
+- Versus play (garbage puyos, offset/counter, network play) is out of scope for now
+- Puzzle modes such as Nazo Puyo are out of scope
+- No native mobile app (the PWA serves as a substitute)
 
-## 3. 決定事項サマリ
+## 3. Decision Summary
 
-| 項目               | 決定内容                                                     |
-| ------------------ | ------------------------------------------------------------ |
-| プラットフォーム   | Webブラウザ (TypeScript + React + TensorFlow.js) + PWA       |
-| 対応端末           | スマホメイン、PCレスポンシブ対応                             |
-| インタラクション   | ユーザがプレイ、AIがアドバイス表示                           |
-| 可視化             | ベスト手ゴースト + トップN候補リスト                         |
-| AIの目的           | 1ゲームの総スコア最大化                                      |
-| AI実装段階         | フェーズ1: ヒューリスティック / フェーズ2: Python事前学習DQN |
-| 学習環境           | ローカルCPU(デバッグ) + Colab無料GPU(本番学習)               |
-| 盤面               | 6列 × 13段(最上段は半透明で表示)                             |
-| ツモ出現位置       | 左から3列目(col=2)の最上段                                   |
-| ゲームオーバー条件 | ツモ出現位置が埋まっていて新しいツモが出せないとき           |
-| ネクスト           | 2組先(NEXT + NEXT-NEXT)                                      |
-| 操作(PC)           | キーボード                                                   |
-| 操作(スマホ)       | 盤面上のタッチジェスチャー + 補助ボタン                      |
-| タイミング         | ターン制(ユーザが置くまで時間停止)                           |
+| Item                | Decision                                                                  |
+| ------------------- | ------------------------------------------------------------------------- |
+| Platform            | Web browser (TypeScript + React + TensorFlow.js) + PWA                    |
+| Target devices      | Smartphone first, with responsive support for PC                          |
+| Interaction         | User plays; AI displays advice                                            |
+| Visualization       | Best-move ghost + top-N candidate list                                    |
+| AI objective        | Maximize total score over a single game                                   |
+| AI implementation   | Phase 1: heuristic / Phase 2: Python pre-trained DQN                      |
+| Training environment| Local CPU (debugging) + Colab free-tier GPU (production training)         |
+| Field               | 6 columns x 13 rows (the top row is rendered semi-transparent)            |
+| Pair spawn position | Top row of the 3rd column from the left (col=2)                           |
+| Game-over condition | The spawn cell is occupied so a new pair cannot be placed                 |
+| Next queue          | Two pairs ahead (NEXT + NEXT-NEXT)                                        |
+| Controls (PC)       | Keyboard                                                                  |
+| Controls (mobile)   | Touch gestures on the field + auxiliary buttons                           |
+| Timing              | Turn-based (time stops until the user places a pair)                      |
 
-## 4. 全体アーキテクチャ
+## 4. Overall Architecture
 
 ```
 ┌────────────────────────────────────────────────────────┐
@@ -63,66 +62,66 @@
 │  │  - NextQueue     │      │  }                   │    │
 │  │  - GhostOverlay  │      │                      │    │
 │  │  - CandidateList │      │  ├─ HeuristicAI      │    │
-│  │  - Stats         │      │  │  (フェーズ1)       │    │
+│  │  - Stats         │      │  │  (Phase 1)        │    │
 │  └──────────────────┘      │  └─ DqnAI            │    │
-│         ↕                  │     (フェーズ2)       │    │
-│  ┌──────────────────┐      │     TF.jsで重み読込   │    │
-│  │  Game Core       │      └──────────────────────┘    │
-│  │  (Pure TS)       │              ↑                   │
-│  │                  │              │                   │
-│  │  - GameState     │──────────────┘ 読み取り専用       │
-│  │  - applyMove()   │                                  │
+│         ↕                  │     (Phase 2)        │    │
+│  ┌──────────────────┐      │     loads weights    │    │
+│  │  Game Core       │      │     via TF.js        │    │
+│  │  (Pure TS)       │      └──────────────────────┘    │
+│  │                  │              ↑                   │
+│  │  - GameState     │              │                   │
+│  │  - applyMove()   │──────────────┘ read-only         │
 │  │  - resolveChain()│                                  │
 │  │  - isGameOver()  │                                  │
 │  └──────────────────┘                                  │
 └────────────────────────────────────────────────────────┘
                             │
-                ─────────── 別プロジェクト ────────────
+                ─────────── separate project ──────────
                             ▼
 ┌────────────────────────────────────────────────────────┐
 │                  Training Pipeline (Python)            │
 │                                                        │
-│  - puyo/env.py       (ゲームロジックのPython移植)        │
+│  - puyo/env.py       (Python port of game logic)       │
 │  - dqn/agent.py      (PyTorch)                         │
-│  - dqn/train.py      (ローカル/Colab両対応)             │
-│  - scripts/export_to_tfjs.py (重みをTF.js形式に変換)   │
+│  - dqn/train.py      (works locally and on Colab)      │
+│  - scripts/export_to_tfjs.py (convert weights to TF.js)│
 └────────────────────────────────────────────────────────┘
 ```
 
-### 原則
+### Principles
 
-- **Game Core は純粋関数の集合**。GameState を受け取り新しい GameState を返す。
-  React も TF.js も知らない。
-- **AI はプラグイン**。`PuyoAI` を実装すればヒューリスティックでもDQNでも差し替え可能。
-- **Python と TypeScript の整合性**は、`src/shared/specs/game_spec.json` に
-  大量のテストケース(初期盤面 → 操作 → 期待盤面)を書き、両側から読んで
-  テストすることで担保する。
+- **The Game Core is a set of pure functions.** It takes a GameState and returns a new GameState.
+  It knows nothing about React or TF.js.
+- **AIs are plugins.** Anything that implements `PuyoAI` — heuristic or DQN — can be swapped in.
+- **Consistency between Python and TypeScript** is guaranteed by writing a large set of test cases
+  (initial field -> operations -> expected field) into `src/shared/specs/game_spec.json`, then
+  reading and testing them from both sides.
 
-## 5. ゲームコア(Game Core)
+## 5. Game Core
 
-### 5.1 データモデル
+### 5.1 Data Model
 
 ```typescript
-// ----- 基本型 -----
-type Color = 'R' | 'B' | 'Y' | 'P'; // 赤/青/黄/紫
-type Cell = Color | null; // null = 空マス
-type Rotation = 0 | 1 | 2 | 3; // 0:上 1:右 2:下 3:左 (軸からの子方向)
+// ----- Basic types -----
+type Color = 'R' | 'B' | 'Y' | 'P'; // Red / Blue / Yellow / Purple
+type Cell = Color | null; // null = empty cell
+type Rotation = 0 | 1 | 2 | 3; // 0:up 1:right 2:down 3:left (direction of child relative to axis)
 
-// 盤面サイズ
-const ROWS = 13; // うち row=0 が見えない天井段
+// Board size
+const ROWS = 13; // row=0 is the invisible ceiling row
 const COLS = 6;
-const VISIBLE_ROW_START = 1; // row=1..12 が通常表示域
-const SPAWN_COL = 2; // 0-indexed、「左から3列目」
+const VISIBLE_ROW_START = 1; // row=1..12 is the regular display area
+const SPAWN_COL = 2; // 0-indexed; "the 3rd column from the left"
 
-// ----- 盤面 -----
+// ----- Field -----
 interface Field {
   readonly cells: ReadonlyArray<ReadonlyArray<Cell>>; // [ROWS][COLS]
 }
 
-// ----- ツモ -----
+// ----- Pair -----
 interface Pair {
-  readonly axis: Color; // 軸ぷよ
-  readonly child: Color; // 子ぷよ
+  readonly axis: Color; // axis puyo
+  readonly child: Color; // child puyo
 }
 
 interface ActivePair {
@@ -132,19 +131,19 @@ interface ActivePair {
   readonly rotation: Rotation;
 }
 
-// ----- ゲーム全体 -----
+// ----- Whole game -----
 interface GameState {
   readonly field: Field;
   readonly current: ActivePair | null;
-  readonly nextQueue: ReadonlyArray<Pair>; // 先頭2つが NEXT/NEXT-NEXT
+  readonly nextQueue: ReadonlyArray<Pair>; // first two are NEXT/NEXT-NEXT
   readonly score: number;
-  readonly chainCount: number; // 直近で発生した連鎖数
-  readonly totalChains: number; // 累計
+  readonly chainCount: number; // number of chains in the most recent resolution
+  readonly totalChains: number; // cumulative
   readonly status: 'playing' | 'resolving' | 'gameover';
   readonly rngSeed: number;
 }
 
-// ----- 操作 -----
+// ----- Inputs -----
 type Input =
   | { type: 'moveLeft' }
   | { type: 'moveRight' }
@@ -153,7 +152,7 @@ type Input =
   | { type: 'softDrop' }
   | { type: 'hardDrop' };
 
-// ----- Move (AIが返す粒度) -----
+// ----- Move (the granularity returned by the AI) -----
 interface Move {
   readonly axisCol: number;
   readonly rotation: Rotation;
@@ -162,7 +161,7 @@ interface Move {
 }
 ```
 
-### 5.2 純粋関数群
+### 5.2 Pure Functions
 
 ```typescript
 function createInitialState(seed: number): GameState;
@@ -185,27 +184,27 @@ interface ChainStep {
 }
 ```
 
-### 5.3 ゲームルール仕様
+### 5.3 Game Rule Specification
 
-- **回転軸**: 軸ぷよを中心に子ぷよが回る本家仕様
-- **壁蹴り**: 回転先が壁/ブロックで不可なら軸を1マスずらして再試行
-- **クイックターン**: 両側が塞がれているときは180度回転を許可
-- **ちぎり**: 軸と子が違う高さになる場合は連結解除してそれぞれ独立に落下
-- **連結判定**: 4マス以上の同色連結を消去
-- **連鎖**: 消去 → 重力 → 再度連結チェック、を繰り返す
-- **スコア**: 本家式 `消去数 × (連鎖ボーナス + 連結ボーナス + 色数ボーナス) × 10`
-- **ツモ生成**: シード付きPRNGで決定論的に生成(AI学習でのエピソード再現のため)
-- **ゲームオーバー**: 出現位置(col=2, row=0)がすでに埋まっていて新ツモを置けないとき
+- **Rotation axis**: the child rotates around the axis puyo, matching the official spec
+- **Wall kick**: if rotation is blocked by a wall or block, shift the axis by one cell and retry
+- **Quick turn**: when both sides are blocked, allow a 180-degree rotation
+- **Split (chigiri)**: if the axis and child end up at different heights, break the connection and let them fall independently
+- **Group detection**: erase same-color connected groups of 4 or more
+- **Chain**: repeat erase -> gravity -> re-check for connected groups
+- **Scoring**: official formula `erased count x (chain bonus + group bonus + color bonus) x 10`
+- **Pair generation**: deterministic generation via a seeded PRNG (so episodes are reproducible during AI training)
+- **Game over**: when the spawn position (col=2, row=0) is already occupied and a new pair cannot be placed
 
-### 5.4 最上段(row=0)の扱い
+### 5.4 Handling of the Top Row (row=0)
 
-- 通常は落下途中のツモが一瞬通過する領域
-- 置いたぷよは存在可能。UI上は opacity 0.5 で半透明表示
-- col=2 の row=0 には「ここが埋まると終わり」を示す薄い枠を常時描画
+- Normally this is the area a falling pair passes through momentarily
+- Placed puyos may exist there. In the UI they are drawn semi-transparently with opacity 0.5
+- A faint border is always drawn at col=2 / row=0 to indicate "the game ends if this fills up"
 
-## 6. AI層
+## 6. AI Layer
 
-### 6.1 共通インターフェイス
+### 6.1 Common Interface
 
 ```typescript
 interface PuyoAI {
@@ -216,228 +215,229 @@ interface PuyoAI {
 }
 ```
 
-返り値は score 降順。UI は `moves[0]` をゴースト、`moves[0..topK]` を
-候補リストに使う。
+The return value is sorted by score in descending order. The UI uses `moves[0]` for the ghost and
+`moves[0..topK]` for the candidate list.
 
-### 6.2 フェーズ1: HeuristicAI
+### 6.2 Phase 1: HeuristicAI
 
-評価関数 + beam search (depth=2) で上位候補を列挙する。
+Enumerates the top candidates using an evaluation function plus beam search (depth=2).
 
-評価関数の項(初期重み):
+Evaluator terms (initial weights):
 
-| 項             | 意味                               | 符号            |
-| -------------- | ---------------------------------- | --------------- |
-| chainPotential | 今発火したら何連鎖か(ポテンシャル) | +               |
-| heightBalance  | 列ごとの高低差(小さいほど良)       | −               |
-| danger         | 3列目の高さ(高いほど危険)          | −               |
-| connection     | 2〜3連結の種の多さ                 | +               |
-| flatSurface    | 表面のでこぼこ具合                 | −               |
-| uShape         | U字/GTR的な形ができているか        | +               |
-| deathColor     | 消せなくなっている色の下敷きの数   | −               |
-| immediateChain | 今連鎖を発火してしまうこと         | −(早発火を抑制) |
+| Term           | Meaning                                              | Sign                          |
+| -------------- | ---------------------------------------------------- | ----------------------------- |
+| chainPotential | How many chains would fire if triggered now          | +                             |
+| heightBalance  | Per-column height variation (smaller is better)      | -                             |
+| danger         | Height of column 3 (taller is more dangerous)        | -                             |
+| connection     | Number of 2- to 3-puyo seed groups                   | +                             |
+| flatSurface    | Bumpiness of the top surface                         | -                             |
+| uShape         | Whether a U-shape / GTR-like structure is forming    | +                             |
+| deathColor     | Number of buried puyos of a color that can no longer be cleared | -                  |
+| immediateChain | Penalty for triggering a chain right now             | - (suppresses early ignition) |
 
-重みは `src/ai/heuristic/evaluator.ts` に定数化し、チューニング履歴と
-根拠を `docs/ai-tuning.md` に残す。
+The weights are defined as constants in `src/ai/heuristic/evaluator.ts`, and the tuning history and
+rationale are kept in `docs/ai-tuning.md`.
 
-**理由文生成**: 評価関数の各項のうち寄与が最大の項を文章化して `reason` に入れる。
-例: 「3連鎖の種を作るため」「GTR形を維持するため」「3列目の高さを下げるため」。
+**Reason text generation**: for each candidate, the evaluator term with the largest contribution is
+turned into a sentence and stored in `reason`. Examples: "to build a 3-chain seed", "to maintain the
+GTR shape", "to lower the height of column 3".
 
-### 6.3 フェーズ2: DqnAI
+### 6.3 Phase 2: DqnAI
 
-TF.jsで学習済みモデルをロードし、Q値ベクトルから候補を生成する。
+Loads a trained model with TF.js and generates candidates from the Q-value vector.
 
-**状態エンコーディング (TS/Python共通仕様)**
+**State encoding (shared spec for TS and Python)**
 
-入力テンソル: 形状 `[13, 6, 7]`
+Input tensor: shape `[13, 6, 7]`
 
-| チャンネル | 内容                                  |
-| ---------- | ------------------------------------- |
-| 0          | 赤ぷよの存在マップ                    |
-| 1          | 青ぷよの存在マップ                    |
-| 2          | 黄ぷよの存在マップ                    |
-| 3          | 紫ぷよの存在マップ                    |
-| 4          | 空マスマップ                          |
-| 5          | 現在のツモ情報(ブロードキャスト)      |
-| 6          | ネクスト2組の色情報(ブロードキャスト) |
+| Channel | Contents                                       |
+| ------- | ---------------------------------------------- |
+| 0       | Presence map of red puyos                      |
+| 1       | Presence map of blue puyos                     |
+| 2       | Presence map of yellow puyos                   |
+| 3       | Presence map of purple puyos                   |
+| 4       | Empty-cell map                                 |
+| 5       | Current pair info (broadcast)                  |
+| 6       | Color info of the next two pairs (broadcast)   |
 
-**出力**: 長さ22のQ値ベクトル。各インデックスは `(列, 回転)` の
-合法組み合わせに対応する。
+**Output**: a Q-value vector of length 22. Each index corresponds to a legal `(column, rotation)`
+combination.
 
-- 縦向き(軸上 or 軸下): 6列 × 2方向 = 12
-- 横向き(軸左 or 軸右): 5列 × 2方向 = 10
-- 合計: 22
+- Vertical (axis above or below): 6 columns x 2 directions = 12
+- Horizontal (axis left or right): 5 columns x 2 directions = 10
+- Total: 22
 
-`moveToActionIndex(move)` / `actionIndexToMove(idx, state)` は
-TS/Python両側で同一の仕様で実装する。
+`moveToActionIndex(move)` / `actionIndexToMove(idx, state)` are implemented to the same spec on
+both the TS and Python sides.
 
-**「なぜ」の説明**: Q値そのものを候補リストに表示(例: `Q=7.82`)。
-自然言語の理由生成はフェーズ2の範囲外。
+**"Why" explanation**: the Q value itself is shown in the candidate list (e.g. `Q=7.82`).
+Natural-language reason generation is out of scope for Phase 2.
 
-### 6.4 非同期モデル
+### 6.4 Asynchronous Model
 
-- ツモ出現時(nextQueue変化時)に非同期で `suggest()` を呼ぶ
-- 結果到着前はUIに「AI思考中…」を薄く表示
-- ユーザ操作はAIの完了を待たない(先に動かせる)
-- HeuristicAI/DqnAI ともに Web Worker 上で動かし、UI スレッドをブロックしない
+- Call `suggest()` asynchronously when a pair appears (when nextQueue changes)
+- Show a faint "AI thinking..." indicator in the UI until results arrive
+- User input does not wait for the AI to finish (the user can act first)
+- Both HeuristicAI and DqnAI run on a Web Worker so the UI thread is not blocked
 
-## 7. UI層
+## 7. UI Layer
 
-### 7.1 レイアウト(レスポンシブ)
+### 7.1 Layout (Responsive)
 
-| ブレークポイント | 構成                            |
-| ---------------- | ------------------------------- |
-| sm (<640px)      | 縦1カラム(スマホメイン)         |
-| md (<1024px)     | 縦2カラム(盤面左、サイドに情報) |
-| lg (≥1024px)     | 横3カラム(盤面/NEXT/候補)       |
+| Breakpoint   | Composition                                                |
+| ------------ | ---------------------------------------------------------- |
+| sm (<640px)  | Single column, vertical (mobile-first)                     |
+| md (<1024px) | Two columns, vertical (board on the left, info on the side)|
+| lg (>=1024px)| Three columns, horizontal (board / NEXT / candidates)      |
 
-### 7.2 スマホ縦レイアウト
+### 7.2 Mobile Portrait Layout
 
 ```
 ┌─────────────────────────────┐
-│ Puyo Training       [AI ▼]  │  ヘッダー
+│ Puyo Training       [AI ▼]  │  Header
 ├─────────────────────────────┤
-│ NEXT NEXT-NEXT   Score      │  情報バー
+│ NEXT NEXT-NEXT   Score      │  Info bar
 │ [RB]   [YP]      12,480     │
 ├─────────────────────────────┤
 │                             │
 │                             │
-│    ┌─ 6列×13段 盤面 ─┐       │  ~60-65vh
-│    │                 │       │
-│    │                 │       │
-│    └─────────────────┘       │
+│   ┌─ 6-col x 13-row field ┐ │  ~60-65vh
+│   │                       │ │
+│   │                       │ │
+│   └───────────────────────┘ │
 │                             │
 ├─────────────────────────────┤
-│  ↻CCW   [   ↓ 確定   ]      │  補助ボタン
+│  ↻CCW   [   ↓ Confirm   ]   │  Auxiliary buttons
 ├─────────────────────────────┤
-│ [ AI候補 (5) ▲ ]            │  引き出しハンドル
+│ [ AI Candidates (5) ▲ ]     │  Drawer handle
 └─────────────────────────────┘
 ```
 
-### 7.3 タッチジェスチャー(盤面上)
+### 7.3 Touch Gestures (on the Field)
 
-| ジェスチャー   | 動作                                             |
-| -------------- | ------------------------------------------------ |
-| 左/右スワイプ  | 1列左/右に移動(40px/列で複数可)                  |
-| シングルタップ | 時計回り回転                                     |
-| ダブルタップ   | 反時計回り回転(誤操作防止のため補助ボタンも併設) |
-| 下スワイプ     | ハードドロップ                                   |
-| 長押し(0.5s)   | ソフトドロップ継続、離すと停止                   |
-| 上スワイプ     | AI候補リスト展開                                 |
+| Gesture                | Action                                                                |
+| ---------------------- | --------------------------------------------------------------------- |
+| Swipe left / right     | Move one column left / right (40px per column, multiple columns OK)   |
+| Single tap             | Rotate clockwise                                                      |
+| Double tap             | Rotate counterclockwise (an auxiliary button is also provided to avoid mistaps) |
+| Swipe down             | Hard drop                                                             |
+| Long press (0.5s)      | Continuous soft drop; stops when released                             |
+| Swipe up               | Expand the AI candidate list                                          |
 
-Pointer Events でマウス/タッチ/ペンを統一。補助ボタン `↻CCW` と
-`↓確定` は常設。
+Pointer Events unify mouse / touch / pen. The auxiliary buttons `↻CCW` and `↓ Confirm`
+are always present.
 
-### 7.4 キーボード操作(PC)
+### 7.4 Keyboard Controls (PC)
 
-| キー   | 動作                     |
-| ------ | ------------------------ |
-| ← / →  | 左右移動                 |
-| ↑ or X | 時計回り回転             |
-| Z      | 反時計回り回転           |
-| ↓      | ソフトドロップ           |
-| Space  | ハードドロップ           |
-| H      | ヒント表示切替           |
-| N      | 候補リスト切替           |
-| R      | リセット(確認ダイアログ) |
-| Esc    | ポーズ                   |
+| Key    | Action                              |
+| ------ | ----------------------------------- |
+| ← / →  | Move left / right                   |
+| ↑ or X | Rotate clockwise                    |
+| Z      | Rotate counterclockwise             |
+| ↓      | Soft drop                           |
+| Space  | Hard drop                           |
+| H      | Toggle hint display                 |
+| N      | Toggle candidate list               |
+| R      | Reset (with confirmation dialog)    |
+| Esc    | Pause                               |
 
-### 7.5 AIアドバイスの見せ方
+### 7.5 Presenting AI Advice
 
-- **ゴースト**: ベスト手の最終位置に該当色のぷよを opacity 0.4 +
-  破線アウトラインで表示。軸に「1」、子に「2」の小さな数字
-- **候補リスト**(引き出し): 上位5手を列挙
-  - カードに `順位 / 列+回転 / スコア or Q値 / 理由` を表示
-  - カードタップ → ゴーストがその候補に切り替わる
-  - `[実行]` ボタン → 自動着手(設定でOFF可能)
-- ユーザがツモを操作するとゴーストは一時非表示(操作を邪魔しない)
+- **Ghost**: the best move's final placement is drawn at opacity 0.4 with a dashed outline in the
+  appropriate colors. A small "1" is shown on the axis and "2" on the child.
+- **Candidate list** (drawer): the top 5 moves are listed
+  - Each card shows `rank / column + rotation / score or Q value / reason`
+  - Tapping a card switches the ghost to that candidate
+  - An `[Execute]` button auto-places the move (can be turned off in settings)
+- The ghost is temporarily hidden while the user is moving the pair (so it does not get in the way)
 
-### 7.6 連鎖アニメーション
+### 7.6 Chain Animation
 
-`ChainStep[]` を順再生:
+Replay `ChainStep[]` in order:
 
-1. 消去対象フラッシュ(0.3s)
-2. 消去とスコア加算、「n連鎖!」表示
-3. 重力落下(0.2s)
-4. 次ステップへ
+1. Flash the cells about to be erased (0.3s)
+2. Erase and add to the score; show "n-chain!"
+3. Gravity falls (0.2s)
+4. Move to the next step
 
-再生速度: 0.5x / 1x / 2x / スキップ を設定から選択可。
+Playback speed: 0.5x / 1x / 2x / skip — selectable from settings.
 
-### 7.7 描画戦略
+### 7.7 Rendering Strategy
 
-- 盤面は **Canvas API 直描き**(SVGはノード増で重い、PixiJSはオーバー)
-- それ以外(パネル、候補リスト等)は React + Tailwind
-- 状態管理は Zustand
+- The field is **drawn directly with the Canvas API** (SVG is heavy due to many nodes; PixiJS is overkill)
+- Everything else (panels, candidate list, etc.) uses React + Tailwind
+- State management uses Zustand
 
-### 7.8 モバイル固有の配慮
+### 7.8 Mobile-Specific Considerations
 
-- タップ領域 最小44×44px
-- `env(safe-area-inset-*)` でセーフエリア対応
-- Wake Lock API で画面スリープ抑止(任意)
-- `user-scalable=no` でピンチズーム抑止
-- `navigator.vibrate(10)` で着地ハプティクス(対応端末のみ)
-- 横向きは md/lg レイアウトに切り替え
+- Minimum tap target: 44x44px
+- Honor safe areas with `env(safe-area-inset-*)`
+- Optionally use the Wake Lock API to prevent screen sleep
+- Disable pinch-zoom with `user-scalable=no`
+- Provide haptic feedback on landing via `navigator.vibrate(10)` (only on supported devices)
+- In landscape, switch to the md/lg layout
 
 ## 8. PWA
 
-- `manifest.webmanifest`: アイコン、テーマカラー、display: standalone
-- Service Worker: アプリシェルをキャッシュ、オフライン起動可
-- モデルファイル(`/models/dqn-v1/*`)は Cache API で個別管理し、
-  バージョン更新時のみ差分取得
-- iOS Safari の Add to Home Screen 用に splash screen 画像を準備
-- 実装: `vite-plugin-pwa` (Workbox ベース)
+- `manifest.webmanifest`: icons, theme color, display: standalone
+- Service Worker: caches the app shell, allowing offline launch
+- Model files (`/models/dqn-v1/*`) are managed individually with the Cache API, fetching diffs only
+  on version updates
+- Prepare splash screen images for iOS Safari "Add to Home Screen"
+- Implementation: `vite-plugin-pwa` (Workbox-based)
 
-## 9. 機械学習パイプライン(Phase 5以降)
+## 9. Machine Learning Pipeline (Phase 5 onward)
 
-### 9.1 環境・アルゴリズム
+### 9.1 Environment and Algorithm
 
-- 言語: Python 3.11+
-- フレームワーク: PyTorch
-- アルゴリズム: DQN(Double DQN + Prioritized Experience Replay を基本)
-- 状態/行動空間: 7章の `DqnAI` と同一仕様
+- Language: Python 3.11+
+- Framework: PyTorch
+- Algorithm: DQN (Double DQN + Prioritized Experience Replay as the baseline)
+- State / action space: identical spec to `DqnAI` in section 7
 
-### 9.2 学習フロー
+### 9.2 Training Flow
 
-1. **ローカルCPUデバッグ**(このMac想定): エピソード数百〜数千で
-   正しく学習できるか動作確認
-2. **Google Colab 無料枠(T4 GPU)** で本格学習
-3. 必要なら Colab Pro / vast.ai / RunPod に拡張
+1. **Local CPU debugging** (assumed to be this Mac): verify that learning works correctly with
+   a few hundred to a few thousand episodes
+2. **Full training on Google Colab free tier (T4 GPU)**
+3. If needed, scale out to Colab Pro / vast.ai / RunPod
 
-`train.py` は `--device auto` で CPU/GPU を自動判定。
-同じコードがローカルでもColabでも動く。`notebooks/train_colab.ipynb` は
-Colabでボタン1つで起動できるラッパ。
+`train.py` auto-detects CPU/GPU via `--device auto`.
+The same code runs locally and on Colab. `notebooks/train_colab.ipynb` is a wrapper that lets you
+launch training on Colab with a single click.
 
-### 9.3 Python ↔ TypeScript 整合性
+### 9.3 Python <-> TypeScript Consistency
 
-- `src/shared/specs/game_spec.json` にテストケース(初期盤面・操作列・
-  期待盤面)を記述
-- TS側は `game_spec.test.ts` で読み、Python側は `test_game_spec.py` で読む
-- CIで両方実行、どちらかが落ちたら即検知
+- `src/shared/specs/game_spec.json` describes test cases (initial field, operation sequence,
+  expected field)
+- The TS side reads it via `game_spec.test.ts`; the Python side reads it via `test_game_spec.py`
+- CI runs both, so a regression on either side is detected immediately
 
-### 9.4 モデル変換・配信
+### 9.4 Model Conversion and Delivery
 
-- PyTorch → ONNX → TF.js の変換スクリプト(`scripts/export_to_tfjs.py`)
-- 出力物は `public/models/dqn-vN/{model.json, weights.bin}`
-- バージョンはディレクトリ名に含め、複数モデルの切替を可能にする
-- モデルサイズ目標: ≤ 2 MB(モバイル初回ロード考慮)
+- Conversion script PyTorch -> ONNX -> TF.js (`scripts/export_to_tfjs.py`)
+- Output goes to `public/models/dqn-vN/{model.json, weights.bin}`
+- The version is included in the directory name so multiple models can be switched
+- Target model size: <= 2 MB (to keep the initial mobile load light)
 
-## 10. 開発フェーズ
+## 10. Development Phases
 
-| #   | フェーズ               | 目安   | 主なアウトプット                               |
-| --- | ---------------------- | ------ | ---------------------------------------------- |
-| 0   | プロジェクト基盤       | 0.5日  | Vite + React + TS + PWA + CI                   |
-| 1   | ゲームコア             | 2-3日  | 純粋関数群、game_spec.jsonテスト               |
-| 2   | UI基本                 | 2-3日  | Canvas盤面、レスポンシブレイアウト、連鎖アニメ |
-| 3   | 入力                   | 1-2日  | タッチジェスチャー、キーボード、補助ボタン     |
-| 4   | ヒューリスティックAI   | 2-3日  | HeuristicAI + 候補UI → **MVP完成**             |
-| 5   | Python学習パイプライン | 3-5日  | env.py, dqn agent, train.py                    |
-| 6   | DQN学習                | 数日〜 | 学習済みモデル                                 |
-| 7   | TF.js統合              | 1-2日  | DqnAI、切替UI                                  |
-| 8   | 仕上げ                 | 1-2日  | アクセシビリティ、デプロイ                     |
+| #   | Phase                       | Estimate     | Key Outputs                                              |
+| --- | --------------------------- | ------------ | -------------------------------------------------------- |
+| 0   | Project foundation          | 0.5 day      | Vite + React + TS + PWA + CI                             |
+| 1   | Game core                   | 2-3 days     | Pure functions, game_spec.json tests                     |
+| 2   | UI basics                   | 2-3 days     | Canvas board, responsive layout, chain animation         |
+| 3   | Input                       | 1-2 days     | Touch gestures, keyboard, auxiliary buttons              |
+| 4   | Heuristic AI                | 2-3 days     | HeuristicAI + candidate UI -> **MVP complete**           |
+| 5   | Python training pipeline    | 3-5 days     | env.py, dqn agent, train.py                              |
+| 6   | DQN training                | several days+| Trained model                                            |
+| 7   | TF.js integration           | 1-2 days     | DqnAI, switching UI                                      |
+| 8   | Polish                      | 1-2 days     | Accessibility, deployment                                |
 
-**MVP は Phase 4 完了時点**。ここで公開してフィードバックを集めることも可能。
-Phase 5 以降は ML 強化として独立した別トラックで進められる。
+**The MVP is reached at the end of Phase 4.** It is possible to release at this point and gather
+feedback. Phase 5 onward can proceed as an independent ML-enhancement track.
 
-## 11. ファイル/ディレクトリ構成
+## 11. File / Directory Layout
 
 ```
 puyo-simulator/
@@ -452,7 +452,7 @@ puyo-simulator/
 │  ├─ manifest.webmanifest
 │  ├─ icons/
 │  └─ models/
-│     └─ dqn-v1/                # Phase 7 で追加
+│     └─ dqn-v1/                # added in Phase 7
 │        ├─ model.json
 │        └─ weights.bin
 │
@@ -460,7 +460,7 @@ puyo-simulator/
 │  ├─ main.tsx
 │  ├─ App.tsx
 │  │
-│  ├─ game/                     # 純粋ロジック、副作用なし
+│  ├─ game/                     # pure logic, no side effects
 │  │  ├─ types.ts
 │  │  ├─ constants.ts
 │  │  ├─ rng.ts
@@ -475,7 +475,7 @@ puyo-simulator/
 │  │     └─ game_spec.test.ts
 │  │
 │  ├─ ai/
-│  │  ├─ types.ts               # PuyoAI インターフェイス
+│  │  ├─ types.ts               # PuyoAI interface
 │  │  ├─ heuristic/
 │  │  │  ├─ evaluator.ts
 │  │  │  ├─ search.ts
@@ -508,7 +508,7 @@ puyo-simulator/
 │  │
 │  └─ shared/
 │     └─ specs/
-│        └─ game_spec.json      # TS/Python 共通テストケース
+│        └─ game_spec.json      # shared TS/Python test cases
 │
 ├─ python/                      # Phase 5+
 │  ├─ pyproject.toml
@@ -540,52 +540,52 @@ puyo-simulator/
       └─ deploy.yml
 ```
 
-## 12. 技術スタック
+## 12. Tech Stack
 
-| 領域           | 選定                                        |
-| -------------- | ------------------------------------------- |
-| ビルド         | Vite                                        |
-| フレームワーク | React 18+ (関数コンポーネント + Hooks)      |
-| 言語           | TypeScript 5+ (strict mode)                 |
-| スタイル       | Tailwind CSS                                |
-| 盤面描画       | Canvas API                                  |
-| 状態管理       | Zustand                                     |
-| テスト         | Vitest + React Testing Library + Playwright |
-| AI(推論)       | TensorFlow.js (WebGL backend)               |
-| AI(学習)       | Python 3.11+ + PyTorch                      |
-| PWA            | vite-plugin-pwa (Workbox)                   |
-| CI/CD          | GitHub Actions                              |
-| デプロイ       | GitHub Pages または Cloudflare Pages        |
+| Area                | Choice                                          |
+| ------------------- | ----------------------------------------------- |
+| Build               | Vite                                            |
+| Framework           | React 18+ (function components + Hooks)         |
+| Language            | TypeScript 5+ (strict mode)                     |
+| Styling             | Tailwind CSS                                    |
+| Field rendering     | Canvas API                                      |
+| State management    | Zustand                                         |
+| Tests               | Vitest + React Testing Library + Playwright     |
+| AI (inference)      | TensorFlow.js (WebGL backend)                   |
+| AI (training)       | Python 3.11+ + PyTorch                          |
+| PWA                 | vite-plugin-pwa (Workbox)                       |
+| CI/CD               | GitHub Actions                                  |
+| Hosting             | GitHub Pages or Cloudflare Pages                |
 
-## 13. テスト戦略
+## 13. Test Strategy
 
-- **ゲームコア**: Vitest で単体テスト。`game_spec.json` にエッジケース
-  (壁蹴り、クイックターン、連鎖、ちぎり、ゲームオーバー判定など)を
-  大量に記述し、TS/Python両方から読む
-- **AI層**: 既知の盤面に対して最善手が正しくTop1に来るかをテスト
-  (例: 「発火すれば4連鎖」の盤面で発火手が1位か)
-- **UI層**: コンポーネントは React Testing Library、E2Eは Playwright で
-  主要フロー(操作→着地→連鎖)を1本
-- **Python側**: pytest。学習パイプラインは smoke test
-  (数百エピソードで報酬が上がる傾向を確認)
+- **Game core**: unit-test with Vitest. Write a large number of edge cases (wall kick, quick turn,
+  chain, split, game-over detection, etc.) into `game_spec.json` and read them from both TS and Python.
+- **AI layer**: test that, for known fields, the best move is correctly returned at the top
+  (e.g., on a field where "firing yields a 4-chain", the firing move ranks #1).
+- **UI layer**: test components with React Testing Library; cover the main flow (input -> landing
+  -> chain) with one Playwright E2E test.
+- **Python side**: pytest. The training pipeline gets a smoke test (verifying that reward
+  trends upward over a few hundred episodes).
 
-## 14. リスクと対策
+## 14. Risks and Mitigations
 
-| リスク                                         | 対策                                                                                           |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| 本家準拠ルールの詳細(スコア係数など)が仕様揺れ | 実装前に公開されている仕様まとめを一箇所集めて `docs/puyo-rules.md` に書き出す                 |
-| TS/Python ロジック二重管理                     | `game_spec.json` を Single Source of Truth とし、両側でテスト                                  |
-| モバイルWebGLの推論速度                        | Phase 6でモデルサイズとレイテンシをベンチし、必要なら蒸留/量子化                               |
-| DQN学習がローカルPCで現実的でない              | 早期にColabで回す段取りを作り、ローカルは動作確認のみに絞る                                    |
-| 学習したAIが強くならない                       | HeuristicAI をベースラインに必ず勝てるかで評価。勝てなければ報酬設計・ネットワーク構造を見直し |
-| PWAモデル更新時のキャッシュ汚染                | モデルはバージョン別ディレクトリで管理、古いモデルは Cache API から明示削除                    |
+| Risk                                                              | Mitigation                                                                                                                          |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| The detailed official rules (score coefficients, etc.) are unstable | Before implementing, gather published rule summaries in one place and write them out in `docs/puyo-rules.md`                       |
+| Duplicated TS/Python logic management                             | Treat `game_spec.json` as the single source of truth and test from both sides                                                        |
+| Inference speed of mobile WebGL                                   | In Phase 6 benchmark model size and latency, and apply distillation/quantization if needed                                          |
+| DQN training is impractical on a local PC                         | Set up a Colab pipeline early and use the local machine only for sanity checks                                                       |
+| The trained AI does not get strong                                | Evaluate by whether it can reliably beat HeuristicAI as a baseline; if it cannot, revisit reward design and network architecture     |
+| Cache pollution when updating the PWA model                       | Manage models in version-specific directories and explicitly delete old ones from the Cache API                                      |
 
-## 15. オープン事項(今後詰める)
+## 15. Open Questions (to be resolved later)
 
-- 本家スコア式の厳密な係数(連鎖ボーナス表、連結ボーナス表、色数ボーナス表)
-- 評価関数の初期重みの具体値(HeuristicAI実装時にチューニング)
-- DQNハイパーパラメータ(バッチサイズ、学習率、γ、ε-greedyスケジュール)
-- モデルのネットワーク構造詳細(初期案: Conv2D×2 + Dense×2 の小規模CNN)
-- ホスティング先の最終決定(GitHub Pages / Cloudflare Pages)
+- Exact coefficients of the official scoring formula (chain bonus table, group bonus table, color count bonus table)
+- Concrete initial weights for the evaluation function (to be tuned when implementing HeuristicAI)
+- DQN hyperparameters (batch size, learning rate, gamma, epsilon-greedy schedule)
+- Detailed network architecture of the model (initial proposal: a small CNN with Conv2D x 2 + Dense x 2)
+- Final hosting choice (GitHub Pages / Cloudflare Pages)
 
-これらは実装フェーズ中に確定させて個別のドキュメント or コードコメントに残す。
+These will be finalized during the implementation phases and documented in dedicated documents or
+code comments.

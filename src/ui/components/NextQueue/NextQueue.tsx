@@ -38,8 +38,9 @@ function Dot({ color, size }: { color: Color | undefined; size: number }) {
   const style: React.CSSProperties = { width: size, height: size };
   if (!color) return <div className="rounded-full bg-slate-700" style={style} />;
 
-  // Board.tsx の drawPuyo と同じ見た目。CSS radial-gradient + 暗色 border +
-  // 中央に頭文字。光源は左上に置いて canvas 側と揃える。
+  // Same look as drawPuyo in Board.tsx: CSS radial-gradient + dark border +
+  // initial letter in the center. Light source is at the upper-left to
+  // match the canvas rendering.
   const fontSize = Math.round(size * 0.5);
   const borderWidth = Math.max(1, Math.round(size * 0.08));
   return (

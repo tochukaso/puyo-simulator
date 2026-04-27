@@ -19,9 +19,10 @@ const CHAR_B = 66;
 const CHAR_Y = 89;
 const CHAR_P = 80;
 
-// 1 つの WasmAmaAI インスタンスは 1 つの WASM バリアント (default / gtr-only) に
-// バインドされる。fieldBuf/outBuf は variant 固有の Module ヒープ上に malloc されるため、
-// バリアントを跨いで使い回すことはできない。preset(重み)は variant 内で切替可能。
+// A single WasmAmaAI instance is bound to a single WASM variant
+// (default / gtr-only). fieldBuf/outBuf are malloc'd on that variant's Module
+// heap, so buffers cannot be shared across variants. The preset (weights) can
+// be switched within a variant.
 export class WasmAmaAI implements PuyoAI {
   readonly name = 'ama-wasm';
   get version(): string {
@@ -117,7 +118,7 @@ export class WasmAmaAI implements PuyoAI {
     const moves: Move[] = [];
     for (let i = 0; i < n; i++) {
       const p = this.outBuf + i * 8;
-      // out バッファ内訳: [axisCol, rotation, score(int32 LE), expectedChain, _]
+      // out buffer layout: [axisCol, rotation, score(int32 LE), expectedChain, _]
       const score =
         heap[p + 2]! |
         (heap[p + 3]! << 8) |

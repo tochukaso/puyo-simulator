@@ -16,6 +16,7 @@ export interface Dict {
   'header.trainer': string;
   'header.trainerOff': string;
   'header.trainerGtr': string;
+  'header.trainerKaidan': string;
   'header.language': string;
   'stats.score': string;
   'stats.chain': string;
@@ -50,6 +51,7 @@ export const translations: Record<Lang, Dict> = {
     'header.trainer': 'テンプレ',
     'header.trainerOff': 'なし',
     'header.trainerGtr': 'GTR',
+    'header.trainerKaidan': '階段',
     'header.language': '言語',
     'stats.score': 'スコア',
     'stats.chain': '連鎖',
@@ -82,6 +84,7 @@ export const translations: Record<Lang, Dict> = {
     'header.trainer': 'Template',
     'header.trainerOff': 'None',
     'header.trainerGtr': 'GTR',
+    'header.trainerKaidan': 'Staircase',
     'header.language': 'Language',
     'stats.score': 'Score',
     'stats.chain': 'Chain',
@@ -114,6 +117,7 @@ export const translations: Record<Lang, Dict> = {
     'header.trainer': '模板',
     'header.trainerOff': '无',
     'header.trainerGtr': 'GTR',
+    'header.trainerKaidan': '阶梯',
     'header.language': '语言',
     'stats.score': '得分',
     'stats.chain': '连锁',
@@ -146,6 +150,7 @@ export const translations: Record<Lang, Dict> = {
     'header.trainer': '템플릿',
     'header.trainerOff': '없음',
     'header.trainerGtr': 'GTR',
+    'header.trainerKaidan': '계단',
     'header.language': '언어',
     'stats.score': '점수',
     'stats.chain': '연쇄',

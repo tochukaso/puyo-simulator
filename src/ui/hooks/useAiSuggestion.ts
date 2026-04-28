@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useGameStore } from '../store';
 import type { GameState, Move } from '../../game/types';
 import type { AiKind as Kind } from '../../ai/types';
-import type { AmaVariant } from '../../ai/wasm-ama/wasm-loader';
 
 // Singleton Worker: the Header selector and the Suggestion hook share the
 // same Worker; when set-ai switches the AI, the next suggest uses the new one.
@@ -80,11 +79,11 @@ function getWorker(): Worker {
   return w;
 }
 
-export function setAiKind(kind: Kind, preset?: string, variant?: AmaVariant): void {
+export function setAiKind(kind: Kind, preset?: string): void {
   currentAiKind = kind;
   currentAiReady = false;
   for (const h of aiReadyHandlers) h(kind, false);
-  getWorker().postMessage({ type: 'set-ai', kind, preset, variant });
+  getWorker().postMessage({ type: 'set-ai', kind, preset });
 }
 
 function requestSuggestFor(state: GameState): void {

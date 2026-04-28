@@ -1,12 +1,7 @@
-import {
-  loadAmaModule,
-  setAmaPreset,
-  type AmaVariant,
-} from '../src/ai/wasm-ama/wasm-loader';
+import { loadAmaModule, setAmaPreset } from '../src/ai/wasm-ama/wasm-loader';
 
-// usage: npx tsx scripts/dump-ama-weights.ts [preset] [variant]
-//   preset:  build (default) | gtr | ac | fast | freestyle
-//   variant: default (default) | gtr-only
+// usage: npx tsx scripts/dump-ama-weights.ts [preset]
+//   preset:  build (default) | gtr | kaidan | ac | fast | freestyle
 
 const KEYS = [
   'chain', 'y', 'key', 'chi',
@@ -17,12 +12,10 @@ const KEYS = [
 
 async function main() {
   const preset = process.argv[2] ?? 'build';
-  const variant = (process.argv[3] ?? 'default') as AmaVariant;
-  const m = await loadAmaModule(variant, preset);
-  await setAmaPreset(variant, preset);
+  const m = await loadAmaModule(preset);
+  await setAmaPreset(preset);
   const diag = m.cwrap('ama_diag_weight', 'number', ['number']);
-  console.log(`# variant: ${variant}`);
-  console.log(`# preset:  ${preset}`);
+  console.log(`# preset: ${preset}`);
   for (let i = 0; i < KEYS.length; i++) {
     const v = diag(i);
     console.log(`${i.toString().padStart(2)} ${KEYS[i]!.padEnd(10)} = ${v}`);

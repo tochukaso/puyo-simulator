@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 
-// Trainer mode. When 'gtr', the Header's "AI selection" is overridden to use
-// ama-wasm with the gtr preset, the Board lightly overlays the GTR template,
-// and a progress meter is displayed near the Stats.
+// Trainer mode. Selects which form preset is loaded into ama-wasm.
+//   off    : preset='build'   — default play, all forms active
+//   gtr    : preset='gtr'     — only GTR matched, AI is guided to build GTR
+//   kaidan : preset='kaidan'  — only KAIDAN (staircase) matched
 // Shared across components via a singleton + listener (same approach as useUiPrefs).
 
-export type TrainerMode = 'off' | 'gtr';
+export type TrainerMode = 'off' | 'gtr' | 'kaidan';
 
 const STORAGE_KEY = 'puyo.trainer.mode';
-const VALID: readonly TrainerMode[] = ['off', 'gtr'] as const;
+const VALID: readonly TrainerMode[] = ['off', 'gtr', 'kaidan'] as const;
 
 function readInitial(): TrainerMode {
   try {

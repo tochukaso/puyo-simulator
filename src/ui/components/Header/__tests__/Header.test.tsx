@@ -35,15 +35,17 @@ describe('Header', () => {
     expect(select.value).toBe('gtr');
   });
 
-  it('switches AI engine variant when trainer template changes', async () => {
+  it('switches preset on the unified ama-wasm when trainer template changes', async () => {
     const { setAiKind } = (await import('../../../hooks/useAiSuggestion')) as unknown as {
       setAiKind: ReturnType<typeof vi.fn>;
     };
     setAiKind.mockClear();
     render(<Header />);
-    // The initial effect should call setAiKind with the gtr-only variant.
-    expect(setAiKind).toHaveBeenLastCalledWith('ama-wasm', 'gtr', 'gtr-only');
+    // The initial effect should call setAiKind with preset='gtr'.
+    expect(setAiKind).toHaveBeenLastCalledWith('ama-wasm', 'gtr');
     await userEvent.selectOptions(screen.getByLabelText('Template'), 'off');
-    expect(setAiKind).toHaveBeenLastCalledWith('ama-wasm', 'build', 'default');
+    expect(setAiKind).toHaveBeenLastCalledWith('ama-wasm', 'build');
+    await userEvent.selectOptions(screen.getByLabelText('Template'), 'kaidan');
+    expect(setAiKind).toHaveBeenLastCalledWith('ama-wasm', 'kaidan');
   });
 });

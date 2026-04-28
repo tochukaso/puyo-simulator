@@ -13,6 +13,7 @@ export interface Dict {
   'app.title': string;
   'header.ghost': string;
   'header.ceiling': string;
+  'header.tapToDrop': string;
   'header.trainer': string;
   'header.trainerOff': string;
   'header.trainerGtr': string;
@@ -90,6 +91,7 @@ export const translations: Record<Lang, Dict> = {
     'app.title': 'ぷよトレーニング',
     'header.ghost': 'ゴースト',
     'header.ceiling': '天井',
+    'header.tapToDrop': 'タップで落下',
     'header.trainer': 'テンプレ',
     'header.trainerOff': 'なし',
     'header.trainerGtr': 'GTR',
@@ -165,6 +167,7 @@ export const translations: Record<Lang, Dict> = {
     'app.title': 'Puyo Training',
     'header.ghost': 'Ghost',
     'header.ceiling': 'Ceiling',
+    'header.tapToDrop': 'Tap to drop',
     'header.trainer': 'Template',
     'header.trainerOff': 'None',
     'header.trainerGtr': 'GTR',
@@ -240,6 +243,7 @@ export const translations: Record<Lang, Dict> = {
     'app.title': '噗哟训练',
     'header.ghost': '幽灵预览',
     'header.ceiling': '顶部',
+    'header.tapToDrop': '点击落下',
     'header.trainer': '模板',
     'header.trainerOff': '无',
     'header.trainerGtr': 'GTR',
@@ -315,6 +319,7 @@ export const translations: Record<Lang, Dict> = {
     'app.title': '뿌요 트레이닝',
     'header.ghost': '고스트',
     'header.ceiling': '천장',
+    'header.tapToDrop': '탭하여 낙하',
     'header.trainer': '템플릿',
     'header.trainerOff': '없음',
     'header.trainerGtr': 'GTR',

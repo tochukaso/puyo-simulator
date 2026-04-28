@@ -5,6 +5,8 @@ import {
   setGhostEnabled,
   useCeilingVisible,
   setCeilingVisible,
+  useTapToDropEnabled,
+  setTapToDropEnabled,
 } from '../../hooks/useUiPrefs';
 import {
   useTrainerMode,
@@ -24,6 +26,7 @@ import {
 export function Header() {
   const ghost = useGhostEnabled();
   const ceiling = useCeilingVisible();
+  const tapToDrop = useTapToDropEnabled();
   const trainer = useTrainerMode();
   const lang = useLang();
   const t = useT();
@@ -79,6 +82,16 @@ export function Header() {
               className="accent-blue-500"
             />
             {t('header.ceiling')}
+          </label>
+          <label className="text-sm flex items-center gap-1 select-none">
+            <input
+              type="checkbox"
+              aria-label={t('header.tapToDrop')}
+              checked={tapToDrop}
+              onChange={(e) => setTapToDropEnabled(e.target.checked)}
+              className="accent-blue-500"
+            />
+            {t('header.tapToDrop')}
           </label>
         </div>
         <select

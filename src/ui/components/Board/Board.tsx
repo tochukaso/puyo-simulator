@@ -6,6 +6,7 @@ import {
   useCeilingVisible,
   useBoardCellSize,
   setBoardCellSize,
+  useTapToDropEnabled,
 } from '../../hooks/useUiPrefs';
 import { usePreviewMove } from '../../hooks/useAiPreview';
 import { useT } from '../../../i18n';
@@ -31,6 +32,9 @@ export function Board() {
   const viewing = useGameStore((s) => s.viewing);
   const editing = useGameStore((s) => s.editing);
   const paintCell = useGameStore((s) => s.paintCell);
+  const commit = useGameStore((s) => s.commit);
+  const animating = useGameStore((s) => s.animatingSteps.length > 0);
+  const tapToDrop = useTapToDropEnabled();
   // While viewing the AI side, swap the game source. If the user scrubbed
   // the AI history slider (aiHistoryViewIndex set), render that snapshot.
   const game =
@@ -135,34 +139,69 @@ export function Board() {
     if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return null;
     return { row: r, col: c };
   };
+  // tap-to-drop: タップした列に現在のペアを即落下。
+  // 1 回のタップ = pointer down → up が同じ列で完了したケースのみ commit する。
+  // ドラッグして列が変わった場合は誤発火を防ぐためキャンセル(指をスライドして
+  // 「やっぱりやめた」を表現できる)。
+  const tapStartColRef = useRef<number | null>(null);
+  const canTapDrop =
+    tapToDrop && !editing && viewing === 'player' && !animating;
+
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!editing) return;
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    paintedThisStrokeRef.current = new Set();
-    const pos = pointerToCell(e);
-    if (!pos) return;
-    paintedThisStrokeRef.current.add(`${pos.row},${pos.col}`);
-    paintCell(pos.row, pos.col);
+    if (editing) {
+      e.preventDefault();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      paintedThisStrokeRef.current = new Set();
+      const pos = pointerToCell(e);
+      if (!pos) return;
+      paintedThisStrokeRef.current.add(`${pos.row},${pos.col}`);
+      paintCell(pos.row, pos.col);
+      return;
+    }
+    if (canTapDrop) {
+      const pos = pointerToCell(e);
+      if (!pos) return;
+      tapStartColRef.current = pos.col;
+    }
   };
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!editing) return;
-    if (e.buttons === 0 && e.pointerType === 'mouse') return; // only paint while held
-    const pos = pointerToCell(e);
-    if (!pos) return;
-    const key = `${pos.row},${pos.col}`;
-    if (paintedThisStrokeRef.current.has(key)) return;
-    paintedThisStrokeRef.current.add(key);
-    paintCell(pos.row, pos.col);
+    if (editing) {
+      if (e.buttons === 0 && e.pointerType === 'mouse') return; // only paint while held
+      const pos = pointerToCell(e);
+      if (!pos) return;
+      const key = `${pos.row},${pos.col}`;
+      if (paintedThisStrokeRef.current.has(key)) return;
+      paintedThisStrokeRef.current.add(key);
+      paintCell(pos.row, pos.col);
+      return;
+    }
+    if (canTapDrop && tapStartColRef.current !== null) {
+      const pos = pointerToCell(e);
+      // 列が変わったらキャンセル(誤タップ救済 / "やめた" ジェスチャ)。
+      if (pos && pos.col !== tapStartColRef.current) {
+        tapStartColRef.current = null;
+      }
+    }
   };
   const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!editing) return;
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch {
-      // ignore: capture may have already been lost
+    if (editing) {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {
+        // ignore: capture may have already been lost
+      }
+      paintedThisStrokeRef.current = new Set();
+      return;
     }
-    paintedThisStrokeRef.current = new Set();
+    if (!canTapDrop) return;
+    const pos = pointerToCell(e);
+    const startCol = tapStartColRef.current;
+    tapStartColRef.current = null;
+    if (pos === null || startCol === null) return;
+    if (pos.col !== startCol) return; // dragged off — abort
+    const cur = playerGame.current;
+    if (!cur) return;
+    void commit({ axisCol: startCol, rotation: cur.rotation });
   };
 
   return (
@@ -183,7 +222,13 @@ export function Board() {
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
-          className={`bg-slate-900 block ${editing ? 'cursor-crosshair ring-2 ring-blue-500/60' : ''}`}
+          className={`bg-slate-900 block ${
+            editing
+              ? 'cursor-crosshair ring-2 ring-blue-500/60'
+              : canTapDrop
+                ? 'cursor-pointer'
+                : ''
+          }`}
         />
         {chainTexts.map((entry) => (
           <div

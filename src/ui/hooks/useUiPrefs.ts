@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 // same value. Same approach as aiKind.
 const STORAGE_KEY_GHOST = 'puyo.ghost.enabled';
 const STORAGE_KEY_CEILING = 'puyo.ceiling.visible';
+const STORAGE_KEY_TAP_TO_DROP = 'puyo.tapToDrop.enabled';
 
 function readBoolPref(key: string, fallback: boolean): boolean {
   try {
@@ -62,6 +63,28 @@ export function useCeilingVisible(): boolean {
     ceilingListeners.add(setV);
     return () => {
       ceilingListeners.delete(setV);
+    };
+  }, []);
+  return v;
+}
+
+// タップした列に現在のペアを即落下する。回転は既存の CCW ボタンで事前変更。
+// OFF (既定) の時は従来どおり Left / Right / Drop のボタン操作のみ。
+let tapToDropEnabled = readBoolPref(STORAGE_KEY_TAP_TO_DROP, false);
+const tapToDropListeners = new Set<(v: boolean) => void>();
+
+export function setTapToDropEnabled(v: boolean): void {
+  tapToDropEnabled = v;
+  writeBoolPref(STORAGE_KEY_TAP_TO_DROP, v);
+  for (const h of tapToDropListeners) h(v);
+}
+
+export function useTapToDropEnabled(): boolean {
+  const [v, setV] = useState(tapToDropEnabled);
+  useEffect(() => {
+    tapToDropListeners.add(setV);
+    return () => {
+      tapToDropListeners.delete(setV);
     };
   }, []);
   return v;

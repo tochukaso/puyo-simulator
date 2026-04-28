@@ -17,6 +17,10 @@ const CHAR_R = 82;
 const CHAR_B = 66;
 const CHAR_Y = 89;
 const CHAR_P = 80;
+// Garbage / ojama. ama の wasm_api は現状 'G' を NONE 扱いするが、将来的に
+// 'G' → cell::Type::GARBAGE の認識が入ったら自動で活きるよう、こちら側で
+// 先に文字を送っておく (`docs/TODO.md` 参照)。
+const CHAR_G = 71;
 
 // 単一 WASM バイナリで全 form (GTR / FRON / SGTR / KAIDAN) をカバーし、
 // preset (weights + 有効 form) を実行時に切り替える。
@@ -84,6 +88,7 @@ export class WasmAmaAI implements PuyoAI {
         else if (cell === 'B') ch = CHAR_B;
         else if (cell === 'Y') ch = CHAR_Y;
         else if (cell === 'P') ch = CHAR_P;
+        else if (cell === 'G') ch = CHAR_G;
         heap[this.fieldBuf + r * 6 + c] = ch;
       }
     }

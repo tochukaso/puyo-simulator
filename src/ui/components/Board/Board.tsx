@@ -29,6 +29,8 @@ export function Board() {
   const aiHistory = useGameStore((s) => s.aiHistory);
   const aiHistoryViewIndex = useGameStore((s) => s.aiHistoryViewIndex);
   const viewing = useGameStore((s) => s.viewing);
+  const editing = useGameStore((s) => s.editing);
+  const paintCell = useGameStore((s) => s.paintCell);
   // While viewing the AI side, swap the game source. If the user scrubbed
   // the AI history slider (aiHistoryViewIndex set), render that snapshot.
   const game =
@@ -115,6 +117,54 @@ export function Board() {
     };
   }, [game, cell, bestMove, poppingCells, landedCells, yOffset]);
 
+  // Edit-mode: tap & drag-paint. Track which cells we already painted in the
+  // current pointer stroke so re-entering a cell on the same drag doesn't
+  // trigger the "same color → erase" toggle (that toggle is intended for
+  // discrete taps only).
+  const paintedThisStrokeRef = useRef<Set<string>>(new Set());
+  const pointerToCell = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    // Convert canvas-pixel coords back to logical (row, col), accounting for
+    // the optional ceiling-row hidden offset.
+    const c = Math.floor((x / rect.width) * COLS);
+    const visibleH = visibleRows;
+    const rVisible = Math.floor((y / rect.height) * visibleH);
+    const r = ceilingVisible ? rVisible : rVisible + 1;
+    if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return null;
+    return { row: r, col: c };
+  };
+  const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!editing) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    paintedThisStrokeRef.current = new Set();
+    const pos = pointerToCell(e);
+    if (!pos) return;
+    paintedThisStrokeRef.current.add(`${pos.row},${pos.col}`);
+    paintCell(pos.row, pos.col);
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!editing) return;
+    if (e.buttons === 0 && e.pointerType === 'mouse') return; // only paint while held
+    const pos = pointerToCell(e);
+    if (!pos) return;
+    const key = `${pos.row},${pos.col}`;
+    if (paintedThisStrokeRef.current.has(key)) return;
+    paintedThisStrokeRef.current.add(key);
+    paintCell(pos.row, pos.col);
+  };
+  const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!editing) return;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      // ignore: capture may have already been lost
+    }
+    paintedThisStrokeRef.current = new Set();
+  };
+
   return (
     <div
       ref={wrapperRef}
@@ -129,7 +179,11 @@ export function Board() {
           ref={canvasRef}
           width={boardWidth}
           height={boardHeight}
-          className="bg-slate-900 block"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          className={`bg-slate-900 block ${editing ? 'cursor-crosshair ring-2 ring-blue-500/60' : ''}`}
         />
         {chainTexts.map((entry) => (
           <div
@@ -263,7 +317,8 @@ function drawConnectors(ctx: CanvasRenderingContext2D, field: Field, cell: numbe
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       const color = field.cells[r]![c]!;
-      if (color === null) continue;
+      // Garbage doesn't form connections — skip drawing connector bars for it.
+      if (color === null || color === 'G') continue;
       const hex = PUYO_COLORS[color];
       const cx = c * cell + cell / 2;
       const cy = r * cell + cell / 2;
@@ -337,7 +392,7 @@ function drawPuyo(
   ctx: CanvasRenderingContext2D,
   row: number,
   col: number,
-  color: Color,
+  color: Color | 'G',
   alpha: number,
   cell: number,
   scale: PuyoScale = ONE_SCALE,
@@ -378,6 +433,26 @@ function drawPuyo(
   ctx.stroke();
   ctx.restore();
 
+  // Garbage has no letter; show a small inner highlight instead so it still
+  // reads as a puyo at a glance.
+  if (color === 'G') {
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.85;
+    ctx.fillStyle = PUYO_LIGHT[color];
+    ctx.beginPath();
+    ctx.ellipse(
+      cx - rx * 0.25,
+      centerY - ry * 0.3,
+      Math.max(2, rx * 0.18),
+      Math.max(2, ry * 0.18),
+      0,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
   drawSymbol(ctx, cx, centerY, color, cell, scale, alpha);
 }
 

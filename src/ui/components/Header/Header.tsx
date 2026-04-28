@@ -32,6 +32,9 @@ export function Header() {
   const setGameMode = useGameStore((s) => s.setGameMode);
   const setMatchTurnLimit = useGameStore((s) => s.setMatchTurnLimit);
   const startMatch = useGameStore((s) => s.startMatch);
+  const editing = useGameStore((s) => s.editing);
+  const enterEditMode = useGameStore((s) => s.enterEditMode);
+  const exitEditMode = useGameStore((s) => s.exitEditMode);
 
   // ama-wasm に統一。trainer mode に応じて preset (form 集合 + weight) を切替。
   useEffect(() => {
@@ -119,6 +122,30 @@ export function Header() {
             <option value="200">200</option>
           </select>
         )}
+        {/* 編集モードトグル。マッチ中に編集に入ろうとしたら 1 回だけ確認を出す
+            (マッチを抜けて編集に入る方針。盤面が変わるので再開不可)。 */}
+        <button
+          type="button"
+          onClick={() => {
+            if (editing) {
+              exitEditMode(true);
+              return;
+            }
+            if (mode === 'match') {
+              if (!confirm(t('edit.matchExitConfirm'))) return;
+              setGameMode('free');
+            }
+            enterEditMode();
+          }}
+          aria-pressed={editing}
+          className={`px-3 py-1 rounded text-sm border ${
+            editing
+              ? 'bg-blue-600 border-blue-400 text-white'
+              : 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700'
+          }`}
+        >
+          {editing ? t('edit.editing') : t('edit.edit')}
+        </button>
         <label className="text-sm flex items-center gap-2">
           <span className="sr-only">{t('header.language')}</span>
           <select

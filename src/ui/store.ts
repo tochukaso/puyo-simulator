@@ -1,6 +1,16 @@
 import { create } from 'zustand';
-import type { GameState, Field, Input, Move, ChainStep } from '../game/types';
-import { ROWS, COLS } from '../game/constants';
+import type {
+  GameState,
+  Field,
+  Input,
+  Move,
+  ChainStep,
+  Cell,
+  Color,
+  ActivePair,
+  Pair,
+} from '../game/types';
+import { ROWS, COLS, SPAWN_AXIS_ROW, SPAWN_COL } from '../game/constants';
 import { createInitialState, spawnNext } from '../game/state';
 import { applyInput } from '../game/moves';
 import { resolveChain } from '../game/chain';
@@ -57,6 +67,20 @@ export type CommitSource = 'user' | 'ai';
 export type GameMode = 'free' | 'match';
 export type MatchTurnLimit = 100 | 200;
 export type ViewSide = 'player' | 'ai';
+
+/** Edit-mode palette selection. 'X' = eraser. */
+export type EditPalette = Color | 'G' | 'X';
+/** Which pair slot is being edited (0 = current, 1 = next, 2 = next-next). */
+export type EditPairSlot = 0 | 1 | 2;
+/** Which puyo of a pair is targeted. */
+export type EditPairWhich = 'axis' | 'child';
+
+/** Snapshot kept while edit mode is active so Cancel can revert exactly. */
+interface EditSnapshot {
+  field: Field;
+  current: ActivePair | null;
+  nextQueue: ReadonlyArray<Pair>;
+}
 
 export interface MatchResult {
   playerScore: number;
@@ -119,6 +143,24 @@ interface Store {
   setAiHistoryViewIndex(index: number | null): void;
   /** Mark match ended if either side has consumed all turns or topped out. Computes result. */
   finalizeMatchIfDone(): void;
+
+  // ---- Board editing ----
+  /** True while the user is in edit mode. Game inputs (commit, dispatch) are no-ops. */
+  editing: boolean;
+  /** Snapshot of game state taken at edit entry; used by Cancel. */
+  editSnapshot: EditSnapshot | null;
+  /** Currently selected palette entry. */
+  editPalette: EditPalette;
+  enterEditMode(): void;
+  /** apply=true: keep edits. apply=false: revert to the snapshot taken when entering edit mode. */
+  exitEditMode(apply: boolean): void;
+  setEditPalette(p: EditPalette): void;
+  /** Paint a single cell with the active palette (handles erase / garbage / colors). */
+  paintCell(row: number, col: number): void;
+  /** Set a specific puyo of a queue slot to a color. (slot=0 means the active pair.) */
+  setPairColor(slot: EditPairSlot, which: EditPairWhich, color: Color): void;
+  /** Clear all field cells in the visible playfield. */
+  clearEditField(): void;
 }
 
 const CHAIN_TEXT_LIFETIME_MS = 2000;
@@ -190,6 +232,10 @@ export const useGameStore = create<Store>((set, get) => ({
   matchEnded: false,
   matchResult: null,
 
+  editing: false,
+  editSnapshot: null,
+  editPalette: 'R',
+
   reset: (seed?: number) =>
     set((st) => {
       const newSeed = seed ?? (Date.now() | 0);
@@ -218,8 +264,14 @@ export const useGameStore = create<Store>((set, get) => ({
         aiHistoryViewIndex: null,
       };
     }),
-  dispatch: (input: Input) => set((s) => ({ game: applyInput(s.game, input) })),
+  dispatch: (input: Input) =>
+    set((s) =>
+      // While editing we don't want left/right/rotate to move the active pair —
+      // it's being recolored, not played.
+      s.editing ? {} : { game: applyInput(s.game, input) },
+    ),
   commit: async (move: Move, opts?: { source?: CommitSource }) => {
+    if (get().editing) return;
     const s = get().game;
     if (!s.current) return;
     const source: CommitSource = opts?.source ?? 'user';
@@ -497,6 +549,128 @@ export const useGameStore = create<Store>((set, get) => ({
     const winner: MatchResult['winner'] =
       playerScore > aiScore ? 'player' : aiScore > playerScore ? 'ai' : 'draw';
     set({ matchEnded: true, matchResult: { playerScore, aiScore, winner } });
+  },
+
+  // ---- Board editing ----
+
+  enterEditMode: () => {
+    const st = get();
+    if (st.editing) return;
+    if (st.animatingSteps.length > 0) return; // mid-chain — refuse silently
+    // Snapshot what we'll be changing. Pair queue must be at least 2 entries
+    // long (NEXT + NEXT2); pad with a default pair if not.
+    const snapshot: EditSnapshot = {
+      field: st.game.field,
+      current: st.game.current,
+      nextQueue: st.game.nextQueue,
+    };
+    // Spawn a usable active pair if there isn't one (e.g. mid-resolve / gameover).
+    const ensuredCurrent: ActivePair =
+      st.game.current ?? {
+        pair: { axis: 'R', child: 'R' },
+        axisRow: SPAWN_AXIS_ROW,
+        axisCol: SPAWN_COL,
+        rotation: 0,
+      };
+    const ensuredQueue: Pair[] = [...st.game.nextQueue];
+    while (ensuredQueue.length < 2) ensuredQueue.push({ axis: 'R', child: 'R' });
+    set({
+      editing: true,
+      editSnapshot: snapshot,
+      game: {
+        ...st.game,
+        current: ensuredCurrent,
+        nextQueue: ensuredQueue,
+        // While editing we want the field to look stable, not 'gameover' / 'resolving'.
+        status: 'playing',
+        chainCount: 0,
+      },
+      // Animations / overlays from the prior turn would render incorrectly
+      // against the edited field; clear them.
+      poppingCells: [],
+      chainTexts: [],
+      landedCells: [],
+      animatingSteps: [],
+    });
+  },
+
+  exitEditMode: (apply) => {
+    const st = get();
+    if (!st.editing) return;
+    if (!apply && st.editSnapshot) {
+      // Cancel: restore the game's field/current/queue from the snapshot.
+      set({
+        game: {
+          ...st.game,
+          field: st.editSnapshot.field,
+          current: st.editSnapshot.current,
+          nextQueue: st.editSnapshot.nextQueue,
+          status: st.editSnapshot.current ? 'playing' : 'gameover',
+        },
+      });
+    }
+    // Apply: just keep the current edited values (already in st.game).
+    set({ editing: false, editSnapshot: null });
+  },
+
+  setEditPalette: (p) => set({ editPalette: p }),
+
+  paintCell: (row, col) => {
+    const st = get();
+    if (!st.editing) return;
+    if (row < 0 || row >= ROWS || col < 0 || col >= COLS) return;
+    let next: Cell;
+    switch (st.editPalette) {
+      case 'X':
+        next = null;
+        break;
+      case 'G':
+        next = 'G';
+        break;
+      default:
+        next = st.editPalette;
+    }
+    // Tap the same color twice to erase — feels natural and saves swapping
+    // to the eraser for one-off corrections.
+    const cur = st.game.field.cells[row]![col]!;
+    if (cur === next && next !== null) next = null;
+    const newCells = st.game.field.cells.map((rr, ri) =>
+      ri === row ? rr.map((cc, ci) => (ci === col ? next : cc)) : rr,
+    );
+    set({ game: { ...st.game, field: { cells: newCells } } });
+  },
+
+  setPairColor: (slot, which, color) => {
+    const st = get();
+    if (!st.editing) return;
+    if (slot === 0) {
+      const cur = st.game.current;
+      if (!cur) return;
+      const pair: Pair =
+        which === 'axis'
+          ? { axis: color, child: cur.pair.child }
+          : { axis: cur.pair.axis, child: color };
+      set({ game: { ...st.game, current: { ...cur, pair } } });
+    } else {
+      const idx = slot - 1;
+      const queue = [...st.game.nextQueue];
+      while (queue.length <= idx) queue.push({ axis: 'R', child: 'R' });
+      const old = queue[idx]!;
+      queue[idx] =
+        which === 'axis'
+          ? { axis: color, child: old.child }
+          : { axis: old.axis, child: color };
+      set({ game: { ...st.game, nextQueue: queue } });
+    }
+  },
+
+  clearEditField: () => {
+    const st = get();
+    if (!st.editing) return;
+    const newCells: Cell[][] = Array.from({ length: ROWS }, () =>
+      Array(COLS).fill(null),
+    );
+    set({ game: { ...st.game, field: { cells: newCells } } });
   },
 }));
 

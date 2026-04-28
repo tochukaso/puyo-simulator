@@ -66,14 +66,13 @@ export function Board() {
       ? (previewMove ?? moves[0] ?? null)
       : null;
 
-  // When hiding the ceiling (row 0), shift the entire drawing up by one cell
-  // and shrink the canvas/wrapper height by one cell. Anything originating in
-  // row 0 (background strip, DANGER frame, an axis puyo on the ceiling row) is
-  // naturally clipped out.
-  const visibleRows = ceilingVisible ? ROWS : ROWS - 1;
-  const yOffset = ceilingVisible ? 0 : -cell;
+  // canvas はつねに ROWS=13 行ぶんを確保する。`ceilingVisible=false` の時は
+  // draw() 側で「行 0 の背景帯 / DANGER 枠 / 配置済みぷよ」だけを描画スキップし、
+  // **アクティブペアの行 0 ぷよは常に薄く表示** する(操作中の child が完全に
+  // 隠れて 1 個しか見えない問題を避ける)。
+  const yOffset = 0;
   const boardWidth = COLS * cell;
-  const boardHeight = visibleRows * cell;
+  const boardHeight = ROWS * cell;
 
   useLayoutEffect(() => {
     const ro = new ResizeObserver((entries) => {
@@ -105,6 +104,7 @@ export function Board() {
         landedCells,
         yOffset,
         now,
+        ceilingVisible,
       );
       // If either the landing animation or the pop-flash animation is still
       // running, schedule the next frame.
@@ -119,7 +119,7 @@ export function Board() {
     return () => {
       if (rafId) cancelAnimationFrame(rafId);
     };
-  }, [game, cell, bestMove, poppingCells, landedCells, yOffset]);
+  }, [game, cell, bestMove, poppingCells, landedCells, yOffset, ceilingVisible]);
 
   // Edit-mode: tap & drag-paint. Track which cells we already painted in the
   // current pointer stroke so re-entering a cell on the same drag doesn't
@@ -130,12 +130,8 @@ export function Board() {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    // Convert canvas-pixel coords back to logical (row, col), accounting for
-    // the optional ceiling-row hidden offset.
     const c = Math.floor((x / rect.width) * COLS);
-    const visibleH = visibleRows;
-    const rVisible = Math.floor((y / rect.height) * visibleH);
-    const r = ceilingVisible ? rVisible : rVisible + 1;
+    const r = Math.floor((y / rect.height) * ROWS);
     if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return null;
     return { row: r, col: c };
   };
@@ -254,19 +250,23 @@ function draw(
   landedCells: readonly LandedCell[],
   yOffset: number,
   now: number,
+  ceilingVisible: boolean,
 ) {
-  // Translate everything by yOffset (0 or -cell). When the ceiling is hidden,
-  // anything coming from row 0 escapes above the canvas top edge and is
-  // automatically clipped.
   ctx.save();
   ctx.translate(0, yOffset);
 
+  // 背景は天井行も含め全面を一度塗る (ベースのトーン)。天井非表示の時は
+  // 後で行 0 の上に "playfield 外" を覆う黒帯を載せて、行 0 を視覚的に
+  // 「キャンバス外」として扱う。アクティブペアの行 0 ぷよだけは上から
+  // 描かれるので、薄く透けて見える状態になる。
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, COLS * cell, ROWS * cell);
 
   ctx.strokeStyle = GRID_COLOR;
   ctx.lineWidth = 1;
-  for (let r = 0; r <= ROWS; r++) {
+  // 天井非表示の時は行 0 のグリッド線を引かない (=完全に "枠外" の見た目)。
+  const gridStart = ceilingVisible ? 0 : VISIBLE_ROW_START;
+  for (let r = gridStart; r <= ROWS; r++) {
     ctx.beginPath();
     ctx.moveTo(0, r * cell);
     ctx.lineTo(COLS * cell, r * cell);
@@ -274,17 +274,19 @@ function draw(
   }
   for (let c = 0; c <= COLS; c++) {
     ctx.beginPath();
-    ctx.moveTo(c * cell, 0);
+    ctx.moveTo(c * cell, gridStart * cell);
     ctx.lineTo(c * cell, ROWS * cell);
     ctx.stroke();
   }
 
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.5)';
-  ctx.fillRect(0, 0, COLS * cell, VISIBLE_ROW_START * cell);
-
-  ctx.strokeStyle = DANGER_COLOR;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(SPAWN_COL * cell + 1, 1, cell - 2, cell - 2);
+  if (ceilingVisible) {
+    // 天井行の薄いトーンと、危険列を示す赤枠 (DANGER) を表示。
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.5)';
+    ctx.fillRect(0, 0, COLS * cell, VISIBLE_ROW_START * cell);
+    ctx.strokeStyle = DANGER_COLOR;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(SPAWN_COL * cell + 1, 1, cell - 2, cell - 2);
+  }
 
   // Pulse coefficient for the popping highlight. Driven by `Date.now()` and
   // called per frame from rAF.
@@ -300,9 +302,12 @@ function draw(
   }
 
   // Draw the same-color connection bars first (we want them under the puyo discs).
-  drawConnectors(ctx, field, cell);
+  drawConnectors(ctx, field, cell, ceilingVisible);
 
-  for (let r = 0; r < ROWS; r++) {
+  // 配置済みぷよは天井非表示時は行 0 を描かない (=「枠外」扱い)。
+  // アクティブペアの行 0 ぷよだけは下のブロックで別途描画される。
+  const fieldStartRow = ceilingVisible ? 0 : VISIBLE_ROW_START;
+  for (let r = fieldStartRow; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       const color = field.cells[r]![c]!;
       if (color === null) continue;
@@ -356,10 +361,17 @@ function draw(
 // Connect adjacent same-color puyos with a thick bar (the "connection
 // expression" used in the original Puyo Puyo). Called before drawPuyo so the
 // bar layers underneath the discs.
-function drawConnectors(ctx: CanvasRenderingContext2D, field: Field, cell: number) {
+function drawConnectors(
+  ctx: CanvasRenderingContext2D,
+  field: Field,
+  cell: number,
+  ceilingVisible: boolean,
+) {
   const W = cell * 0.55; // Bar thickness. Thinner than the puyo diameter so it reads as a "neck".
   const alphaOf = (r: number) => (r < VISIBLE_ROW_START ? 0.5 : 1);
-  for (let r = 0; r < ROWS; r++) {
+  // 天井非表示時は行 0 のコネクタは描画しない (=フィールドぷよが見えない領域)。
+  const startRow = ceilingVisible ? 0 : VISIBLE_ROW_START;
+  for (let r = startRow; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       const color = field.cells[r]![c]!;
       // Garbage doesn't form connections — skip drawing connector bars for it.

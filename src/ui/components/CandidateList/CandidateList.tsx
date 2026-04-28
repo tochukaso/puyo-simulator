@@ -1,15 +1,26 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAiSuggestion } from '../../hooks/useAiSuggestion';
 import { useGameStore } from '../../store';
 import { setPreviewMove, usePreviewMove } from '../../hooks/useAiPreview';
 import { useT } from '../../../i18n';
 import type { Move } from '../../../game/types';
 
+const COLLAPSED_KEY = 'puyo.candidates.collapsed';
+
+function readInitialCollapsed(): boolean {
+  try {
+    return localStorage.getItem(COLLAPSED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 export function CandidateList() {
   const { moves, loading, aiKind, aiReady } = useAiSuggestion(5);
   const commit = useGameStore((s) => s.commit);
   const previewMove = usePreviewMove();
   const t = useT();
+  const [collapsed, setCollapsed] = useState<boolean>(readInitialCollapsed);
 
   // Clear the preview when a new pair arrives (= moves is recomputed). This
   // avoids the confusing case where an old move's ghost is drawn with the new
@@ -17,6 +28,12 @@ export function CandidateList() {
   useEffect(() => {
     setPreviewMove(null);
   }, [moves]);
+
+  // Also clear preview when collapsed (so the ghost on the Board doesn't
+  // linger while the list is hidden).
+  useEffect(() => {
+    if (collapsed) setPreviewMove(null);
+  }, [collapsed]);
 
   const status = !aiReady
     ? t('candidates.loading', { aiKind })
@@ -34,11 +51,32 @@ export function CandidateList() {
     previewMove.axisCol === m.axisCol &&
     previewMove.rotation === m.rotation;
 
+  const toggle = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    try {
+      localStorage.setItem(COLLAPSED_KEY, next ? '1' : '0');
+    } catch {
+      // ignore
+    }
+  };
+
   return (
     <div className="bg-slate-900 border border-slate-700 rounded text-xs" data-no-gesture>
-      <div className="px-2 py-1 text-slate-300 border-b border-slate-700">
-        {t('candidates.title')} <span className="text-slate-500">{status}</span>
-      </div>
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={!collapsed}
+        aria-label={collapsed ? t('candidates.expand') : t('candidates.collapse')}
+        className="w-full px-2 py-1 text-left text-slate-300 border-b border-slate-700 flex items-center gap-1 hover:bg-slate-800"
+      >
+        <span aria-hidden="true" className="inline-block w-3 text-slate-500">
+          {collapsed ? '▶' : '▼'}
+        </span>
+        <span>{t('candidates.title')}</span>
+        <span className="text-slate-500">{status}</span>
+      </button>
+      {collapsed ? null : (
       <ul className="p-1 space-y-1">
         {moves.map((m) => {
           const pct = top > 0 ? Math.max(0, Math.round(((m.score ?? 0) / top) * 100)) : 0;
@@ -76,6 +114,7 @@ export function CandidateList() {
           );
         })}
       </ul>
+      )}
     </div>
   );
 }

@@ -86,6 +86,15 @@ export function setAiKind(kind: Kind, preset?: string): void {
   getWorker().postMessage({ type: 'set-ai', kind, preset });
 }
 
+// Snapshot of the AI's most recent topK moves for the current GameState.
+// Used at commit time to score the user's move against the AI's evaluation.
+// Returns null if no suggestion has arrived yet (i.e. AI is still thinking
+// for this state, or the game is not in a state where suggestions apply).
+export function getCurrentAiMoves(): { state: GameState; moves: Move[] } | null {
+  if (!shared.requestedFor) return null;
+  return { state: shared.requestedFor, moves: shared.moves };
+}
+
 function requestSuggestFor(state: GameState): void {
   // Already requested for this exact state (another hook beat us to it) — no-op.
   if (shared.requestedFor === state) return;

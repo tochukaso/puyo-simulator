@@ -7,10 +7,15 @@ import type { GameState, Move } from '../../game/types';
 
 export type WorkerMessage =
   | { type: 'suggest'; id: number; state: GameState; topK: number }
+  // 1-shot suggest: bypasses the player UI's shared subscription. Used by
+  // the match driver to fetch the AI's auto-play move for an arbitrary state
+  // without disturbing the player-side suggestion stream.
+  | { type: 'suggest-once'; id: number; state: GameState; topK: number }
   | { type: 'set-ai'; kind: Kind; preset?: string };
 
 export type WorkerResponse =
   | { type: 'suggest'; id: number; moves: Move[] }
+  | { type: 'suggest-once'; id: number; moves: Move[]; error?: string }
   | { type: 'set-ai'; kind: Kind; ok: boolean; error?: string };
 
 const heuristic = new HeuristicAI();
@@ -97,6 +102,21 @@ export async function handleMessage(
     await active.init();
     const moves = await active.suggest(msg.state, msg.topK);
     send({ type: 'suggest', id: msg.id, moves });
+    return;
+  }
+  if (msg.type === 'suggest-once') {
+    try {
+      await active.init();
+      const moves = await active.suggest(msg.state, msg.topK);
+      send({ type: 'suggest-once', id: msg.id, moves });
+    } catch (err) {
+      send({
+        type: 'suggest-once',
+        id: msg.id,
+        moves: [],
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 }
 

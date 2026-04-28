@@ -11,6 +11,7 @@ import {
   setTrainerMode,
   type TrainerMode,
 } from '../../hooks/useTrainerMode';
+import { useGameStore, type GameMode, type MatchTurnLimit } from '../../store';
 import {
   LANGUAGES,
   LANGUAGE_LABELS,
@@ -26,6 +27,11 @@ export function Header() {
   const trainer = useTrainerMode();
   const lang = useLang();
   const t = useT();
+  const mode = useGameStore((s) => s.mode);
+  const matchTurnLimit = useGameStore((s) => s.matchTurnLimit);
+  const setGameMode = useGameStore((s) => s.setGameMode);
+  const setMatchTurnLimit = useGameStore((s) => s.setMatchTurnLimit);
+  const startMatch = useGameStore((s) => s.startMatch);
 
   // ama-wasm に統一。trainer mode に応じて preset (form 集合 + weight) を切替。
   useEffect(() => {
@@ -74,6 +80,37 @@ export function Header() {
           <option value="gtr">{t('header.trainerGtr')}</option>
           <option value="kaidan">{t('header.trainerKaidan')}</option>
         </select>
+        <select
+          aria-label={t('header.gameMode')}
+          value={mode}
+          onChange={(e) => {
+            const next = e.target.value as GameMode;
+            if (next === 'match' && mode !== 'match') {
+              startMatch({ turnLimit: matchTurnLimit });
+            } else {
+              setGameMode(next);
+            }
+          }}
+          className="bg-slate-800 text-slate-100 border border-slate-700 rounded px-2 py-1 text-sm"
+        >
+          <option value="free">{t('header.modeFree')}</option>
+          <option value="match">{t('header.modeMatch')}</option>
+        </select>
+        {mode === 'match' && (
+          <select
+            aria-label={t('header.turnLimit')}
+            value={matchTurnLimit}
+            onChange={(e) => {
+              const limit = (Number(e.target.value) as MatchTurnLimit);
+              setMatchTurnLimit(limit);
+              startMatch({ turnLimit: limit });
+            }}
+            className="bg-slate-800 text-slate-100 border border-slate-700 rounded px-2 py-1 text-sm"
+          >
+            <option value="100">100</option>
+            <option value="200">200</option>
+          </select>
+        )}
         <label className="text-sm flex items-center gap-2">
           <span className="sr-only">{t('header.language')}</span>
           <select

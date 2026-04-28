@@ -14,22 +14,51 @@ import { PUYO_COLORS, PUYO_LIGHT, PUYO_DARK, BG_COLOR, GRID_COLOR, DANGER_COLOR 
 import type { Color, Field, ActivePair, Move } from '../../../game/types';
 import { ghostCells } from './ghost';
 
+// Module-level frozen empty references used while spectating the AI side, so
+// the Board memoization sees a stable identity instead of a fresh `[]` per render.
+const EMPTY_POPPING: PoppingCell[] = [];
+const EMPTY_CHAIN_TEXTS: ReturnType<typeof useGameStore.getState>['chainTexts'] = [];
+const EMPTY_LANDED: LandedCell[] = [];
+
 export function Board() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const cell = useBoardCellSize();
-  const game = useGameStore((s) => s.game);
-  const poppingCells = useGameStore((s) => s.poppingCells);
-  const chainTexts = useGameStore((s) => s.chainTexts);
-  const landedCells = useGameStore((s) => s.landedCells);
+  const playerGame = useGameStore((s) => s.game);
+  const aiGame = useGameStore((s) => s.aiGame);
+  const aiHistory = useGameStore((s) => s.aiHistory);
+  const aiHistoryViewIndex = useGameStore((s) => s.aiHistoryViewIndex);
+  const viewing = useGameStore((s) => s.viewing);
+  // While viewing the AI side, swap the game source. If the user scrubbed
+  // the AI history slider (aiHistoryViewIndex set), render that snapshot.
+  const game =
+    viewing === 'ai'
+      ? aiHistoryViewIndex !== null
+        ? (aiHistory[aiHistoryViewIndex] ?? aiGame ?? playerGame)
+        : (aiGame ?? playerGame)
+      : playerGame;
+  // The pop / landing animations only fire on the player side; if the user is
+  // spectating the AI we don't drive those overlays. Read raw store fields and
+  // gate locally so the selector returns a stable reference (avoids the
+  // infinite-update loop you'd hit by returning a fresh `[]` per render).
+  const playerPoppingCells = useGameStore((s) => s.poppingCells);
+  const playerChainTexts = useGameStore((s) => s.chainTexts);
+  const playerLandedCells = useGameStore((s) => s.landedCells);
+  const poppingCells = viewing === 'player' ? playerPoppingCells : EMPTY_POPPING;
+  const chainTexts = viewing === 'player' ? playerChainTexts : EMPTY_CHAIN_TEXTS;
+  const landedCells = viewing === 'player' ? playerLandedCells : EMPTY_LANDED;
   const { moves } = useAiSuggestion(5);
   const ghostEnabled = useGhostEnabled();
   const ceilingVisible = useCeilingVisible();
   const previewMove = usePreviewMove();
   const t = useT();
   // If a candidate is hovered/selected in CandidateList, prefer it. Otherwise
-  // fall back to the top candidate.
-  const bestMove = ghostEnabled ? (previewMove ?? moves[0] ?? null) : null;
+  // fall back to the top candidate. Suppress when not viewing the live player
+  // board (suggestions are computed for the player's state, not the AI's).
+  const bestMove =
+    ghostEnabled && viewing === 'player'
+      ? (previewMove ?? moves[0] ?? null)
+      : null;
 
   // When hiding the ceiling (row 0), shift the entire drawing up by one cell
   // and shrink the canvas/wrapper height by one cell. Anything originating in

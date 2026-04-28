@@ -48,6 +48,10 @@ const aiReadyHandlers = new Set<AiReadyHandler>();
 let currentAiKind: Kind = 'ml-ama-v1';
 let currentAiReady = false;
 
+// One-shot suggest pending resolvers, keyed by request id.
+const suggestOnceResolvers = new Map<number, (moves: Move[]) => void>();
+let nextSuggestOnceId = 1_000_000; // Disjoint from regular suggest ids.
+
 function getWorker(): Worker {
   if (workerSingleton) return workerSingleton;
   const w = new Worker(new URL('../../ai/worker/ai.worker.ts', import.meta.url), {
@@ -70,6 +74,16 @@ function getWorker(): Worker {
         pendingId: shared.pendingId,
       };
       notify();
+    } else if (
+      e.data.type === 'suggest-once' &&
+      typeof e.data.id === 'number' &&
+      e.data.moves
+    ) {
+      const r = suggestOnceResolvers.get(e.data.id);
+      if (r) {
+        suggestOnceResolvers.delete(e.data.id);
+        r(e.data.moves);
+      }
     } else if (e.data.type === 'set-ai' && e.data.kind && typeof e.data.ok === 'boolean') {
       if (e.data.kind === currentAiKind) currentAiReady = e.data.ok;
       for (const h of aiReadyHandlers) h(e.data.kind, e.data.ok);
@@ -77,6 +91,17 @@ function getWorker(): Worker {
   };
   workerSingleton = w;
   return w;
+}
+
+// Fire-and-await suggest for an arbitrary state. Returns whatever the worker's
+// active AI produces (top `topK` candidates ranked best-first). Does not affect
+// the shared player-UI subscription stream. Resolves to [] on worker error.
+export function suggestForState(state: GameState, topK: number = 1): Promise<Move[]> {
+  const id = nextSuggestOnceId++;
+  return new Promise<Move[]>((resolve) => {
+    suggestOnceResolvers.set(id, resolve);
+    getWorker().postMessage({ type: 'suggest-once', id, state, topK });
+  });
 }
 
 export function setAiKind(kind: Kind, preset?: string): void {

@@ -53,6 +53,16 @@ const EMPTY_AI_STATS: AiStats = {
 
 export type CommitSource = 'user' | 'ai';
 
+export type GameMode = 'free' | 'match';
+export type MatchTurnLimit = 100 | 200;
+export type ViewSide = 'player' | 'ai';
+
+export interface MatchResult {
+  playerScore: number;
+  aiScore: number;
+  winner: 'player' | 'ai' | 'draw';
+}
+
 interface Store {
   game: GameState;
   animatingSteps: ChainStep[];
@@ -66,11 +76,40 @@ interface Store {
   /** Snapshots of aiStats taken before each commit; same length as `history`. Undo pops from both. */
   aiStatsHistory: AiStats[];
   aiStats: AiStats;
+
+  // ---- Match-vs-AI state ----
+  /** Game mode. 'free' is the default solo simulator; 'match' runs a turn-limited score race against ama. */
+  mode: GameMode;
+  matchTurnLimit: MatchTurnLimit;
+  /** Number of pairs the player has already committed in the current match. */
+  matchTurnsPlayed: number;
+  /** AI's parallel game state. Same RNG seed as the player so both see identical pair sequence. */
+  aiGame: GameState | null;
+  /** AI's per-turn snapshots, captured AFTER each AI commit. Index = turn number (0-based). */
+  aiHistory: GameState[];
+  /** Which side's board the user is currently viewing. */
+  viewing: ViewSide;
+  /** When viewing AI side: index into aiHistory to display, or null = live. */
+  aiHistoryViewIndex: number | null;
+  matchEnded: boolean;
+  matchResult: MatchResult | null;
+
   reset(seed?: number): void;
   dispatch(input: Input): void;
   commit(move: Move, opts?: { source?: CommitSource }): Promise<void>;
   undo(steps?: number): void;
   canUndo(): boolean;
+
+  // ---- Match-vs-AI actions ----
+  setGameMode(mode: GameMode): void;
+  setMatchTurnLimit(limit: MatchTurnLimit): void;
+  startMatch(opts?: { seed?: number; turnLimit?: MatchTurnLimit }): void;
+  /** Apply a single AI auto-play move on the AI's parallel state and snapshot it. Called by the match driver. */
+  applyAiMove(move: Move): void;
+  setViewing(side: ViewSide): void;
+  setAiHistoryViewIndex(index: number | null): void;
+  /** Mark match ended if either side has consumed all turns or topped out. Computes result. */
+  finalizeMatchIfDone(): void;
 }
 
 const CHAIN_TEXT_LIFETIME_MS = 2000;
@@ -86,6 +125,38 @@ const GRAVITY_MS = 300; // Pause after gravity has settled the falling puyos.
 
 const MAX_HISTORY = 100;
 
+function readPersistedMode(): GameMode {
+  try {
+    return localStorage.getItem('puyo.gameMode') === 'match' ? 'match' : 'free';
+  } catch {
+    return 'free';
+  }
+}
+
+function readPersistedTurnLimit(): MatchTurnLimit {
+  try {
+    return localStorage.getItem('puyo.matchTurnLimit') === '200' ? 200 : 100;
+  } catch {
+    return 100;
+  }
+}
+
+function persistMode(mode: GameMode): void {
+  try {
+    localStorage.setItem('puyo.gameMode', mode);
+  } catch {
+    // noop
+  }
+}
+
+function persistTurnLimit(limit: MatchTurnLimit): void {
+  try {
+    localStorage.setItem('puyo.matchTurnLimit', String(limit));
+  } catch {
+    // noop
+  }
+}
+
 export const useGameStore = create<Store>((set, get) => ({
   game: createInitialState(Date.now() | 0),
   animatingSteps: [],
@@ -95,16 +166,41 @@ export const useGameStore = create<Store>((set, get) => ({
   history: [],
   aiStatsHistory: [],
   aiStats: { ...EMPTY_AI_STATS },
+
+  mode: readPersistedMode(),
+  matchTurnLimit: readPersistedTurnLimit(),
+  matchTurnsPlayed: 0,
+  aiGame: null,
+  aiHistory: [],
+  viewing: 'player',
+  aiHistoryViewIndex: null,
+  matchEnded: false,
+  matchResult: null,
+
   reset: (seed?: number) =>
-    set({
-      game: createInitialState(seed ?? (Date.now() | 0)),
-      animatingSteps: [],
-      poppingCells: [],
-      chainTexts: [],
-      landedCells: [],
-      history: [],
-      aiStatsHistory: [],
-      aiStats: { ...EMPTY_AI_STATS },
+    set((st) => {
+      const newSeed = seed ?? (Date.now() | 0);
+      const playerGame = createInitialState(newSeed);
+      // In match mode, also reset the AI's parallel state to the same seed so
+      // the pair sequence stays identical for both sides.
+      const aiGame = st.mode === 'match' ? createInitialState(newSeed) : null;
+      return {
+        game: playerGame,
+        animatingSteps: [],
+        poppingCells: [],
+        chainTexts: [],
+        landedCells: [],
+        history: [],
+        aiStatsHistory: [],
+        aiStats: { ...EMPTY_AI_STATS },
+        aiGame,
+        aiHistory: [],
+        matchTurnsPlayed: 0,
+        matchEnded: false,
+        matchResult: null,
+        viewing: 'player',
+        aiHistoryViewIndex: null,
+      };
     }),
   dispatch: (input: Input) => set((s) => ({ game: applyInput(s.game, input) })),
   commit: async (move: Move, opts?: { source?: CommitSource }) => {
@@ -231,11 +327,21 @@ export const useGameStore = create<Store>((set, get) => ({
       status: 'resolving',
     };
     set({ game: spawnNext(finalState), animatingSteps: [], poppingCells: [] });
+
+    // Match-mode bookkeeping. Both 'user' and 'ai' sources count as a player
+    // turn — clicking AI Best is the player's chosen action for this turn, just
+    // delegated. Source only gates the AI-agreement metric.
+    if (get().mode === 'match' && !get().matchEnded) {
+      set((st) => ({ matchTurnsPlayed: st.matchTurnsPlayed + 1 }));
+      get().finalizeMatchIfDone();
+    }
   },
   undo: (steps = 1) => {
-    const { history, animatingSteps, aiStatsHistory } = get();
+    const { history, animatingSteps, aiStatsHistory, mode } = get();
     if (history.length === 0) return;
     if (animatingSteps.length > 0) return;
+    // Undo during a match would desync the AI's parallel state. Disable for now.
+    if (mode === 'match') return;
     const n = Math.min(Math.max(1, steps), history.length);
     const targetIndex = history.length - n;
     const target = history[targetIndex]!;
@@ -251,7 +357,117 @@ export const useGameStore = create<Store>((set, get) => ({
       landedCells: [],
     });
   },
-  canUndo: () => get().history.length > 0 && get().animatingSteps.length === 0,
+  canUndo: () =>
+    get().history.length > 0 &&
+    get().animatingSteps.length === 0 &&
+    get().mode !== 'match',
+
+  // ---- Match-vs-AI actions ----
+
+  setGameMode: (mode) => {
+    persistMode(mode);
+    set({ mode });
+    if (mode === 'free') {
+      set({
+        aiGame: null,
+        aiHistory: [],
+        matchEnded: false,
+        matchResult: null,
+        matchTurnsPlayed: 0,
+        viewing: 'player',
+        aiHistoryViewIndex: null,
+      });
+    }
+  },
+
+  setMatchTurnLimit: (limit) => {
+    persistTurnLimit(limit);
+    set({ matchTurnLimit: limit });
+  },
+
+  startMatch: (opts) => {
+    const seed = opts?.seed ?? (Date.now() | 0);
+    const turnLimit = opts?.turnLimit ?? get().matchTurnLimit;
+    persistMode('match');
+    persistTurnLimit(turnLimit);
+    const playerGame = createInitialState(seed);
+    const aiGame = createInitialState(seed);
+    set({
+      mode: 'match',
+      matchTurnLimit: turnLimit,
+      game: playerGame,
+      aiGame,
+      aiHistory: [],
+      matchTurnsPlayed: 0,
+      matchEnded: false,
+      matchResult: null,
+      viewing: 'player',
+      aiHistoryViewIndex: null,
+      animatingSteps: [],
+      poppingCells: [],
+      chainTexts: [],
+      landedCells: [],
+      history: [],
+      aiStatsHistory: [],
+      aiStats: { ...EMPTY_AI_STATS },
+    });
+  },
+
+  applyAiMove: (move) => {
+    const { aiGame, mode, matchEnded } = get();
+    if (mode !== 'match' || matchEnded || !aiGame || !aiGame.current) return;
+    // Synchronous ama play: lock + resolve the chain in one step (no animation).
+    // We still capture the post-spawn state so spectating uses normal puyo logic.
+    const placed = {
+      ...aiGame.current,
+      axisCol: move.axisCol,
+      rotation: move.rotation,
+    };
+    const locked = lockActive(aiGame.field, placed);
+    const { finalField, steps, totalScore } = resolveChain(locked);
+    const resolved: GameState = {
+      ...aiGame,
+      field: finalField,
+      current: null,
+      score: aiGame.score + totalScore,
+      chainCount: steps.length,
+      totalChains: aiGame.totalChains + steps.length,
+      maxChain: Math.max(aiGame.maxChain, steps.length),
+      status: 'resolving',
+    };
+    const nextAiGame = spawnNext(resolved);
+    set((st) => ({
+      aiGame: nextAiGame,
+      aiHistory: [...st.aiHistory, nextAiGame],
+    }));
+    get().finalizeMatchIfDone();
+  },
+
+  setViewing: (side) =>
+    set((st) => ({
+      viewing: side,
+      // When switching back to player (live) or to AI live tail, drop scrubbing.
+      aiHistoryViewIndex: side === 'player' ? null : st.aiHistoryViewIndex,
+    })),
+
+  setAiHistoryViewIndex: (index) => set({ aiHistoryViewIndex: index }),
+
+  finalizeMatchIfDone: () => {
+    const st = get();
+    if (st.mode !== 'match' || st.matchEnded) return;
+    const playerDone =
+      st.matchTurnsPlayed >= st.matchTurnLimit || st.game.status === 'gameover';
+    const aiDone =
+      !st.aiGame ||
+      st.aiHistory.length >= st.matchTurnLimit ||
+      st.aiGame.status === 'gameover';
+    if (!playerDone || !aiDone) return;
+    const playerScore = st.game.score;
+    const aiScore = st.aiGame ? st.aiGame.score : 0;
+    const winner: MatchResult['winner'] =
+      playerScore > aiScore ? 'player' : aiScore > playerScore ? 'ai' : 'draw';
+    set({ matchEnded: true, matchResult: { playerScore, aiScore, winner } });
+  },
 }));
 
 function sleep(ms: number) {

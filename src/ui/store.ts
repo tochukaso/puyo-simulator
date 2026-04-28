@@ -161,6 +161,17 @@ interface Store {
   setPairColor(slot: EditPairSlot, which: EditPairWhich, color: Color): void;
   /** Clear all field cells in the visible playfield. */
   clearEditField(): void;
+
+  /** Load a shared position (decoded from a `?share=` URL). Replaces the
+   *  current field, current pair, and the first 2 NEXT pairs. Resets score /
+   *  chain counters. Stays in 'free' mode (so the receiver isn't dropped into
+   *  the middle of someone else's match). */
+  loadSharedPosition(p: {
+    field: Field;
+    current: Pair;
+    next1: Pair;
+    next2: Pair;
+  }): void;
 }
 
 const CHAIN_TEXT_LIFETIME_MS = 2000;
@@ -671,6 +682,49 @@ export const useGameStore = create<Store>((set, get) => ({
       Array(COLS).fill(null),
     );
     set({ game: { ...st.game, field: { cells: newCells } } });
+  },
+
+  loadSharedPosition: ({ field, current, next1, next2 }) => {
+    const st = get();
+    // 親側のマッチ進行や編集モードを巻き戻して "クリーンな自由モード" にしてから流し込む。
+    const newCurrent = {
+      pair: current,
+      axisRow: SPAWN_AXIS_ROW,
+      axisCol: SPAWN_COL,
+      rotation: 0,
+    } as const;
+    set({
+      mode: 'free',
+      editing: false,
+      editSnapshot: null,
+      game: {
+        ...st.game,
+        field,
+        current: newCurrent,
+        nextQueue: [next1, next2, ...st.game.nextQueue.slice(2)],
+        score: 0,
+        chainCount: 0,
+        totalChains: 0,
+        maxChain: 0,
+        status: 'playing',
+      },
+      animatingSteps: [],
+      poppingCells: [],
+      chainTexts: [],
+      landedCells: [],
+      history: [],
+      aiStatsHistory: [],
+      aiStats: { ...EMPTY_AI_STATS },
+      aiGame: null,
+      aiHistory: [],
+      matchEnded: false,
+      matchResult: null,
+      matchTurnsPlayed: 0,
+      matchPlayerMoves: [],
+      matchAiMoves: [],
+      viewing: 'player',
+      aiHistoryViewIndex: null,
+    });
   },
 }));
 

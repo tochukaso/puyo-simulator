@@ -53,6 +53,13 @@ export interface Dict {
   'edit.pair.current': string;
   'edit.pair.next1': string;
   'edit.pair.next2': string;
+  'share.button': string;
+  'share.title': string;
+  'share.close': string;
+  'share.copy': string;
+  'share.copied': string;
+  'share.note': string;
+  'share.unavailable': string;
   'header.language': string;
   'stats.score': string;
   'stats.chain': string;
@@ -130,6 +137,13 @@ export const translations: Record<Lang, Dict> = {
     'edit.pair.current': '現在',
     'edit.pair.next1': 'NEXT',
     'edit.pair.next2': 'NEXT2',
+    'share.button': '共有',
+    'share.title': '盤面を共有',
+    'share.close': '閉じる',
+    'share.copy': 'URLをコピー',
+    'share.copied': 'コピーしました',
+    'share.note': 'この URL を開くと、現在の盤面 (フィールド + 現在ペア + NEXT2 つ) で再開できます。スコアや履歴は引き継がれません。',
+    'share.unavailable': '現在は共有できません(操作可能なペアが無いため)。',
     'header.language': '言語',
     'stats.score': 'スコア',
     'stats.chain': '連鎖',
@@ -205,6 +219,13 @@ export const translations: Record<Lang, Dict> = {
     'edit.pair.current': 'Current',
     'edit.pair.next1': 'Next',
     'edit.pair.next2': 'Next 2',
+    'share.button': 'Share',
+    'share.title': 'Share board',
+    'share.close': 'Close',
+    'share.copy': 'Copy URL',
+    'share.copied': 'Copied!',
+    'share.note': "Opening this URL recreates the current board (field + current pair + 2 NEXT pairs). Score and history aren't carried over.",
+    'share.unavailable': 'Cannot share right now (no active pair).',
     'header.language': 'Language',
     'stats.score': 'Score',
     'stats.chain': 'Chain',
@@ -280,6 +301,13 @@ export const translations: Record<Lang, Dict> = {
     'edit.pair.current': '当前',
     'edit.pair.next1': 'NEXT',
     'edit.pair.next2': 'NEXT2',
+    'share.button': '分享',
+    'share.title': '分享棋盘',
+    'share.close': '关闭',
+    'share.copy': '复制链接',
+    'share.copied': '已复制',
+    'share.note': '打开此链接可恢复当前棋盘 (场地 + 当前方块 + 2 个 NEXT)。分数和历史不会传递。',
+    'share.unavailable': '当前无法分享 (没有可操作的方块)。',
     'header.language': '语言',
     'stats.score': '得分',
     'stats.chain': '连锁',
@@ -355,6 +383,13 @@ export const translations: Record<Lang, Dict> = {
     'edit.pair.current': '현재',
     'edit.pair.next1': 'NEXT',
     'edit.pair.next2': 'NEXT2',
+    'share.button': '공유',
+    'share.title': '보드 공유',
+    'share.close': '닫기',
+    'share.copy': 'URL 복사',
+    'share.copied': '복사됨',
+    'share.note': '이 URL 을 열면 현재 보드 (필드 + 현재 페어 + NEXT 2 개) 가 복원됩니다. 점수와 기록은 이어지지 않습니다.',
+    'share.unavailable': '지금은 공유할 수 없습니다 (조작 가능한 페어가 없음).',
     'header.language': '언어',
     'stats.score': '점수',
     'stats.chain': '연쇄',

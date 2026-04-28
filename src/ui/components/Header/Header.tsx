@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { setAiKind } from '../../hooks/useAiSuggestion';
+import { ShareDialog } from '../ShareDialog/ShareDialog';
 import {
   useGhostEnabled,
   setGhostEnabled,
@@ -35,6 +36,7 @@ export function Header() {
   const editing = useGameStore((s) => s.editing);
   const enterEditMode = useGameStore((s) => s.enterEditMode);
   const exitEditMode = useGameStore((s) => s.exitEditMode);
+  const [shareOpen, setShareOpen] = useState(false);
 
   // ama-wasm に統一。trainer mode に応じて preset (form 集合 + weight) を切替。
   useEffect(() => {
@@ -146,6 +148,15 @@ export function Header() {
         >
           {editing ? t('edit.editing') : t('edit.edit')}
         </button>
+        <button
+          type="button"
+          onClick={() => setShareOpen(true)}
+          aria-label={t('share.button')}
+          className="px-3 py-1 rounded text-sm border bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700"
+        >
+          {t('share.button')}
+        </button>
+        {shareOpen && <ShareDialog onClose={() => setShareOpen(false)} />}
         <label className="text-sm flex items-center gap-2">
           <span className="sr-only">{t('header.language')}</span>
           <select

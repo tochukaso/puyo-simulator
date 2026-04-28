@@ -3,6 +3,11 @@ import { useKeyboard } from './ui/hooks/useKeyboard';
 import { useGestures } from './ui/hooks/useGestures';
 import { useMatchDriver } from './ui/hooks/useMatchDriver';
 import { useGameStore } from './ui/store';
+import {
+  readShareFromUrl,
+  decodeShare,
+  clearShareFromUrl,
+} from './share/encode';
 import { Board } from './ui/components/Board/Board';
 import { NextQueue } from './ui/components/NextQueue/NextQueue';
 import { Stats } from './ui/components/Stats/Stats';
@@ -19,10 +24,28 @@ export default function App() {
   useGestures(gestureRef);
   useMatchDriver();
   const editing = useGameStore((s) => s.editing);
-  // If the user reloaded while in match mode, the persisted `mode='match'`
-  // wakes up without an `aiGame`. Kick off a fresh match so both sides spawn
-  // from the same seed instead of leaving the AI side null.
+  // 起動時 URL に `?share=...` が乗っていたらそれを優先して盤面ロード。
+  // 共有を踏んだ時は match を続行せず free に切替えるのが直感的なので
+  // loadSharedPosition 側で handle 済み。失敗時はサイレントに無視。
   useEffect(() => {
+    const encoded = readShareFromUrl();
+    if (encoded) {
+      const pos = decodeShare(encoded);
+      if (pos) {
+        useGameStore.getState().loadSharedPosition({
+          field: pos.field,
+          current: pos.current,
+          next1: pos.next1,
+          next2: pos.next2,
+        });
+        clearShareFromUrl();
+        return; // match モード復元はスキップ
+      }
+      clearShareFromUrl();
+    }
+    // If the user reloaded while in match mode, the persisted `mode='match'`
+    // wakes up without an `aiGame`. Kick off a fresh match so both sides spawn
+    // from the same seed instead of leaving the AI side null.
     const st = useGameStore.getState();
     if (st.mode === 'match' && !st.aiGame) {
       st.startMatch({ turnLimit: st.matchTurnLimit });

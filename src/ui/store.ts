@@ -6,6 +6,7 @@ import { applyInput } from '../game/moves';
 import { resolveChain } from '../game/chain';
 import { lockActive } from '../game/landing';
 import { getCurrentAiMoves } from './hooks/useAiSuggestion';
+import { getAmaPreset } from '../ai/wasm-ama/wasm-loader';
 
 export interface PoppingCell {
   row: number;
@@ -81,8 +82,16 @@ interface Store {
   /** Game mode. 'free' is the default solo simulator; 'match' runs a turn-limited score race against ama. */
   mode: GameMode;
   matchTurnLimit: MatchTurnLimit;
+  /** RNG seed used for the current match. Persisted with saved records to allow exact replay later. */
+  matchSeed: number | null;
+  /** ama-wasm preset that was active when the match started (e.g. 'build' / 'gtr' / 'kaidan'). */
+  matchPreset: string;
   /** Number of pairs the player has already committed in the current match. */
   matchTurnsPlayed: number;
+  /** Player's moves played, in order. Recorded for save/replay. */
+  matchPlayerMoves: Move[];
+  /** AI's moves played, in order. Recorded for save/replay. */
+  matchAiMoves: Move[];
   /** AI's parallel game state. Same RNG seed as the player so both see identical pair sequence. */
   aiGame: GameState | null;
   /** AI's per-turn snapshots, captured AFTER each AI commit. Index = turn number (0-based). */
@@ -169,7 +178,11 @@ export const useGameStore = create<Store>((set, get) => ({
 
   mode: readPersistedMode(),
   matchTurnLimit: readPersistedTurnLimit(),
+  matchSeed: null,
+  matchPreset: 'build',
   matchTurnsPlayed: 0,
+  matchPlayerMoves: [],
+  matchAiMoves: [],
   aiGame: null,
   aiHistory: [],
   viewing: 'player',
@@ -195,7 +208,10 @@ export const useGameStore = create<Store>((set, get) => ({
         aiStats: { ...EMPTY_AI_STATS },
         aiGame,
         aiHistory: [],
+        matchSeed: st.mode === 'match' ? newSeed : null,
         matchTurnsPlayed: 0,
+        matchPlayerMoves: [],
+        matchAiMoves: [],
         matchEnded: false,
         matchResult: null,
         viewing: 'player',
@@ -332,7 +348,13 @@ export const useGameStore = create<Store>((set, get) => ({
     // turn — clicking AI Best is the player's chosen action for this turn, just
     // delegated. Source only gates the AI-agreement metric.
     if (get().mode === 'match' && !get().matchEnded) {
-      set((st) => ({ matchTurnsPlayed: st.matchTurnsPlayed + 1 }));
+      set((st) => ({
+        matchTurnsPlayed: st.matchTurnsPlayed + 1,
+        matchPlayerMoves: [
+          ...st.matchPlayerMoves,
+          { axisCol: move.axisCol, rotation: move.rotation },
+        ],
+      }));
       get().finalizeMatchIfDone();
     }
   },
@@ -395,10 +417,14 @@ export const useGameStore = create<Store>((set, get) => ({
     set({
       mode: 'match',
       matchTurnLimit: turnLimit,
+      matchSeed: seed,
+      matchPreset: getAmaPreset(),
       game: playerGame,
       aiGame,
       aiHistory: [],
       matchTurnsPlayed: 0,
+      matchPlayerMoves: [],
+      matchAiMoves: [],
       matchEnded: false,
       matchResult: null,
       viewing: 'player',
@@ -439,6 +465,10 @@ export const useGameStore = create<Store>((set, get) => ({
     set((st) => ({
       aiGame: nextAiGame,
       aiHistory: [...st.aiHistory, nextAiGame],
+      matchAiMoves: [
+        ...st.matchAiMoves,
+        { axisCol: move.axisCol, rotation: move.rotation },
+      ],
     }));
     get().finalizeMatchIfDone();
   },

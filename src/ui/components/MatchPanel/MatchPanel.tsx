@@ -1,5 +1,12 @@
+import { useEffect, useState } from 'react';
 import { useGameStore } from '../../store';
 import { useT } from '../../../i18n';
+import {
+  listRecords,
+  saveRecord,
+  deleteRecord,
+  type MatchRecord,
+} from '../../../match/records';
 
 // Live status panel for match mode: turn counter, dual scores, side toggle,
 // and (when applicable) an AI history scrubber. Hidden in 'free' mode.
@@ -14,10 +21,29 @@ export function MatchPanel() {
   const viewing = useGameStore((s) => s.viewing);
   const matchEnded = useGameStore((s) => s.matchEnded);
   const matchResult = useGameStore((s) => s.matchResult);
+  const matchSeed = useGameStore((s) => s.matchSeed);
+  const matchPreset = useGameStore((s) => s.matchPreset);
+  const matchPlayerMoves = useGameStore((s) => s.matchPlayerMoves);
+  const matchAiMoves = useGameStore((s) => s.matchAiMoves);
   const setViewing = useGameStore((s) => s.setViewing);
   const setAiHistoryViewIndex = useGameStore((s) => s.setAiHistoryViewIndex);
   const startMatch = useGameStore((s) => s.startMatch);
   const t = useT();
+
+  // 保存済みレコードの一覧 (IndexedDB から非同期に読む)。
+  const [records, setRecords] = useState<MatchRecord[]>([]);
+  const [savedThisMatch, setSavedThisMatch] = useState(false);
+
+  // 結果画面を出すたびに最新の一覧を取り直す。
+  useEffect(() => {
+    if (mode !== 'match') return;
+    void listRecords().then(setRecords);
+  }, [mode, matchEnded]);
+
+  // 同じマッチの保存ボタンを 1 回だけ有効にしたいので、マッチが切り替わるたびにフラグを戻す。
+  useEffect(() => {
+    setSavedThisMatch(false);
+  }, [matchSeed]);
 
   if (mode !== 'match') return null;
 
@@ -120,12 +146,89 @@ export function MatchPanel() {
           </span>
           <button
             type="button"
+            disabled={savedThisMatch || matchSeed === null}
+            onClick={async () => {
+              if (matchSeed === null) return;
+              await saveRecord({
+                turnLimit: matchTurnLimit,
+                preset: matchPreset,
+                seed: matchSeed,
+                playerScore,
+                aiScore,
+                winner: matchResult.winner,
+                playerMoves: matchPlayerMoves,
+                aiMoves: matchAiMoves,
+              });
+              setSavedThisMatch(true);
+              setRecords(await listRecords());
+            }}
+            className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
+          >
+            {savedThisMatch ? t('match.saved') : t('match.save')}
+          </button>
+          <button
+            type="button"
             onClick={() => startMatch({ turnLimit: matchTurnLimit })}
             className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 rounded text-xs"
           >
             {t('match.rematch')}
           </button>
         </div>
+      )}
+
+      {records.length > 0 && (
+        <details className="border-t border-slate-700 pt-2">
+          <summary className="text-slate-300 cursor-pointer select-none">
+            {t('match.records')}{' '}
+            <span className="text-slate-500">({records.length})</span>
+          </summary>
+          <ul className="mt-2 flex flex-col gap-1 max-h-48 overflow-y-auto">
+            {records.map((r) => {
+              const date = new Date(r.createdAt);
+              const dateStr = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+              const winLabel =
+                r.winner === 'player'
+                  ? t('match.you')
+                  : r.winner === 'ai'
+                    ? t('match.ama')
+                    : t('match.draw');
+              const winColor =
+                r.winner === 'player'
+                  ? 'text-emerald-300'
+                  : r.winner === 'ai'
+                    ? 'text-amber-300'
+                    : 'text-slate-300';
+              return (
+                <li
+                  key={r.id}
+                  className="flex items-center justify-between gap-2 bg-slate-800 rounded px-2 py-1"
+                >
+                  <span className="text-slate-400 tabular-nums whitespace-nowrap">
+                    {dateStr}
+                  </span>
+                  <span className="text-slate-500 whitespace-nowrap">
+                    {r.turnLimit}
+                  </span>
+                  <span className={`font-mono tabular-nums whitespace-nowrap ${winColor}`}>
+                    {r.playerScore.toLocaleString()} - {r.aiScore.toLocaleString()}
+                  </span>
+                  <span className={`whitespace-nowrap ${winColor}`}>{winLabel}</span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await deleteRecord(r.id);
+                      setRecords(await listRecords());
+                    }}
+                    aria-label={t('match.deleteRecord')}
+                    className="text-slate-500 hover:text-red-400 px-1"
+                  >
+                    ✕
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </details>
       )}
     </div>
   );

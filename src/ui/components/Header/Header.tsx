@@ -46,7 +46,15 @@ export function Header() {
 
   return (
     <header className="p-3 border-b border-slate-800 flex flex-wrap justify-between items-center gap-3">
-      <span className="text-lg">{t('app.title')}</span>
+      <span className="text-lg flex items-baseline gap-2">
+        {t('app.title')}
+        <span
+          className="text-xs text-slate-500 font-mono"
+          title={`Built ${__BUILD_TIME__}`}
+        >
+          v{__BUILD_SHA__}
+        </span>
+      </span>
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex flex-col gap-1">
           <label className="text-sm flex items-center gap-1 select-none">

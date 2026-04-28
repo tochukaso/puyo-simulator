@@ -6,13 +6,22 @@ import { execSync } from 'node:child_process';
 
 import { cloudflare } from "@cloudflare/vite-plugin";
 
-// ビルド時点の git short SHA を取得し、ランタイムに埋め込む。
-// CI / Cloudflare Workers Builds でも同じコマンドが通る (どちらも .git ありで
-// チェックアウトされる)。取得に失敗した場合は 'dev' を入れて build を止めない。
+// ビルド時点のコミット SHA を取得し、ランタイムに埋め込む。
+// 優先順:
+//   1. VITE_BUILD_SHA (手動上書き)
+//   2. Cloudflare Workers Builds の WORKERS_CI_COMMIT_SHA
+//   3. Cloudflare Pages の CF_PAGES_COMMIT_SHA
+//   4. ローカル git からの取得
+// Cloudflare ダッシュボードに出る "v xxxxxxxx" と完全一致させるため
+// 先頭 8 文字に揃える。取得に失敗した場合は 'dev' を入れて build を止めない。
 function readGitSha(): string {
-  if (process.env.VITE_BUILD_SHA) return process.env.VITE_BUILD_SHA;
+  const explicit =
+    process.env.VITE_BUILD_SHA ||
+    process.env.WORKERS_CI_COMMIT_SHA ||
+    process.env.CF_PAGES_COMMIT_SHA;
+  if (explicit) return explicit.slice(0, 8);
   try {
-    return execSync('git rev-parse --short HEAD').toString().trim();
+    return execSync('git rev-parse --short=8 HEAD').toString().trim();
   } catch {
     return 'dev';
   }

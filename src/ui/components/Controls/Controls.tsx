@@ -66,7 +66,7 @@ export function Controls() {
           disabled={!canAiCommit}
           onClick={() => {
             if (!aiBest) return;
-            useGameStore.getState().commit(aiBest);
+            useGameStore.getState().commit(aiBest, { source: 'ai' });
           }}
           title={
             canAiCommit

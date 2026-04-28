@@ -5,6 +5,7 @@ import { createInitialState, spawnNext } from '../game/state';
 import { applyInput } from '../game/moves';
 import { resolveChain } from '../game/chain';
 import { lockActive } from '../game/landing';
+import { getCurrentAiMoves } from './hooks/useAiSuggestion';
 
 export interface PoppingCell {
   row: number;
@@ -28,6 +29,30 @@ export interface LandedCell {
   landedAt: number;
 }
 
+/**
+ * AI agreement metrics. Updated by commit() against the current AI suggestion
+ * snapshot, except when the commit was initiated by the AI itself (source='ai').
+ *   measured       : total user-initiated commits where AI snapshot was available
+ *   bestMatchCount : commits where the user's move == AI's #1 candidate
+ *   inListCount    : commits where the user's move appeared anywhere in the AI's topK
+ *   pctSum         : sum of (userMoveScore / topScore * 100) over inListCount commits
+ */
+export interface AiStats {
+  measured: number;
+  bestMatchCount: number;
+  inListCount: number;
+  pctSum: number;
+}
+
+const EMPTY_AI_STATS: AiStats = {
+  measured: 0,
+  bestMatchCount: 0,
+  inListCount: 0,
+  pctSum: 0,
+};
+
+export type CommitSource = 'user' | 'ai';
+
 interface Store {
   game: GameState;
   animatingSteps: ChainStep[];
@@ -38,9 +63,12 @@ interface Store {
   /** Puyos that just landed. Board bounces them with a squash-and-stretch. */
   landedCells: LandedCell[];
   history: GameState[];
+  /** Snapshots of aiStats taken before each commit; same length as `history`. Undo pops from both. */
+  aiStatsHistory: AiStats[];
+  aiStats: AiStats;
   reset(seed?: number): void;
   dispatch(input: Input): void;
-  commit(move: Move): Promise<void>;
+  commit(move: Move, opts?: { source?: CommitSource }): Promise<void>;
   undo(steps?: number): void;
   canUndo(): boolean;
 }
@@ -65,6 +93,8 @@ export const useGameStore = create<Store>((set, get) => ({
   chainTexts: [],
   landedCells: [],
   history: [],
+  aiStatsHistory: [],
+  aiStats: { ...EMPTY_AI_STATS },
   reset: (seed?: number) =>
     set({
       game: createInitialState(seed ?? (Date.now() | 0)),
@@ -73,11 +103,41 @@ export const useGameStore = create<Store>((set, get) => ({
       chainTexts: [],
       landedCells: [],
       history: [],
+      aiStatsHistory: [],
+      aiStats: { ...EMPTY_AI_STATS },
     }),
   dispatch: (input: Input) => set((s) => ({ game: applyInput(s.game, input) })),
-  commit: async (move: Move) => {
+  commit: async (move: Move, opts?: { source?: CommitSource }) => {
     const s = get().game;
     if (!s.current) return;
+    const source: CommitSource = opts?.source ?? 'user';
+
+    // AI agreement metric. Skip when the AI itself executed the move (e.g. "AI Best" button).
+    // Compute the next aiStats and snapshot the previous one for undo.
+    const priorAiStats = get().aiStats;
+    let nextAiStats = priorAiStats;
+    if (source === 'user') {
+      const ai = getCurrentAiMoves();
+      if (ai && ai.state === s && ai.moves.length > 0) {
+        const top = ai.moves[0]!;
+        const topScore = ai.moves.reduce((m, x) => Math.max(m, x.score ?? 0), 0);
+        const inList = ai.moves.find(
+          (m) => m.axisCol === move.axisCol && m.rotation === move.rotation,
+        );
+        const isBest = top.axisCol === move.axisCol && top.rotation === move.rotation;
+        nextAiStats = {
+          measured: priorAiStats.measured + 1,
+          bestMatchCount: priorAiStats.bestMatchCount + (isBest ? 1 : 0),
+          inListCount: priorAiStats.inListCount + (inList ? 1 : 0),
+          pctSum:
+            priorAiStats.pctSum +
+            (inList && topScore > 0
+              ? Math.max(0, ((inList.score ?? 0) / topScore) * 100)
+              : 0),
+        };
+      }
+    }
+
     // Puyo Puyo Tsuu (eSport) rules: no "no-crossing" restriction. Any
     // (axisCol, rotation) can be placed directly (equivalent to wall-kick
     // and teleportation).
@@ -92,7 +152,9 @@ export const useGameStore = create<Store>((set, get) => ({
     const { finalField, steps } = resolveChain(locked);
 
     const priorHistory = get().history;
+    const priorAiStatsHistory = get().aiStatsHistory;
     const newHistory = [...priorHistory, s].slice(-MAX_HISTORY);
+    const newAiStatsHistory = [...priorAiStatsHistory, priorAiStats].slice(-MAX_HISTORY);
 
     // Show the board right after landing. Record the cells newly occupied by
     // lockActive (= the two puyos of this pair) as bounce targets.
@@ -103,6 +165,8 @@ export const useGameStore = create<Store>((set, get) => ({
       animatingSteps: steps,
       poppingCells: [],
       history: newHistory,
+      aiStatsHistory: newAiStatsHistory,
+      aiStats: nextAiStats,
     });
 
     if (steps.length > 0) {
@@ -169,15 +233,18 @@ export const useGameStore = create<Store>((set, get) => ({
     set({ game: spawnNext(finalState), animatingSteps: [], poppingCells: [] });
   },
   undo: (steps = 1) => {
-    const { history, animatingSteps } = get();
+    const { history, animatingSteps, aiStatsHistory } = get();
     if (history.length === 0) return;
     if (animatingSteps.length > 0) return;
     const n = Math.min(Math.max(1, steps), history.length);
     const targetIndex = history.length - n;
     const target = history[targetIndex]!;
+    const targetAiStats = aiStatsHistory[targetIndex] ?? { ...EMPTY_AI_STATS };
     set({
       game: target,
       history: history.slice(0, targetIndex),
+      aiStatsHistory: aiStatsHistory.slice(0, targetIndex),
+      aiStats: targetAiStats,
       animatingSteps: [],
       poppingCells: [],
       chainTexts: [],

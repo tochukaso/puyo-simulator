@@ -33,6 +33,10 @@ export interface Dict {
   'match.amaWin': string;
   'match.draw': string;
   'match.rematch': string;
+  'match.save': string;
+  'match.saved': string;
+  'match.records': string;
+  'match.deleteRecord': string;
   'header.language': string;
   'stats.score': string;
   'stats.chain': string;
@@ -90,6 +94,10 @@ export const translations: Record<Lang, Dict> = {
     'match.amaWin': 'amaの勝ち',
     'match.draw': '引き分け',
     'match.rematch': '再戦',
+    'match.save': '保存',
+    'match.saved': '保存済み',
+    'match.records': '保存した対戦',
+    'match.deleteRecord': 'レコードを削除',
     'header.language': '言語',
     'stats.score': 'スコア',
     'stats.chain': '連鎖',
@@ -145,6 +153,10 @@ export const translations: Record<Lang, Dict> = {
     'match.amaWin': 'ama wins',
     'match.draw': 'Draw',
     'match.rematch': 'Rematch',
+    'match.save': 'Save',
+    'match.saved': 'Saved',
+    'match.records': 'Saved matches',
+    'match.deleteRecord': 'Delete record',
     'header.language': 'Language',
     'stats.score': 'Score',
     'stats.chain': 'Chain',
@@ -200,6 +212,10 @@ export const translations: Record<Lang, Dict> = {
     'match.amaWin': 'ama获胜',
     'match.draw': '平局',
     'match.rematch': '再战',
+    'match.save': '保存',
+    'match.saved': '已保存',
+    'match.records': '已保存的对战',
+    'match.deleteRecord': '删除记录',
     'header.language': '语言',
     'stats.score': '得分',
     'stats.chain': '连锁',
@@ -255,6 +271,10 @@ export const translations: Record<Lang, Dict> = {
     'match.amaWin': 'ama 승',
     'match.draw': '무승부',
     'match.rematch': '재대결',
+    'match.save': '저장',
+    'match.saved': '저장됨',
+    'match.records': '저장된 대전',
+    'match.deleteRecord': '기록 삭제',
     'header.language': '언어',
     'stats.score': '점수',
     'stats.chain': '연쇄',

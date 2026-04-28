@@ -1,5 +1,5 @@
 import { ROWS, COLS } from './constants';
-import type { Field, Cell, Color } from './types';
+import type { Field, Cell } from './types';
 
 export function createEmptyField(): Field {
   const cells: Cell[][] = [];
@@ -29,7 +29,8 @@ export function withCell(field: Field, row: number, col: number, value: Cell): F
 export function applyGravity(field: Field): Field {
   const newCells: Cell[][] = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
   for (let c = 0; c < COLS; c++) {
-    const stack: Color[] = [];
+    // Stack non-null cells (colors + garbage). Both fall under gravity.
+    const stack: Exclude<Cell, null>[] = [];
     for (let r = 0; r < ROWS; r++) {
       const v = field.cells[r]![c]!;
       if (v !== null) stack.push(v);

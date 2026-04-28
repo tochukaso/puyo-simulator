@@ -10,12 +10,15 @@ import { Controls } from './ui/components/Controls/Controls';
 import { CandidateList } from './ui/components/CandidateList/CandidateList';
 import { Header } from './ui/components/Header/Header';
 import { MatchPanel } from './ui/components/MatchPanel/MatchPanel';
+import { EditToolbar } from './ui/components/EditToolbar/EditToolbar';
+import { EditPairs } from './ui/components/EditPairs/EditPairs';
 
 export default function App() {
   const gestureRef = useRef<HTMLDivElement>(null);
   useKeyboard();
   useGestures(gestureRef);
   useMatchDriver();
+  const editing = useGameStore((s) => s.editing);
   // If the user reloaded while in match mode, the persisted `mode='match'`
   // wakes up without an `aiGame`. Kick off a fresh match so both sides spawn
   // from the same seed instead of leaving the AI side null.
@@ -39,13 +42,19 @@ export default function App() {
           <div className="flex gap-3 items-stretch justify-center w-full">
             <Board />
             <div className="flex flex-col gap-2 w-32 shrink-0" data-no-gesture>
-              <NextQueue />
-              <div className="mt-auto">
-                <CandidateList />
-              </div>
+              {/* 編集モード中はペア編集カードを優先表示。NextQueue はゲーム中の
+                  情報源で編集と概念が違うので入れ替える方が混乱しない。 */}
+              {editing ? <EditPairs /> : <NextQueue />}
+              {!editing && (
+                <div className="mt-auto">
+                  <CandidateList />
+                </div>
+              )}
             </div>
           </div>
-          <Controls />
+          {/* 編集中は通常 Controls の代わりに EditToolbar を出す。下半分の
+              スペース(親指のレストポジション)を編集 UI に明け渡す。 */}
+          {editing ? <EditToolbar /> : <Controls />}
         </div>
       </div>
     </div>

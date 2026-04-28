@@ -1,5 +1,8 @@
 export type Color = 'R' | 'B' | 'Y' | 'P';
-export type Cell = Color | null;
+/** Garbage / nuisance puyo. Doesn't form groups on its own; pops only when
+ *  adjacent to a color group that pops in the same step. */
+export type Garbage = 'G';
+export type Cell = Color | Garbage | null;
 export type Rotation = 0 | 1 | 2 | 3; // 0: up, 1: right, 2: down, 3: left
 
 export interface Field {
@@ -50,7 +53,8 @@ export interface Move {
 
 export interface ChainStep {
   readonly beforeField: Field;
-  readonly popped: ReadonlyArray<{ row: number; col: number; color: Color }>;
+  /** color: 'G' indicates a garbage cell cleared by adjacency. */
+  readonly popped: ReadonlyArray<{ row: number; col: number; color: Color | 'G' }>;
   readonly afterPop: Field;
   readonly afterGravity: Field;
   readonly chainIndex: number;

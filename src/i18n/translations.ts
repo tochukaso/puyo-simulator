@@ -37,6 +37,22 @@ export interface Dict {
   'match.saved': string;
   'match.records': string;
   'match.deleteRecord': string;
+  'edit.edit': string;
+  'edit.editing': string;
+  'edit.apply': string;
+  'edit.cancel': string;
+  'edit.clear': string;
+  'edit.clearConfirm': string;
+  'edit.matchExitConfirm': string;
+  'edit.erase': string;
+  'edit.garbage': string;
+  'edit.color.R': string;
+  'edit.color.B': string;
+  'edit.color.Y': string;
+  'edit.color.P': string;
+  'edit.pair.current': string;
+  'edit.pair.next1': string;
+  'edit.pair.next2': string;
   'header.language': string;
   'stats.score': string;
   'stats.chain': string;
@@ -98,6 +114,22 @@ export const translations: Record<Lang, Dict> = {
     'match.saved': '保存済み',
     'match.records': '保存した対戦',
     'match.deleteRecord': 'レコードを削除',
+    'edit.edit': '編集',
+    'edit.editing': '編集中',
+    'edit.apply': '適用',
+    'edit.cancel': 'キャンセル',
+    'edit.clear': '盤面クリア',
+    'edit.clearConfirm': '盤面を全て消しますか?',
+    'edit.matchExitConfirm': 'マッチを終了して編集モードに入りますか? (現在のマッチは中断されます)',
+    'edit.erase': '消去',
+    'edit.garbage': 'おじゃま',
+    'edit.color.R': '赤',
+    'edit.color.B': '青',
+    'edit.color.Y': '黄',
+    'edit.color.P': '緑',
+    'edit.pair.current': '現在',
+    'edit.pair.next1': 'NEXT',
+    'edit.pair.next2': 'NEXT2',
     'header.language': '言語',
     'stats.score': 'スコア',
     'stats.chain': '連鎖',
@@ -157,6 +189,22 @@ export const translations: Record<Lang, Dict> = {
     'match.saved': 'Saved',
     'match.records': 'Saved matches',
     'match.deleteRecord': 'Delete record',
+    'edit.edit': 'Edit',
+    'edit.editing': 'Editing',
+    'edit.apply': 'Apply',
+    'edit.cancel': 'Cancel',
+    'edit.clear': 'Clear',
+    'edit.clearConfirm': 'Clear the entire field?',
+    'edit.matchExitConfirm': 'End the current match and enter edit mode? (the match will be aborted)',
+    'edit.erase': 'Erase',
+    'edit.garbage': 'Garbage',
+    'edit.color.R': 'Red',
+    'edit.color.B': 'Blue',
+    'edit.color.Y': 'Yellow',
+    'edit.color.P': 'Green',
+    'edit.pair.current': 'Current',
+    'edit.pair.next1': 'Next',
+    'edit.pair.next2': 'Next 2',
     'header.language': 'Language',
     'stats.score': 'Score',
     'stats.chain': 'Chain',
@@ -216,6 +264,22 @@ export const translations: Record<Lang, Dict> = {
     'match.saved': '已保存',
     'match.records': '已保存的对战',
     'match.deleteRecord': '删除记录',
+    'edit.edit': '编辑',
+    'edit.editing': '编辑中',
+    'edit.apply': '应用',
+    'edit.cancel': '取消',
+    'edit.clear': '清空',
+    'edit.clearConfirm': '清空整个棋盘?',
+    'edit.matchExitConfirm': '结束当前对战并进入编辑模式?(当前对战将被中断)',
+    'edit.erase': '橡皮',
+    'edit.garbage': '杂质',
+    'edit.color.R': '红',
+    'edit.color.B': '蓝',
+    'edit.color.Y': '黄',
+    'edit.color.P': '绿',
+    'edit.pair.current': '当前',
+    'edit.pair.next1': 'NEXT',
+    'edit.pair.next2': 'NEXT2',
     'header.language': '语言',
     'stats.score': '得分',
     'stats.chain': '连锁',
@@ -275,6 +339,22 @@ export const translations: Record<Lang, Dict> = {
     'match.saved': '저장됨',
     'match.records': '저장된 대전',
     'match.deleteRecord': '기록 삭제',
+    'edit.edit': '편집',
+    'edit.editing': '편집 중',
+    'edit.apply': '적용',
+    'edit.cancel': '취소',
+    'edit.clear': '비우기',
+    'edit.clearConfirm': '필드를 전부 비울까요?',
+    'edit.matchExitConfirm': '대전을 종료하고 편집 모드로 들어갈까요? (현재 대전은 중단됩니다)',
+    'edit.erase': '지우기',
+    'edit.garbage': '방해',
+    'edit.color.R': '빨강',
+    'edit.color.B': '파랑',
+    'edit.color.Y': '노랑',
+    'edit.color.P': '초록',
+    'edit.pair.current': '현재',
+    'edit.pair.next1': 'NEXT',
+    'edit.pair.next2': 'NEXT2',
     'header.language': '언어',
     'stats.score': '점수',
     'stats.chain': '연쇄',

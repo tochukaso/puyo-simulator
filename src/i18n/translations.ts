@@ -17,6 +17,22 @@ export interface Dict {
   'header.trainerOff': string;
   'header.trainerGtr': string;
   'header.trainerKaidan': string;
+  'header.gameMode': string;
+  'header.modeFree': string;
+  'header.modeMatch': string;
+  'header.turnLimit': string;
+  'match.turn': string;
+  'match.remaining': string;
+  'match.you': string;
+  'match.ama': string;
+  'match.viewYou': string;
+  'match.viewAi': string;
+  'match.scrub': string;
+  'match.live': string;
+  'match.youWin': string;
+  'match.amaWin': string;
+  'match.draw': string;
+  'match.rematch': string;
   'header.language': string;
   'stats.score': string;
   'stats.chain': string;
@@ -58,6 +74,22 @@ export const translations: Record<Lang, Dict> = {
     'header.trainerOff': 'なし',
     'header.trainerGtr': 'GTR',
     'header.trainerKaidan': '階段',
+    'header.gameMode': 'モード',
+    'header.modeFree': 'フリー',
+    'header.modeMatch': '対amaスコア勝負',
+    'header.turnLimit': '手数',
+    'match.turn': 'ターン',
+    'match.remaining': '残り{n}',
+    'match.you': 'あなた',
+    'match.ama': 'ama',
+    'match.viewYou': '自分の盤面',
+    'match.viewAi': 'amaの盤面',
+    'match.scrub': 'amaヒストリー',
+    'match.live': 'ライブ',
+    'match.youWin': '勝利!',
+    'match.amaWin': 'amaの勝ち',
+    'match.draw': '引き分け',
+    'match.rematch': '再戦',
     'header.language': '言語',
     'stats.score': 'スコア',
     'stats.chain': '連鎖',
@@ -97,6 +129,22 @@ export const translations: Record<Lang, Dict> = {
     'header.trainerOff': 'None',
     'header.trainerGtr': 'GTR',
     'header.trainerKaidan': 'Staircase',
+    'header.gameMode': 'Mode',
+    'header.modeFree': 'Free',
+    'header.modeMatch': 'Score vs ama',
+    'header.turnLimit': 'Turns',
+    'match.turn': 'Turn',
+    'match.remaining': '{n} left',
+    'match.you': 'You',
+    'match.ama': 'ama',
+    'match.viewYou': 'Your board',
+    'match.viewAi': "ama's board",
+    'match.scrub': 'ama history',
+    'match.live': 'Live',
+    'match.youWin': 'You win!',
+    'match.amaWin': 'ama wins',
+    'match.draw': 'Draw',
+    'match.rematch': 'Rematch',
     'header.language': 'Language',
     'stats.score': 'Score',
     'stats.chain': 'Chain',
@@ -136,6 +184,22 @@ export const translations: Record<Lang, Dict> = {
     'header.trainerOff': '无',
     'header.trainerGtr': 'GTR',
     'header.trainerKaidan': '阶梯',
+    'header.gameMode': '模式',
+    'header.modeFree': '自由',
+    'header.modeMatch': '与ama比分',
+    'header.turnLimit': '手数',
+    'match.turn': '回合',
+    'match.remaining': '剩余{n}',
+    'match.you': '你',
+    'match.ama': 'ama',
+    'match.viewYou': '你的棋盘',
+    'match.viewAi': 'ama的棋盘',
+    'match.scrub': 'ama历史',
+    'match.live': '实时',
+    'match.youWin': '你赢了!',
+    'match.amaWin': 'ama获胜',
+    'match.draw': '平局',
+    'match.rematch': '再战',
     'header.language': '语言',
     'stats.score': '得分',
     'stats.chain': '连锁',
@@ -175,6 +239,22 @@ export const translations: Record<Lang, Dict> = {
     'header.trainerOff': '없음',
     'header.trainerGtr': 'GTR',
     'header.trainerKaidan': '계단',
+    'header.gameMode': '모드',
+    'header.modeFree': '자유',
+    'header.modeMatch': 'ama 점수 대결',
+    'header.turnLimit': '수',
+    'match.turn': '턴',
+    'match.remaining': '{n}수 남음',
+    'match.you': '당신',
+    'match.ama': 'ama',
+    'match.viewYou': '내 보드',
+    'match.viewAi': 'ama 보드',
+    'match.scrub': 'ama 기록',
+    'match.live': '실시간',
+    'match.youWin': '승리!',
+    'match.amaWin': 'ama 승',
+    'match.draw': '무승부',
+    'match.rematch': '재대결',
     'header.language': '언어',
     'stats.score': '점수',
     'stats.chain': '연쇄',

@@ -4,7 +4,6 @@ import {
   loadAmaModule,
   setAmaPreset,
   type AmaModule,
-  type AmaVariant,
 } from './wasm-loader';
 import {
   FIELD_BUFFER_BYTES,
@@ -19,14 +18,12 @@ const CHAR_B = 66;
 const CHAR_Y = 89;
 const CHAR_P = 80;
 
-// A single WasmAmaAI instance is bound to a single WASM variant
-// (default / gtr-only). fieldBuf/outBuf are malloc'd on that variant's Module
-// heap, so buffers cannot be shared across variants. The preset (weights) can
-// be switched within a variant.
+// 単一 WASM バイナリで全 form (GTR / FRON / SGTR / KAIDAN) をカバーし、
+// preset (weights + 有効 form) を実行時に切り替える。
 export class WasmAmaAI implements PuyoAI {
   readonly name = 'ama-wasm';
   get version(): string {
-    return `ama-wasm-${this.variant}-${this.preset}-v1`;
+    return `ama-wasm-${this.preset}-v1`;
   }
 
   private module: AmaModule | null = null;
@@ -35,25 +32,23 @@ export class WasmAmaAI implements PuyoAI {
   private outBuf = 0;
   private loading: Promise<void> | null = null;
   preset: string;
-  readonly variant: AmaVariant;
 
-  constructor(preset: string = 'build', variant: AmaVariant = 'default') {
+  constructor(preset: string = 'build') {
     this.preset = preset;
-    this.variant = variant;
   }
 
   async init(): Promise<void> {
     if (this.module) {
-      await setAmaPreset(this.variant, this.preset);
+      await setAmaPreset(this.preset);
       return;
     }
     if (this.loading) {
       await this.loading;
-      await setAmaPreset(this.variant, this.preset);
+      await setAmaPreset(this.preset);
       return;
     }
     this.loading = (async () => {
-      const m = await loadAmaModule(this.variant, this.preset);
+      const m = await loadAmaModule(this.preset);
       this.suggestFn = m.cwrap('ama_suggest', 'number', [
         'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number',
       ]);
@@ -66,12 +61,12 @@ export class WasmAmaAI implements PuyoAI {
     } finally {
       this.loading = null;
     }
-    await setAmaPreset(this.variant, this.preset);
+    await setAmaPreset(this.preset);
   }
 
   async setPreset(preset: string): Promise<void> {
     this.preset = preset;
-    if (this.module) await setAmaPreset(this.variant, preset);
+    if (this.module) await setAmaPreset(preset);
   }
 
   // Encodes the state into the WASM buffers and calls ama_suggest.

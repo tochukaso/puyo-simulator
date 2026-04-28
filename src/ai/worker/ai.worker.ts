@@ -2,13 +2,12 @@ import { HeuristicAI } from '../heuristic';
 import { MlAI } from '../ml/ml-policy-ai';
 import { MlSearchAI } from '../ml/ml-search-ai';
 import { WasmAmaAI } from '../wasm-ama/wasm-ama-ai';
-import type { AmaVariant } from '../wasm-ama/wasm-loader';
 import type { AiKind as Kind, PuyoAI } from '../types';
 import type { GameState, Move } from '../../game/types';
 
 export type WorkerMessage =
   | { type: 'suggest'; id: number; state: GameState; topK: number }
-  | { type: 'set-ai'; kind: Kind; preset?: string; variant?: AmaVariant };
+  | { type: 'set-ai'; kind: Kind; preset?: string };
 
 export type WorkerResponse =
   | { type: 'suggest'; id: number; moves: Move[] }
@@ -17,9 +16,8 @@ export type WorkerResponse =
 const heuristic = new HeuristicAI();
 let active: PuyoAI = heuristic;
 const mlInstances: Partial<Record<'ml-v1' | 'ml-ama-v1', MlAI>> = {};
-// One instance per variant. Each WasmAmaAI is tied to a fixed variant
-// (its heap buffers are variant-specific and cannot be reused).
-const amaWasmInstances: Partial<Record<AmaVariant, WasmAmaAI>> = {};
+// 単一 WASM のみで preset 切り替え方式に統一。
+let amaWasmInstance: WasmAmaAI | null = null;
 
 let mlSearchInstance: MlSearchAI | null = null;
 
@@ -44,24 +42,19 @@ async function getOrInitMl(kind: 'ml-v1' | 'ml-ama-v1'): Promise<MlAI> {
   return inst;
 }
 
-async function getOrInitAmaWasm(
-  preset: string = 'build',
-  variant: AmaVariant = 'default',
-): Promise<WasmAmaAI> {
-  let inst = amaWasmInstances[variant];
-  if (!inst) {
-    console.log(`[ama-wasm worker] creating WasmAmaAI variant=${variant} preset=${preset}`);
-    inst = new WasmAmaAI(preset, variant);
-    amaWasmInstances[variant] = inst;
-  } else if (inst.preset !== preset) {
-    console.log(`[ama-wasm worker] switching preset ${inst.preset} -> ${preset} on variant=${variant}`);
-    await inst.setPreset(preset);
+async function getOrInitAmaWasm(preset: string = 'build'): Promise<WasmAmaAI> {
+  if (!amaWasmInstance) {
+    console.log(`[ama-wasm worker] creating WasmAmaAI preset=${preset}`);
+    amaWasmInstance = new WasmAmaAI(preset);
+  } else if (amaWasmInstance.preset !== preset) {
+    console.log(`[ama-wasm worker] switching preset ${amaWasmInstance.preset} -> ${preset}`);
+    await amaWasmInstance.setPreset(preset);
   }
-  console.log(`[ama-wasm worker] init() start variant=${variant}`);
+  console.log(`[ama-wasm worker] init() start`);
   const t0 = performance.now();
-  await inst.init();
+  await amaWasmInstance.init();
   console.log(`[ama-wasm worker] init() done in ${(performance.now() - t0).toFixed(0)}ms`);
-  return inst;
+  return amaWasmInstance;
 }
 
 export async function handleMessage(
@@ -76,7 +69,7 @@ export async function handleMessage(
         return;
       }
       if (msg.kind === 'ama-wasm') {
-        active = await getOrInitAmaWasm(msg.preset ?? 'build', msg.variant ?? 'default');
+        active = await getOrInitAmaWasm(msg.preset ?? 'build');
         console.log('[ama-wasm worker] active set, sending set-ai ok=true');
         send({ type: 'set-ai', kind: 'ama-wasm', ok: true });
         return;

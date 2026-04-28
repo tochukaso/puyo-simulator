@@ -27,14 +27,14 @@ export function Header() {
   const lang = useLang();
   const t = useT();
 
-  // The AI is fixed to ama-wasm. While the GTR template is selected, use the
-  // GTR-only build (form::list = { GTR }); otherwise use the default build
-  // with preset='build'.
+  // ama-wasm に統一。trainer mode に応じて preset (form 集合 + weight) を切替。
   useEffect(() => {
     if (trainer === 'gtr') {
-      setAiKind('ama-wasm', 'gtr', 'gtr-only');
+      setAiKind('ama-wasm', 'gtr');
+    } else if (trainer === 'kaidan') {
+      setAiKind('ama-wasm', 'kaidan');
     } else {
-      setAiKind('ama-wasm', 'build', 'default');
+      setAiKind('ama-wasm', 'build');
     }
   }, [trainer]);
 
@@ -72,6 +72,7 @@ export function Header() {
         >
           <option value="off">{t('header.trainerOff')}</option>
           <option value="gtr">{t('header.trainerGtr')}</option>
+          <option value="kaidan">{t('header.trainerKaidan')}</option>
         </select>
         <label className="text-sm flex items-center gap-2">
           <span className="sr-only">{t('header.language')}</span>

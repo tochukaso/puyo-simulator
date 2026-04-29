@@ -1,4 +1,4 @@
-mod ama_ffi;
+pub mod ama_ffi;
 mod ama_command;
 
 #[tauri::command]

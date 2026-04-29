@@ -521,6 +521,9 @@ export const useGameStore = create<Store>((set, get) => ({
       history: [],
       aiStats: { ...EMPTY_AI_STATS },
       analyzing: false,
+      // Free-mode の解析ログは match 開始時点で意味を失う(再開時に古い seed
+      // 由来の手列を新しい盤面に当ててしまう)。空にしておく。
+      freePlayerMoves: [],
     });
   },
 
@@ -708,6 +711,8 @@ export const useGameStore = create<Store>((set, get) => ({
     if (!st.editing) return;
     if (!apply && st.editSnapshot) {
       // Cancel: restore the game's field/current/queue from the snapshot.
+      // Pre-edit state was already a valid replay of `freePlayerMoves` from
+      // `rngSeed`, so the move log stays consistent.
       set({
         game: {
           ...st.game,
@@ -717,9 +722,19 @@ export const useGameStore = create<Store>((set, get) => ({
           status: st.editSnapshot.current ? 'playing' : 'gameover',
         },
       });
+      set({ editing: false, editSnapshot: null });
+      return;
     }
-    // Apply: just keep the current edited values (already in st.game).
-    set({ editing: false, editSnapshot: null });
+    // Apply: keep edited board. The board now diverges from what
+    // `rngSeed + freePlayerMoves` would produce, so the analysis baseline is
+    // no longer valid — drop the move log and any previously analyzed stats.
+    set({
+      editing: false,
+      editSnapshot: null,
+      freePlayerMoves: [],
+      aiStats: { ...EMPTY_AI_STATS },
+      analyzing: false,
+    });
   },
 
   setEditPalette: (p) => set({ editPalette: p }),

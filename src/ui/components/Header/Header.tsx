@@ -20,9 +20,12 @@ import {
   type Lang,
 } from '../../../i18n';
 import type { AiKind as Kind } from '../../../ai/types';
+import { NativeAmaAI } from '../../../ai/native-ama/native-ama-ai';
 
 const STORAGE_KEY = 'puyo.ai.kind';
-const VALID: readonly Kind[] = ['heuristic', 'ml-v1', 'ml-ama-v1', 'ml-ama-v2-search', 'ama-wasm'] as const;
+const VALID: readonly Kind[] = [
+  'heuristic', 'ml-v1', 'ml-ama-v1', 'ml-ama-v2-search', 'ama-wasm', 'ama-native',
+] as const;
 
 function readInitialKind(): Kind {
   const v =
@@ -104,6 +107,9 @@ export function Header() {
             <option value="ml-ama-v1">ML (ama-distilled-v1)</option>
             <option value="ml-ama-v2-search">ML (ama-v2 + search)</option>
             <option value="ama-wasm">ama (WASM)</option>
+            {NativeAmaAI.isAvailable() && (
+              <option value="ama-native">ama (Native) ⚡</option>
+            )}
           </select>
         </label>
         <label className="text-sm flex items-center gap-2">

@@ -111,15 +111,6 @@ export function setAiKind(kind: Kind, preset?: string): void {
   getWorker().postMessage({ type: 'set-ai', kind, preset });
 }
 
-// Snapshot of the AI's most recent topK moves for the current GameState.
-// Used at commit time to score the user's move against the AI's evaluation.
-// Returns null if no suggestion has arrived yet (i.e. AI is still thinking
-// for this state, or the game is not in a state where suggestions apply).
-export function getCurrentAiMoves(): { state: GameState; moves: Move[] } | null {
-  if (!shared.requestedFor) return null;
-  return { state: shared.requestedFor, moves: shared.moves };
-}
-
 function requestSuggestFor(state: GameState): void {
   // Already requested for this exact state (another hook beat us to it) — no-op.
   if (shared.requestedFor === state) return;
@@ -151,7 +142,13 @@ function clearShared(): void {
 const getMovesSnapshot = (): Move[] => shared.moves;
 const getLoadingSnapshot = (): boolean => shared.loading;
 
-export function useAiSuggestion(topK: number = SHARED_TOPK) {
+/**
+ * `enabled = false` だと shared state の購読は続けるが worker への suggest 投げ
+ * は行わない。match モードでは player 側 AI 候補手の表示・最善手機能を完全に
+ * 隠しているので計算する意味が無い。worker への WASM 呼び出しは決して安く
+ * ないため、不要なら必ず止める。
+ */
+export function useAiSuggestion(topK: number = SHARED_TOPK, enabled: boolean = true) {
   const field = useGameStore((s) => s.game.field);
   const currentPair = useGameStore((s) => s.game.current?.pair);
   const nextQueue = useGameStore((s) => s.game.nextQueue);
@@ -175,10 +172,12 @@ export function useAiSuggestion(topK: number = SHARED_TOPK) {
   }, []);
 
   useEffect(() => {
+    if (!enabled) return;
     getWorker();
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
+    if (!enabled) return;
     if (!currentPair || status !== 'playing') return;
     if (!aiReady) {
       // While the AI is loading, don't send suggest requests. Clear shared
@@ -189,7 +188,7 @@ export function useAiSuggestion(topK: number = SHARED_TOPK) {
     }
     requestSuggestFor(fullGame);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [field, currentPair, nextQueue, status, aiReady]);
+  }, [field, currentPair, nextQueue, status, aiReady, enabled]);
 
   const moves = useMemo(
     () => (topK >= allMoves.length ? allMoves : allMoves.slice(0, topK)),

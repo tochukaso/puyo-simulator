@@ -24,6 +24,7 @@ export default function App() {
   useGestures(gestureRef);
   useMatchDriver();
   const editing = useGameStore((s) => s.editing);
+  const mode = useGameStore((s) => s.mode);
   // 起動時 URL に `?share=...` が乗っていたらそれを優先して盤面ロード。
   // 共有を踏んだ時は match を続行せず free に切替えるのが直感的なので
   // loadSharedPosition 側で handle 済み。失敗時はサイレントに無視。
@@ -68,7 +69,10 @@ export default function App() {
               {/* 編集モード中はペア編集カードを優先表示。NextQueue はゲーム中の
                   情報源で編集と概念が違うので入れ替える方が混乱しない。 */}
               {editing ? <EditPairs /> : <NextQueue />}
-              {!editing && (
+              {/* match モード中は AI 候補手を出さない (対人戦の趣旨を壊すので)。
+                  free モード = サンドボックス的にぷよ研究するためのモードなので
+                  そちらでは引き続き表示する。 */}
+              {!editing && mode !== 'match' && (
                 <div className="mt-auto">
                   <CandidateList />
                 </div>

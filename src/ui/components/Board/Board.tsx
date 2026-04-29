@@ -49,16 +49,21 @@ export function Board() {
   const poppingCells = viewing === 'player' ? playerPoppingCells : EMPTY_POPPING;
   const chainTexts = viewing === 'player' ? playerChainTexts : EMPTY_CHAIN_TEXTS;
   const landedCells = viewing === 'player' ? playerLandedCells : EMPTY_LANDED;
-  const { moves } = useAiSuggestion(5);
+  const mode = useGameStore((s) => s.mode);
+  // match モードでは候補手リスト・ゴースト・「AI 最善手」ボタンを全部隠して
+  // いるので、worker への suggest 投げそのものを止める (WASM 全幅探索は重い
+  // ので生かしっぱなしは計算資源の無駄)。
+  const { moves } = useAiSuggestion(5, mode !== 'match');
   const ghostEnabled = useGhostEnabled();
   const ceilingVisible = useCeilingVisible();
   const previewMove = usePreviewMove();
   const t = useT();
   // If a candidate is hovered/selected in CandidateList, prefer it. Otherwise
-  // fall back to the top candidate. Suppress when not viewing the live player
-  // board (suggestions are computed for the player's state, not the AI's).
+  // fall back to the top candidate. Suppress in match mode (the ghost would
+  // give away the answer in a player-vs-ama score race) and when viewing the
+  // AI side (suggestions are computed for the player's state, not the AI's).
   const bestMove =
-    ghostEnabled && viewing === 'player'
+    ghostEnabled && viewing === 'player' && mode !== 'match'
       ? (previewMove ?? moves[0] ?? null)
       : null;
 

@@ -11,11 +11,11 @@ import type {
   Pair,
 } from '../game/types';
 import { ROWS, COLS, SPAWN_AXIS_ROW, SPAWN_COL } from '../game/constants';
-import { createInitialState, spawnNext } from '../game/state';
+import { createInitialState, spawnNext, commitMove } from '../game/state';
 import { applyInput } from '../game/moves';
 import { resolveChain } from '../game/chain';
 import { lockActive } from '../game/landing';
-import { getCurrentAiMoves } from './hooks/useAiSuggestion';
+import { suggestForState } from './hooks/useAiSuggestion';
 import { getAmaPreset } from '../ai/wasm-ama/wasm-loader';
 
 export interface PoppingCell {
@@ -98,9 +98,21 @@ interface Store {
   /** Puyos that just landed. Board bounces them with a squash-and-stretch. */
   landedCells: LandedCell[];
   history: GameState[];
-  /** Snapshots of aiStats taken before each commit; same length as `history`. Undo pops from both. */
-  aiStatsHistory: AiStats[];
+  /**
+   * AI agreement metrics. Empty (measured=0) until the user clicks "Analyze".
+   * Cleared on commit / undo / reset / mode change because each of those
+   * invalidates the move list the previous analysis was built on.
+   */
   aiStats: AiStats;
+  /** True while analyzeStats() is iterating through past moves. */
+  analyzing: boolean;
+  /**
+   * Player's moves in free mode, in commit order. Used by analyzeStats() to
+   * replay the game and run ama on each pre-move state. Reset on reset() and
+   * popped on undo() so the count always matches the live game state.
+   * (Match mode uses `matchPlayerMoves` for the same purpose.)
+   */
+  freePlayerMoves: Move[];
 
   // ---- Match-vs-AI state ----
   /** Game mode. 'free' is the default solo simulator; 'match' runs a turn-limited score race against ama. */
@@ -143,6 +155,17 @@ interface Store {
   setAiHistoryViewIndex(index: number | null): void;
   /** Mark match ended if either side has consumed all turns or topped out. Computes result. */
   finalizeMatchIfDone(): void;
+  /** Player concedes the current match. Result is set with `winner: 'ai'` regardless of score. */
+  resignMatch(): void;
+
+  /**
+   * Replay every player move from the recorded sequence, run ama on each
+   * pre-commit state, and aggregate the agreement metrics into `aiStats`.
+   * Free mode replays from `game.rngSeed` + `freePlayerMoves`; match mode
+   * replays from `matchSeed` + `matchPlayerMoves`. Sets `analyzing=true`
+   * while running and writes results when done.
+   */
+  analyzeStats(): Promise<void>;
 
   // ---- Board editing ----
   /** True while the user is in edit mode. Game inputs (commit, dispatch) are no-ops. */
@@ -230,8 +253,9 @@ export const useGameStore = create<Store>((set, get) => ({
   chainTexts: [],
   landedCells: [],
   history: [],
-  aiStatsHistory: [],
   aiStats: { ...EMPTY_AI_STATS },
+  analyzing: false,
+  freePlayerMoves: [],
 
   mode: readPersistedMode(),
   matchTurnLimit: readPersistedTurnLimit(),
@@ -265,8 +289,9 @@ export const useGameStore = create<Store>((set, get) => ({
         chainTexts: [],
         landedCells: [],
         history: [],
-        aiStatsHistory: [],
         aiStats: { ...EMPTY_AI_STATS },
+        analyzing: false,
+        freePlayerMoves: [],
         aiGame,
         aiHistory: [],
         matchSeed: st.mode === 'match' ? newSeed : null,
@@ -291,32 +316,6 @@ export const useGameStore = create<Store>((set, get) => ({
     if (!s.current) return;
     const source: CommitSource = opts?.source ?? 'user';
 
-    // AI agreement metric. Skip when the AI itself executed the move (e.g. "AI Best" button).
-    // Compute the next aiStats and snapshot the previous one for undo.
-    const priorAiStats = get().aiStats;
-    let nextAiStats = priorAiStats;
-    if (source === 'user') {
-      const ai = getCurrentAiMoves();
-      if (ai && ai.state === s && ai.moves.length > 0) {
-        const top = ai.moves[0]!;
-        const topScore = ai.moves.reduce((m, x) => Math.max(m, x.score ?? 0), 0);
-        const inList = ai.moves.find(
-          (m) => m.axisCol === move.axisCol && m.rotation === move.rotation,
-        );
-        const isBest = top.axisCol === move.axisCol && top.rotation === move.rotation;
-        nextAiStats = {
-          measured: priorAiStats.measured + 1,
-          bestMatchCount: priorAiStats.bestMatchCount + (isBest ? 1 : 0),
-          inListCount: priorAiStats.inListCount + (inList ? 1 : 0),
-          pctSum:
-            priorAiStats.pctSum +
-            (inList && topScore > 0
-              ? Math.max(0, ((inList.score ?? 0) / topScore) * 100)
-              : 0),
-        };
-      }
-    }
-
     // Puyo Puyo Tsuu (eSport) rules: no "no-crossing" restriction. Any
     // (axisCol, rotation) can be placed directly (equivalent to wall-kick
     // and teleportation).
@@ -331,9 +330,7 @@ export const useGameStore = create<Store>((set, get) => ({
     const { finalField, steps } = resolveChain(locked);
 
     const priorHistory = get().history;
-    const priorAiStatsHistory = get().aiStatsHistory;
     const newHistory = [...priorHistory, s].slice(-MAX_HISTORY);
-    const newAiStatsHistory = [...priorAiStatsHistory, priorAiStats].slice(-MAX_HISTORY);
 
     // Show the board right after landing. Record the cells newly occupied by
     // lockActive (= the two puyos of this pair) as bounce targets.
@@ -344,8 +341,10 @@ export const useGameStore = create<Store>((set, get) => ({
       animatingSteps: steps,
       poppingCells: [],
       history: newHistory,
-      aiStatsHistory: newAiStatsHistory,
-      aiStats: nextAiStats,
+      // AI agreement metrics are recomputed on demand via analyzeStats(); any
+      // change to the move sequence invalidates the previously analyzed result.
+      aiStats: { ...EMPTY_AI_STATS },
+      analyzing: false,
     });
 
     if (steps.length > 0) {
@@ -413,7 +412,7 @@ export const useGameStore = create<Store>((set, get) => ({
 
     // Match-mode bookkeeping. Both 'user' and 'ai' sources count as a player
     // turn — clicking AI Best is the player's chosen action for this turn, just
-    // delegated. Source only gates the AI-agreement metric.
+    // delegated.
     if (get().mode === 'match' && !get().matchEnded) {
       set((st) => ({
         matchTurnsPlayed: st.matchTurnsPlayed + 1,
@@ -424,9 +423,23 @@ export const useGameStore = create<Store>((set, get) => ({
       }));
       get().finalizeMatchIfDone();
     }
+    // Free-mode move log. Used by analyzeStats() to replay the game later.
+    // We log both 'user' and 'ai' sources — if the user delegated to "AI Best",
+    // analyzeStats will still compare ama's analysis against that move (which
+    // will trivially match, but that's a faithful "what was actually played").
+    if (get().mode === 'free') {
+      set((st) => ({
+        freePlayerMoves: [
+          ...st.freePlayerMoves,
+          { axisCol: move.axisCol, rotation: move.rotation },
+        ],
+      }));
+    }
+    // Tag for compiler (variable was previously read; keep param for future use).
+    void source;
   },
   undo: (steps = 1) => {
-    const { history, animatingSteps, aiStatsHistory, mode } = get();
+    const { history, animatingSteps, mode, freePlayerMoves } = get();
     if (history.length === 0) return;
     if (animatingSteps.length > 0) return;
     // Undo during a match would desync the AI's parallel state. Disable for now.
@@ -434,12 +447,14 @@ export const useGameStore = create<Store>((set, get) => ({
     const n = Math.min(Math.max(1, steps), history.length);
     const targetIndex = history.length - n;
     const target = history[targetIndex]!;
-    const targetAiStats = aiStatsHistory[targetIndex] ?? { ...EMPTY_AI_STATS };
     set({
       game: target,
       history: history.slice(0, targetIndex),
-      aiStatsHistory: aiStatsHistory.slice(0, targetIndex),
-      aiStats: targetAiStats,
+      // Drop the same number of recorded moves so analyze can replay correctly.
+      freePlayerMoves: freePlayerMoves.slice(0, Math.max(0, freePlayerMoves.length - n)),
+      // Stale analysis — clear and let the user re-run.
+      aiStats: { ...EMPTY_AI_STATS },
+      analyzing: false,
       animatingSteps: [],
       poppingCells: [],
       chainTexts: [],
@@ -456,6 +471,9 @@ export const useGameStore = create<Store>((set, get) => ({
   setGameMode: (mode) => {
     persistMode(mode);
     set({ mode });
+    // Stats from the previous mode (e.g. a finished match) shouldn't bleed
+    // into the new mode's display. analyzeStats can be re-run on demand.
+    set({ aiStats: { ...EMPTY_AI_STATS }, analyzing: false });
     if (mode === 'free') {
       set({
         aiGame: null,
@@ -501,8 +519,11 @@ export const useGameStore = create<Store>((set, get) => ({
       chainTexts: [],
       landedCells: [],
       history: [],
-      aiStatsHistory: [],
       aiStats: { ...EMPTY_AI_STATS },
+      analyzing: false,
+      // Free-mode の解析ログは match 開始時点で意味を失う(再開時に古い seed
+      // 由来の手列を新しい盤面に当ててしまう)。空にしておく。
+      freePlayerMoves: [],
     });
   },
 
@@ -566,6 +587,82 @@ export const useGameStore = create<Store>((set, get) => ({
     set({ matchEnded: true, matchResult: { playerScore, aiScore, winner } });
   },
 
+  resignMatch: () => {
+    const st = get();
+    if (st.mode !== 'match' || st.matchEnded) return;
+    const playerScore = st.game.score;
+    const aiScore = st.aiGame ? st.aiGame.score : 0;
+    set({
+      matchEnded: true,
+      matchResult: { playerScore, aiScore, winner: 'ai' },
+    });
+  },
+
+  analyzeStats: async () => {
+    const st0 = get();
+    if (st0.analyzing) return;
+    const moves =
+      st0.mode === 'match' ? st0.matchPlayerMoves : st0.freePlayerMoves;
+    if (moves.length === 0) {
+      set({ aiStats: { ...EMPTY_AI_STATS } });
+      return;
+    }
+    const seed =
+      st0.mode === 'match' ? (st0.matchSeed ?? null) : st0.game.rngSeed;
+    if (seed === null) return;
+
+    set({ analyzing: true, aiStats: { ...EMPTY_AI_STATS } });
+
+    let state = createInitialState(seed);
+    let measured = 0;
+    let bestMatchCount = 0;
+    let inListCount = 0;
+    let pctSum = 0;
+    for (const move of moves) {
+      if (!state.current) break;
+      // 起動中に mode/move 列が変わった (例: 解析中にユーザがリセット) なら中断。
+      const stCheck = get();
+      const stillSame =
+        stCheck.analyzing &&
+        (stCheck.mode === 'match'
+          ? stCheck.matchPlayerMoves === moves
+          : stCheck.freePlayerMoves === moves);
+      if (!stillSame) {
+        // analyzing は別経路で false にされている想定 (reset/commit 等)。何もせず終了。
+        return;
+      }
+      const aiMoves = await suggestForState(state, 5);
+      if (aiMoves.length > 0) {
+        measured++;
+        const top = aiMoves[0]!;
+        const topScore = aiMoves.reduce(
+          (m, x) => Math.max(m, x.score ?? 0),
+          0,
+        );
+        const inList = aiMoves.find(
+          (m) => m.axisCol === move.axisCol && m.rotation === move.rotation,
+        );
+        if (top.axisCol === move.axisCol && top.rotation === move.rotation) {
+          bestMatchCount++;
+        }
+        if (inList) {
+          inListCount++;
+          if (topScore > 0) {
+            pctSum += Math.max(
+              0,
+              ((inList.score ?? 0) / topScore) * 100,
+            );
+          }
+        }
+      }
+      state = commitMove(state, move);
+    }
+    set({
+      aiStats: { measured, bestMatchCount, inListCount, pctSum },
+      analyzing: false,
+    });
+  },
+
   // ---- Board editing ----
 
   enterEditMode: () => {
@@ -614,6 +711,8 @@ export const useGameStore = create<Store>((set, get) => ({
     if (!st.editing) return;
     if (!apply && st.editSnapshot) {
       // Cancel: restore the game's field/current/queue from the snapshot.
+      // Pre-edit state was already a valid replay of `freePlayerMoves` from
+      // `rngSeed`, so the move log stays consistent.
       set({
         game: {
           ...st.game,
@@ -623,9 +722,19 @@ export const useGameStore = create<Store>((set, get) => ({
           status: st.editSnapshot.current ? 'playing' : 'gameover',
         },
       });
+      set({ editing: false, editSnapshot: null });
+      return;
     }
-    // Apply: just keep the current edited values (already in st.game).
-    set({ editing: false, editSnapshot: null });
+    // Apply: keep edited board. The board now diverges from what
+    // `rngSeed + freePlayerMoves` would produce, so the analysis baseline is
+    // no longer valid — drop the move log and any previously analyzed stats.
+    set({
+      editing: false,
+      editSnapshot: null,
+      freePlayerMoves: [],
+      aiStats: { ...EMPTY_AI_STATS },
+      analyzing: false,
+    });
   },
 
   setEditPalette: (p) => set({ editPalette: p }),
@@ -717,8 +826,9 @@ export const useGameStore = create<Store>((set, get) => ({
       chainTexts: [],
       landedCells: [],
       history: [],
-      aiStatsHistory: [],
       aiStats: { ...EMPTY_AI_STATS },
+      analyzing: false,
+      freePlayerMoves: [],
       aiGame: null,
       aiHistory: [],
       matchEnded: false,

@@ -16,13 +16,18 @@ pub async fn ama_suggest(
     app: AppHandle,
     input: SuggestInput,
 ) -> Result<Suggestion, String> {
+    // tauri.conf.json declares `vendor/ama/config.json` in bundle.resources, so
+    // the bundler preserves that path under resource_dir() (e.g.
+    // .app/Contents/Resources/vendor/ama/config.json). Don't strip the prefix —
+    // earlier code used join("config.json") and silently failed init in production.
     let config_path = app
         .path()
         .resource_dir()
         .map_err(|e| format!("resource_dir: {e}"))?
-        .join("config.json");
+        .join("vendor/ama/config.json");
 
-    ensure_init("build", &config_path).map_err(|e| e.to_string())?;
+    ensure_init("build", &config_path)
+        .map_err(|e| format!("{e} (config_path={})", config_path.display()))?;
 
     if input.field.len() != 78 {
         return Err("field must be exactly 78 chars".into());

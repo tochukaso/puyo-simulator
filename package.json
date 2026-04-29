@@ -10,6 +10,7 @@
     "build:ama-native": "bash scripts/build-ama-native.sh",
     "build:ama-native:all": "bash scripts/build-ama-native.sh --all-targets",
     "gen:ama-golden": "tsx scripts/gen-ama-golden.ts",
+    "bench:ama": "tsx scripts/bench-ama.ts",
     "lint": "eslint . --ext ts,tsx",
     "format": "prettier --write .",
     "preview": "vite preview",

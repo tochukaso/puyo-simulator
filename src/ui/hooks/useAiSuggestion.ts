@@ -3,6 +3,7 @@ import { useGameStore } from '../store';
 import type { Move } from '../../game/types';
 import type { AiKind as Kind } from '../../ai/types';
 import type { AmaVariant } from '../../ai/wasm-ama/wasm-loader';
+import { NativeAmaAI } from '../../ai/native-ama/native-ama-ai';
 
 // シングルトン Worker: Header のセレクタと Suggestion Hook が同じ Worker を
 // 共有し、set-ai で AI を切り替えると次の suggest からそれが使われる。
@@ -13,6 +14,14 @@ type AiReadyHandler = (kind: Kind, ok: boolean) => void;
 const aiReadyHandlers = new Set<AiReadyHandler>();
 let currentAiKind: Kind = 'ml-ama-v1';
 let currentAiReady = false;
+
+let nativeAi: NativeAmaAI | null = null;
+
+function getNativeAi(): NativeAmaAI | null {
+  if (!NativeAmaAI.isAvailable()) return null;
+  if (!nativeAi) nativeAi = new NativeAmaAI();
+  return nativeAi;
+}
 
 function getWorker(): Worker {
   if (workerSingleton) return workerSingleton;
@@ -41,6 +50,22 @@ export function setAiKind(kind: Kind, preset?: string, variant?: AmaVariant): vo
   currentAiKind = kind;
   currentAiReady = false;
   for (const h of aiReadyHandlers) h(kind, false);
+
+  if (kind === 'ama-native') {
+    const ai = getNativeAi();
+    if (!ai) {
+      console.warn('[ai] ama-native unavailable, falling back to ama-wasm');
+      currentAiKind = 'ama-wasm';
+      getWorker().postMessage({ type: 'set-ai', kind: 'ama-wasm', preset, variant });
+      return;
+    }
+    void ai.init().then(() => {
+      currentAiReady = true;
+      for (const h of aiReadyHandlers) h('ama-native', true);
+    });
+    return;
+  }
+
   getWorker().postMessage({ type: 'set-ai', kind, preset, variant });
 }
 
@@ -96,6 +121,23 @@ export function useAiSuggestion(topK = 5) {
     // Clear stale moves so the candidate list and board ghost don't display
     // the previous turn's suggestion while ama recomputes.
     setMoves([]);
+
+    if (currentAiKind === 'ama-native') {
+      const ai = getNativeAi();
+      if (!ai) {
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      void ai.suggest(fullGame, topK).then((m) => {
+        if (id === idRef.current) {
+          setMoves(m);
+          setLoading(false);
+        }
+      });
+      return;
+    }
+
     getWorker().postMessage({ type: 'suggest', id, state: fullGame, topK });
     setLoading(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,0 +1,6 @@
+TensorFlow.js
+Copyright 2017 The TensorFlow Authors. All rights reserved.
+Licensed under the Apache License, Version 2.0.
+
+You may obtain a copy of the Apache License at:
+http://www.apache.org/licenses/LICENSE-2.0

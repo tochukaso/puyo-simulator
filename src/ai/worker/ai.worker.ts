@@ -86,6 +86,18 @@ export async function handleMessage(
         send({ type: 'set-ai', kind: 'ml-ama-v2-search', ok: true });
         return;
       }
+      if (msg.kind === 'ama-native') {
+        // ama-native runs on the main thread via Tauri invoke, not in the worker.
+        // useAiSuggestion bypasses the worker for this kind; reaching here means a
+        // misroute. Reply with ok=false so the UI can fall back.
+        send({
+          type: 'set-ai',
+          kind: 'ama-native',
+          ok: false,
+          error: 'ama-native must be dispatched from main thread, not worker',
+        });
+        return;
+      }
       const ml = await getOrInitMl(msg.kind);
       active = ml;
       send({ type: 'set-ai', kind: msg.kind, ok: true });

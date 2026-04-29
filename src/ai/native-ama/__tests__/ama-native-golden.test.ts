@@ -3,7 +3,8 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const REPLAY = resolve('src-tauri/target/release/golden_replay');
+// Build with: cd src-tauri && cargo build --release --example golden_replay
+const REPLAY = resolve('src-tauri/target/release/examples/golden_replay');
 const GOLDEN = resolve('src/ai/wasm-ama/__tests__/ama_golden.jsonl');
 
 describe.skipIf(!existsSync(REPLAY))('ama-native golden file', () => {

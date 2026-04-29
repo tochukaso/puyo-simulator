@@ -4,9 +4,11 @@ import { suggestForState } from './useAiSuggestion';
 import { searchEndgameMove } from '../../match/endgameSearch';
 
 /**
- * Drives the AI's auto-play during a match. After each player commit (= a new
- * pair has been spawned, hence `aiHistory.length < matchTurnsPlayed`), this
- * hook computes the AI's next move on its parallel state and applies it.
+ * Drives the AI's auto-play during a match. ama plays its full `matchTurnLimit`
+ * turns at AI speed, independently of the player's pace — otherwise a slow
+ * (or paused) human player would also block ama's queue advance, which the
+ * user found confusing. The puyo sequence is deterministic from `matchSeed`,
+ * so both sides see the same pairs even when ama runs ahead.
  *
  * Move selection:
  *   - When >3 turns remain: defer to the worker's active AI (ama-wasm beam).
@@ -15,13 +17,12 @@ import { searchEndgameMove } from '../../match/endgameSearch';
  *     This overrides ama's "build forever" bias when there's no future left
  *     to build for.
  *
- * Runs as a single in-flight scheduler; if the player commits faster than the
- * AI can respond, requests serialize (no overlap).
+ * Runs as a single in-flight scheduler; ama plays one move at a time, and when
+ * each move applies the next render tick re-fires the effect for the next move.
  */
 export function useMatchDriver(): void {
   const mode = useGameStore((s) => s.mode);
   const matchEnded = useGameStore((s) => s.matchEnded);
-  const matchTurnsPlayed = useGameStore((s) => s.matchTurnsPlayed);
   const matchTurnLimit = useGameStore((s) => s.matchTurnLimit);
   const aiGame = useGameStore((s) => s.aiGame);
   const aiHistoryLength = useGameStore((s) => s.aiHistory.length);
@@ -33,16 +34,13 @@ export function useMatchDriver(): void {
     if (mode !== 'match') return;
     if (matchEnded) return;
     if (!aiGame || !aiGame.current) return;
-    // AI is one move "behind" the player's turn count when the player just
-    // committed. We catch up by playing exactly one move per pending player turn.
-    const owed = matchTurnsPlayed - aiHistoryLength;
-    if (owed <= 0) return;
+    const remainingForAi = Math.max(0, matchTurnLimit - aiHistoryLength);
+    if (remainingForAi <= 0) return;
     if (inFlight.current) return;
 
     inFlight.current = true;
     void (async () => {
       try {
-        const remainingForAi = Math.max(0, matchTurnLimit - aiHistoryLength);
         const lookahead = Math.min(remainingForAi, 3);
         let chosen;
         if (remainingForAi <= 3) {
@@ -66,7 +64,6 @@ export function useMatchDriver(): void {
   }, [
     mode,
     matchEnded,
-    matchTurnsPlayed,
     matchTurnLimit,
     aiGame,
     aiHistoryLength,

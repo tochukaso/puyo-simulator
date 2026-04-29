@@ -1,3 +1,5 @@
+mod ama_ffi;
+
 #[tauri::command]
 fn ping() -> i32 {
     42

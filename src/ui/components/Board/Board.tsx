@@ -254,9 +254,12 @@ function draw(
     if (c.landedAt > prev) landedAtMap.set(k, c.landedAt);
   }
 
-  // Draw the same-color connection bars first (we want them under the puyo discs).
-  drawConnectors(ctx, field, cell);
-
+  // Render order is split into 3 passes so connector lenses sit between body
+  // and symbol layers — keeps the lens shape independent of how wide it
+  // happens to be (a future tweak that pushes it close to the symbol's area
+  // would otherwise hide the color letter).
+  // Pass 1: bodies (with outline clipped at connecting wedges so the lens'
+  // body-side arc replaces the outline cleanly).
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       const color = field.cells[r]![c]!;
@@ -266,7 +269,22 @@ function draw(
       const landedAt = landedAtMap.get(k);
       const scale =
         landedAt !== undefined ? landingScale(now - landedAt) : ONE_SCALE;
-      drawPuyo(ctx, r, c, color, baseAlpha, cell, scale);
+      drawPuyoBody(ctx, r, c, color, baseAlpha, cell, scale, buildConnMask(field, r, c));
+    }
+  }
+  // Pass 2: connector lenses fill the gap between same-color neighbors.
+  drawConnectors(ctx, field, cell);
+  // Pass 3: symbols + pop highlights on top of connectors.
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const color = field.cells[r]![c]!;
+      if (color === null) continue;
+      const baseAlpha = r < VISIBLE_ROW_START ? 0.5 : 1;
+      const k = popKey(r, c);
+      const landedAt = landedAtMap.get(k);
+      const scale =
+        landedAt !== undefined ? landingScale(now - landedAt) : ONE_SCALE;
+      drawPuyoSymbol(ctx, r, c, color, baseAlpha, cell, scale);
       if (poppingSet.has(k)) {
         drawPopHighlight(ctx, r, c, cell, popPulse);
       }
@@ -296,8 +314,10 @@ function draw(
     // ぷよと「これは今操作中」だと一目で区別できるようにする。
     drawActiveHalo(ctx, axisRow, axisCol, cell, axisAlpha);
     drawActiveHalo(ctx, childRow, axisCol + dc, cell, childAlpha);
-    drawPuyo(ctx, axisRow, axisCol, pair.axis, axisAlpha, cell);
-    drawPuyo(ctx, childRow, axisCol + dc, pair.child, childAlpha, cell);
+    drawPuyoBody(ctx, axisRow, axisCol, pair.axis, axisAlpha, cell);
+    drawPuyoBody(ctx, childRow, axisCol + dc, pair.child, childAlpha, cell);
+    drawPuyoSymbol(ctx, axisRow, axisCol, pair.axis, axisAlpha, cell);
+    drawPuyoSymbol(ctx, childRow, axisCol + dc, pair.child, childAlpha, cell);
   }
 
   const ghost = ghostCells(field, current as ActivePair | null, bestMove);
@@ -312,36 +332,160 @@ function draw(
   ctx.restore();
 }
 
-// Connect adjacent same-color puyos with a thick bar (the "connection
-// expression" used in the original Puyo Puyo). Called before drawPuyo so the
-// bar layers underneath the discs.
+// Connect adjacent same-color puyos with a soap-bubble-fusion lens shape.
+// The lens fills the gap between two bodies. It is bounded on the body sides
+// by each body's actual outline arc and on the gap-facing sides by concave
+// quadratic Bezier curves (the "saddle"), giving the "two bubbles fusing"
+// silhouette of the original Puyo Puyo title.
+// Drawn AFTER bodies (so it lines up with the bodies' clipped-outline wedges)
+// and BEFORE symbols (so the color letter never gets hidden).
 function drawConnectors(ctx: CanvasRenderingContext2D, field: Field, cell: number) {
-  const W = cell * 0.55; // Bar thickness. Thinner than the puyo diameter so it reads as a "neck".
   const alphaOf = (r: number) => (r < VISIBLE_ROW_START ? 0.5 : 1);
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       const color = field.cells[r]![c]!;
-      // Garbage doesn't form connections — skip drawing connector bars for it.
       if (color === null || color === 'G') continue;
-      const hex = PUYO_COLORS[color];
       const cx = c * cell + cell / 2;
       const cy = r * cell + cell / 2;
       if (c + 1 < COLS && field.cells[r]![c + 1] === color) {
-        ctx.save();
-        ctx.globalAlpha = alphaOf(r);
-        ctx.fillStyle = hex;
-        ctx.fillRect(cx, cy - W / 2, cell, W);
-        ctx.restore();
+        drawNeckLens(ctx, color, alphaOf(r), cx, cy, cell, 'horizontal');
       }
       if (r + 1 < ROWS && field.cells[r + 1]![c] === color) {
-        ctx.save();
-        ctx.globalAlpha = Math.min(alphaOf(r), alphaOf(r + 1));
-        ctx.fillStyle = hex;
-        ctx.fillRect(cx - W / 2, cy, W, cell);
-        ctx.restore();
+        drawNeckLens(
+          ctx,
+          color,
+          Math.min(alphaOf(r), alphaOf(r + 1)),
+          cx,
+          cy,
+          cell,
+          'vertical',
+        );
       }
     }
   }
+}
+
+// Draws the saddle-shaped fusion neck between two adjacent same-color puyos.
+// `cx`,`cy` are the *first* puyo's center (the upstream cell). `direction`
+// picks horizontal (→ neighbor at cx+cell, cy) or vertical (→ neighbor at cx, cy+cell).
+//
+// The lens is bounded on the body sides by the puyos' actual outline arcs and
+// on the gap-facing sides by concave Bezier curves (the "saddle"). It NEVER
+// extends into body interior, so the body's own gradient and outline elsewhere
+// stay completely intact — only the small wedge of outline at the connecting
+// direction is hidden (handled by drawPuyoBody's clip).
+function drawNeckLens(
+  ctx: CanvasRenderingContext2D,
+  color: Color | 'G',
+  alpha: number,
+  cx: number,
+  cy: number,
+  cell: number,
+  direction: 'horizontal' | 'vertical',
+) {
+  const r = cell / 2 - 2;
+  // Half-width at the body interface — measured perpendicular to the join axis.
+  // Sized close to the body radius (not 0.5 — slightly less so we don't degenerate
+  // the outline arc). Matches how the original Puyo Puyo title joins two bodies
+  // along almost their full edge so they read as one continuous blob.
+  const halfWAtBody = Math.min(cell * 0.42, r * 0.92);
+  // Saddle pinch — only a subtle inward bow at the middle, like the original.
+  const halfWAtSaddle = halfWAtBody * 0.92;
+  // Body outline x-coordinate at y = ±halfWAtBody (relative to body center).
+  // We use this to land the lens endpoints exactly ON the body outline.
+  const sqrtPart = Math.sqrt(Math.max(0, r * r - halfWAtBody * halfWAtBody));
+  // Half-angle that the lens occupies on each body's outline (in radians).
+  const bodyArcAngle = Math.asin(halfWAtBody / r);
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  // Solid mid color (PUYO_COLORS) — same as the body's mid-radius shading.
+  // The neck reads as "same color as the body" rather than its own lit surface.
+  ctx.fillStyle = PUYO_COLORS[color];
+
+  ctx.beginPath();
+  if (direction === 'horizontal') {
+    // Lens between body A (left, center cx,cy) and body B (right, center cx+cell,cy).
+    const yTop = cy - halfWAtBody;
+    const yBot = cy + halfWAtBody;
+    const xA = cx + sqrtPart; // body A right outline at y = cy ± halfWAtBody
+    const xB = cx + cell - sqrtPart; // body B left outline
+    const saddleX = cx + cell / 2;
+    // Solve quadratic Bezier control y so the saddle lands at cy ± halfWAtSaddle:
+    //   B(0.5).y = (P0.y + 2*ctrl.y + P1.y) / 4. With P0.y == P1.y == yTop:
+    //     B(0.5).y = (yTop + ctrl.y) / 2 → ctrl.y = 2*saddle.y - yTop.
+    const ctrlYTop = 2 * (cy - halfWAtSaddle) - yTop; // = cy - 2*halfWAtSaddle + halfWAtBody
+    const ctrlYBot = 2 * (cy + halfWAtSaddle) - yBot;
+    ctx.moveTo(xA, yTop);
+    // Top side: concave saddle from (xA,yTop) to (xB,yTop).
+    ctx.quadraticCurveTo(saddleX, ctrlYTop, xB, yTop);
+    // Right side: body B's left outline arc, from (xB,yTop) through (cx+cell-r, cy) to (xB,yBot).
+    // Endpoint angles from body B center (cx+cell, cy):
+    //   (xB, yTop): atan2(-halfW, -sqrt) = -(π - bodyArcAngle) = bodyArcAngle - π
+    //   (xB, yBot): π - bodyArcAngle
+    // Going through angle ±π (leftmost point) requires anticlockwise (decreasing) wrap.
+    ctx.arc(cx + cell, cy, r, bodyArcAngle - Math.PI, Math.PI - bodyArcAngle, true);
+    // Bottom side: concave saddle from (xB,yBot) back to (xA,yBot).
+    ctx.quadraticCurveTo(saddleX, ctrlYBot, xA, yBot);
+    // Left side: body A's right outline arc, from (xA,yBot) through (cx+r, cy) to (xA,yTop).
+    // Endpoint angles from body A center (cx, cy):
+    //   (xA, yBot): bodyArcAngle, (xA, yTop): -bodyArcAngle.
+    // Going through angle 0 (rightmost) means decreasing angle (anticlockwise).
+    ctx.arc(cx, cy, r, bodyArcAngle, -bodyArcAngle, true);
+  } else {
+    // Lens between body A (top, center cx,cy) and body B (bottom, center cx,cy+cell).
+    const xLeft = cx - halfWAtBody;
+    const xRight = cx + halfWAtBody;
+    const yA = cy + sqrtPart; // body A bottom outline at x = cx ± halfWAtBody
+    const yB = cy + cell - sqrtPart; // body B top outline
+    const saddleY = cy + cell / 2;
+    const ctrlXLeft = 2 * (cx - halfWAtSaddle) - xLeft;
+    const ctrlXRight = 2 * (cx + halfWAtSaddle) - xRight;
+    ctx.moveTo(xLeft, yA);
+    // Top side: body A's bottom (south) outline arc, from (xLeft,yA) through (cx, cy+r) to (xRight,yA).
+    // Endpoint angles from body A center:
+    //   (xLeft, yA): atan2(sqrt, -halfW) = π/2 + bodyArcAngle
+    //   (xRight, yA): atan2(sqrt, halfW) = π/2 - bodyArcAngle
+    // Going through π/2 (= bottom of A): decreasing angle = anticlockwise.
+    ctx.arc(cx, cy, r, Math.PI / 2 + bodyArcAngle, Math.PI / 2 - bodyArcAngle, true);
+    // Right side: concave saddle from (xRight,yA) to (xRight,yB).
+    ctx.quadraticCurveTo(ctrlXRight, saddleY, xRight, yB);
+    // Bottom side: body B's top (north) outline arc, from (xRight,yB) through (cx, cy+cell-r) to (xLeft,yB).
+    // Endpoint angles from body B center (cx, cy+cell):
+    //   (xRight, yB): atan2(-sqrt, halfW) = -(π/2 - bodyArcAngle) = -π/2 + bodyArcAngle
+    //   (xLeft, yB): -π/2 - bodyArcAngle
+    // Going through -π/2 (= top of B): decreasing angle = anticlockwise.
+    ctx.arc(cx, cy + cell, r, -Math.PI / 2 + bodyArcAngle, -Math.PI / 2 - bodyArcAngle, true);
+    // Left side: concave saddle from (xLeft,yB) back to (xLeft,yA).
+    ctx.quadraticCurveTo(ctrlXLeft, saddleY, xLeft, yA);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+interface ConnMask {
+  right: boolean;
+  down: boolean;
+  left: boolean;
+  up: boolean;
+}
+
+const NO_CONN: ConnMask = { right: false, down: false, left: false, up: false };
+// Width of the rectangular outline-clip strip in drawPuyoBody. Matches the
+// lens's half-width at the body interface (drawNeckLens.halfWAtBody) so the
+// outline is hidden exactly under the wedge that the lens replaces.
+const CONNECTOR_HALF_W_FRAC = 0.42;
+
+function buildConnMask(field: Field, r: number, c: number): ConnMask {
+  const color = field.cells[r]![c];
+  if (color === null || color === 'G') return NO_CONN;
+  return {
+    right: c + 1 < COLS && field.cells[r]![c + 1] === color,
+    down: r + 1 < ROWS && field.cells[r + 1]![c] === color,
+    left: c - 1 >= 0 && field.cells[r]![c - 1] === color,
+    up: r - 1 >= 0 && field.cells[r - 1]![c] === color,
+  };
 }
 
 // Draw the color's initial letter in the center of the cell. fontSize is 45%
@@ -392,7 +536,21 @@ function landingScale(elapsedMs: number): PuyoScale {
   return { sx, sy };
 }
 
-function drawPuyo(
+// Geometry helper: where the body ellipse actually lives. The body is anchored
+// to the cell bottom (bouncing tomato style) so we cannot just take the cell center.
+function bodyGeometry(row: number, col: number, cell: number, scale: PuyoScale) {
+  const cx = col * cell + cell / 2;
+  const baseY = row * cell + cell - 2;
+  const r = cell / 2 - 2;
+  const ry = r * scale.sy;
+  const rx = r * scale.sx;
+  const centerY = baseY - ry;
+  return { cx, centerY, rx, ry };
+}
+
+// Body fill + outline, no symbol. Split out so we can draw the connector bars
+// on top of the bodies (covering the dark rim) but UNDER the symbols.
+function drawPuyoBody(
   ctx: CanvasRenderingContext2D,
   row: number,
   col: number,
@@ -400,16 +558,10 @@ function drawPuyo(
   alpha: number,
   cell: number,
   scale: PuyoScale = ONE_SCALE,
+  connections: ConnMask = NO_CONN,
 ) {
   if (row < 0) return;
-  const cx = col * cell + cell / 2;
-  // To convey that "even while bouncing, the bottom stays glued to the floor",
-  // anchor the deformation at the cell bottom.
-  const baseY = row * cell + cell - 2;
-  const r = cell / 2 - 2;
-  const ry = r * scale.sy;
-  const rx = r * scale.sx;
-  const centerY = baseY - ry;
+  const { cx, centerY, rx, ry } = bodyGeometry(row, col, cell, scale);
 
   // Radial gradient for body shading. Offset the highlight slightly up to
   // suggest light coming from above (matching the original Puyo Puyo style).
@@ -431,14 +583,37 @@ function drawPuyo(
   ctx.beginPath();
   ctx.ellipse(cx, centerY, rx, ry, 0, 0, Math.PI * 2);
   ctx.fill();
-  // Dark outline
+  ctx.restore();
+
+  // Dark outline. Clip out the wedge that faces a same-color neighbor — the
+  // connector lens drawn next traces that exact body-outline arc, so without
+  // this clip the outline would show as a thin dark seam between body and lens.
+  ctx.save();
+  ctx.globalAlpha = alpha;
   ctx.lineWidth = Math.max(1, cell * 0.04);
   ctx.strokeStyle = PUYO_DARK[color];
+  if (
+    connections.right ||
+    connections.down ||
+    connections.left ||
+    connections.up
+  ) {
+    const halfW = cell * CONNECTOR_HALF_W_FRAC;
+    ctx.beginPath();
+    ctx.rect(cx - cell * 2, centerY - cell * 2, cell * 4, cell * 4);
+    if (connections.right) ctx.rect(cx, centerY - halfW, cell, halfW * 2);
+    if (connections.left) ctx.rect(cx - cell, centerY - halfW, cell, halfW * 2);
+    if (connections.down) ctx.rect(cx - halfW, centerY, halfW * 2, cell);
+    if (connections.up) ctx.rect(cx - halfW, centerY - cell, halfW * 2, cell);
+    ctx.clip('evenodd');
+  }
+  ctx.beginPath();
+  ctx.ellipse(cx, centerY, rx, ry, 0, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
 
-  // Garbage has no letter; show a small inner highlight instead so it still
-  // reads as a puyo at a glance.
+  // Garbage gets a tiny highlight in lieu of a letter. Drawn here (with the
+  // body) — drawPuyoSymbol skips garbage entirely.
   if (color === 'G') {
     ctx.save();
     ctx.globalAlpha = alpha * 0.85;
@@ -455,8 +630,23 @@ function drawPuyo(
     );
     ctx.fill();
     ctx.restore();
-    return;
   }
+}
+
+// Color-letter symbol only (centered on the body). Drawn AFTER connector bars
+// so the symbol is never hidden by a same-color connection that crosses it.
+function drawPuyoSymbol(
+  ctx: CanvasRenderingContext2D,
+  row: number,
+  col: number,
+  color: Color | 'G',
+  alpha: number,
+  cell: number,
+  scale: PuyoScale = ONE_SCALE,
+) {
+  if (row < 0) return;
+  if (color === 'G') return;
+  const { cx, centerY } = bodyGeometry(row, col, cell, scale);
   drawSymbol(ctx, cx, centerY, color, cell, scale, alpha);
 }
 

@@ -29,7 +29,11 @@ pub enum AmaError {
     InvalidInput(&'static str),
 }
 
+// Use camelCase on the wire so the TS NativeSuggestion type can read fields
+// directly (axisCol / expectedChain). The internal Rust names stay snake_case
+// per Rust convention.
 #[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Suggestion {
     pub axis_col: u8,
     pub rotation: u8,

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useGameStore } from '../../store';
 import { useT } from '../../../i18n';
+import { confirmDialog } from '../../utils/dialog';
 import {
   listRecords,
   saveRecord,
@@ -145,8 +146,8 @@ export function MatchPanel() {
         <div className="flex flex-wrap gap-2 items-center">
           <button
             type="button"
-            onClick={() => {
-              if (confirm(t('match.resignConfirm'))) resignMatch();
+            onClick={async () => {
+              if (await confirmDialog(t('match.resignConfirm'))) resignMatch();
             }}
             className="px-2 py-1 bg-red-600 hover:bg-red-500 active:bg-red-400 rounded text-xs"
           >

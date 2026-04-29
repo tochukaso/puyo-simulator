@@ -5,6 +5,7 @@ import { HamburgerMenu } from '../HamburgerMenu/HamburgerMenu';
 import { useTrainerMode } from '../../hooks/useTrainerMode';
 import { useGameStore, type GameMode, type MatchTurnLimit } from '../../store';
 import { useT } from '../../../i18n';
+import { confirmDialog } from '../../utils/dialog';
 import { NativeAmaAI } from '../../../ai/native-ama/native-ama-ai';
 import type { AiKind } from '../../../ai/types';
 
@@ -86,13 +87,13 @@ export function Header() {
             (マッチを抜けて編集に入る方針。盤面が変わるので再開不可)。 */}
         <button
           type="button"
-          onClick={() => {
+          onClick={async () => {
             if (editing) {
               exitEditMode(true);
               return;
             }
             if (mode === 'match') {
-              if (!confirm(t('edit.matchExitConfirm'))) return;
+              if (!(await confirmDialog(t('edit.matchExitConfirm')))) return;
               setGameMode('free');
             }
             enterEditMode();

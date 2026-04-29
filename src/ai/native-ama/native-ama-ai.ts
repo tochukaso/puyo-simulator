@@ -30,6 +30,7 @@ export class NativeAmaAI implements PuyoAI {
   }
 
   async setPreset(preset: string): Promise<void> {
+    console.log('[ama-native] setPreset', { from: this.preset, to: preset });
     this.preset = preset;
     // Eagerly trigger init for the new preset so AI-ready can flip true.
     // We do a no-op suggest with an empty field; the Rust side will
@@ -37,6 +38,7 @@ export class NativeAmaAI implements PuyoAI {
     // happens only on trainer-mode change, not per move.
     const empty = '.'.repeat(78);
     try {
+      const t0 = performance.now();
       await invokeAmaSuggest({
         preset,
         field: empty,
@@ -44,6 +46,11 @@ export class NativeAmaAI implements PuyoAI {
         next1: ['Y', 'P'],
         next2: ['R', 'Y'],
       });
+      console.log(
+        '[ama-native] setPreset primed',
+        preset,
+        `${(performance.now() - t0).toFixed(0)}ms`,
+      );
     } catch (e) {
       console.error('[ama-native] setPreset prime failed:', e);
     }
@@ -85,13 +92,20 @@ export class NativeAmaAI implements PuyoAI {
     }
 
     try {
-      return await invokeAmaSuggest({
+      const t0 = performance.now();
+      const r = await invokeAmaSuggest({
         preset: this.preset,
         field,
         current: [cur.axis, cur.child],
         next1: [n1.axis, n1.child],
         next2: [n2.axis, n2.child],
       });
+      console.log(
+        '[ama-native] suggest',
+        { preset: this.preset, ...r },
+        `${(performance.now() - t0).toFixed(0)}ms`,
+      );
+      return r;
     } catch (e) {
       console.error('[ama-native] invoke failed:', e);
       return null;

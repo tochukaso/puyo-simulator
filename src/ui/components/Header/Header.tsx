@@ -120,8 +120,9 @@ export function Header() {
             }}
             className="bg-slate-800 text-slate-100 border border-slate-700 rounded px-2 py-1 text-sm"
           >
+            <option value="30">30</option>
+            <option value="50">50</option>
             <option value="100">100</option>
-            <option value="200">200</option>
           </select>
         )}
         {/* 編集モードトグル。マッチ中に編集に入ろうとしたら 1 回だけ確認を出す

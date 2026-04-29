@@ -14,8 +14,8 @@ export interface MatchRecord {
   createdAt: string;
   /** 同じ build SHA で動いていた事の証跡。`__BUILD_SHA__` をそのまま入れる。 */
   buildSha: string;
-  /** マッチの規定手数。 */
-  turnLimit: 100 | 200;
+  /** マッチの規定手数。過去の記録には旧設定値 (例: 200) が残ることがある。 */
+  turnLimit: number;
   /** マッチ中に有効だった ama-wasm preset (例: 'build' / 'gtr' / 'kaidan')。 */
   preset: string;
   /** ぷよ列の再現用に保存する RNG seed。 */

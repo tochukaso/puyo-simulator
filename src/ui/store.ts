@@ -65,7 +65,7 @@ const EMPTY_AI_STATS: AiStats = {
 export type CommitSource = 'user' | 'ai';
 
 export type GameMode = 'free' | 'match';
-export type MatchTurnLimit = 100 | 200;
+export type MatchTurnLimit = 30 | 50 | 100;
 export type ViewSide = 'player' | 'ai';
 
 /** Edit-mode palette selection. 'X' = eraser. */
@@ -197,9 +197,13 @@ function readPersistedMode(): GameMode {
 
 function readPersistedTurnLimit(): MatchTurnLimit {
   try {
-    return localStorage.getItem('puyo.matchTurnLimit') === '200' ? 200 : 100;
+    const raw = localStorage.getItem('puyo.matchTurnLimit');
+    if (raw === '30') return 30;
+    if (raw === '50') return 50;
+    if (raw === '100') return 100;
+    return 50;
   } catch {
-    return 100;
+    return 50;
   }
 }
 

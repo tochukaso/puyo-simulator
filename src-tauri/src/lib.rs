@@ -1,4 +1,5 @@
 mod ama_ffi;
+mod ama_command;
 
 #[tauri::command]
 fn ping() -> i32 {
@@ -18,7 +19,7 @@ pub fn run() {
       }
       Ok(())
     })
-    .invoke_handler(tauri::generate_handler![ping])
+    .invoke_handler(tauri::generate_handler![ping, ama_command::ama_suggest])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }

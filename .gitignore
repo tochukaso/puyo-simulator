@@ -43,3 +43,7 @@ data/eval-runs/
 # type stub and stays in git so the loader typechecks even before a build.
 src/ai/wasm-ama/_glue/ama.js
 src/ai/wasm-ama/_glue/ama-gtr.js
+
+# Tauri build artifacts
+src-tauri/target/
+src-tauri/gen/

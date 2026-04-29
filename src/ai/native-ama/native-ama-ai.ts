@@ -75,7 +75,11 @@ export class NativeAmaAI implements PuyoAI {
   }
 
   private async callSuggest(state: GameState): Promise<NativeSuggestion | null> {
-    const cur = state.current!.pair;
+    // Guard against very early states where nextQueue hasn't filled yet —
+    // ama needs the current pair plus next1+next2, otherwise the indexing
+    // throws before we can catch it.
+    if (!state.current || state.nextQueue.length < 2) return null;
+    const cur = state.current.pair;
     const n1 = state.nextQueue[0]!;
     const n2 = state.nextQueue[1]!;
 

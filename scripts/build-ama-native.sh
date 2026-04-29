@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-AMA_REPO="${AMA_REPO:-/Users/yasumitsuomori/git/ama}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# Default to a sibling checkout (../ama relative to puyo3 root). Override via
+# AMA_REPO env if your clone lives elsewhere; CI sets it explicitly.
+AMA_REPO="${AMA_REPO:-$ROOT/../ama}"
 VENDOR="$ROOT/src-tauri/vendor/ama"
 
 if [ ! -d "$AMA_REPO" ]; then
-  echo "AMA_REPO not found at $AMA_REPO" >&2
+  echo "AMA_REPO not found at $AMA_REPO (set AMA_REPO=/path/to/ama)" >&2
   exit 1
 fi
 

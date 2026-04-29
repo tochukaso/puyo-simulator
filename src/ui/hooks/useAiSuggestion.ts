@@ -136,7 +136,14 @@ export function setAiKind(kind: Kind, preset?: string): void {
       getWorker().postMessage({ type: 'set-ai', kind: 'ama-wasm', preset });
       return;
     }
-    void ai.setPreset(preset ?? 'build').then(() => {
+    const requestedPreset = preset ?? 'build';
+    void ai.setPreset(requestedPreset).then(() => {
+      // Guard against a rapid switch (e.g., trainer flipped twice) — only
+      // publish ready=true if this completion still corresponds to the active
+      // request. Otherwise we'd announce ready for an AI/preset combo the user
+      // already left.
+      if (currentAiKind !== 'ama-native') return;
+      if (ai.preset !== requestedPreset) return;
       currentAiReady = true;
       for (const h of aiReadyHandlers) h('ama-native', true);
     });

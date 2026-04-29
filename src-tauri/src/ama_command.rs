@@ -48,13 +48,24 @@ pub async fn ama_suggest(
     let mut field = [0u8; 78];
     field.copy_from_slice(input.field.as_bytes());
 
-    fn first_byte(s: &str) -> Result<u8, String> {
-        s.as_bytes().first().copied().ok_or_else(|| "empty pair char".into())
+    // Each piece slot must be exactly one ASCII char from the puyo color set
+    // (or '.' for empty). Reject silently-truncated multi-char strings, empty
+    // strings, and non-color bytes before they reach C++ where the to_ama
+    // mapping would just downgrade them to NONE.
+    fn parse_piece_char(s: &str) -> Result<u8, String> {
+        if s.len() != 1 || !s.is_ascii() {
+            return Err(format!("piece char must be exactly 1 ASCII char, got {s:?}"));
+        }
+        let b = s.as_bytes()[0];
+        match b {
+            b'R' | b'G' | b'B' | b'Y' | b'P' | b'.' => Ok(b),
+            _ => Err(format!("invalid piece char: {s:?}")),
+        }
     }
 
-    let cur = (first_byte(&input.current[0])?, first_byte(&input.current[1])?);
-    let n1  = (first_byte(&input.next1[0])?,   first_byte(&input.next1[1])?);
-    let n2  = (first_byte(&input.next2[0])?,   first_byte(&input.next2[1])?);
+    let cur = (parse_piece_char(&input.current[0])?, parse_piece_char(&input.current[1])?);
+    let n1  = (parse_piece_char(&input.next1[0])?,   parse_piece_char(&input.next1[1])?);
+    let n2  = (parse_piece_char(&input.next2[0])?,   parse_piece_char(&input.next2[1])?);
 
     let result = tokio::task::spawn_blocking(move || suggest(&field, cur, n1, n2))
         .await

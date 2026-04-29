@@ -45,3 +45,32 @@ jobs:
       # build は内部で `tsc -b && vite build` を実行するため、型検査も同時に走る。
       - name: Build
         run: npm run build
+
+  # ライセンスチェック: npm 依存(production)に GPL/AGPL/LGPL が混入していないか、
+  # および Rust 側 (src-tauri) のクレートライセンスを cargo-deny で検査する。
+  license-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: '.node-version'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check npm production licenses (no GPL family)
+        run: npx license-checker --production --failOn 'GPL;AGPL;LGPL'
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+
+      - name: Check Rust crate licenses (cargo deny)
+        run: cd src-tauri && cargo deny check licenses

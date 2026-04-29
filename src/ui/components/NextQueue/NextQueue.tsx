@@ -1,18 +1,20 @@
 import { useGameStore } from '../../store';
+import { useBoardCellSize } from '../../hooks/useUiPrefs';
 import { PUYO_COLORS, PUYO_LIGHT, PUYO_DARK } from '../Board/colors';
 import type { Color } from '../../../game/types';
 
-// 本家ぷよぷよと同じく、盤面の右側に NEXT(直近)を上、NEXT-NEXT(その次)を
-// 下に縦並びで表示する。NEXT-NEXT は本家どおりひとまわり小さく表示して
-// 視線の優先順位を示す。
+// 盤面右側に NEXT(直近)を上、NEXT-NEXT(その次)を下に縦並びで表示する。
+// 両方とも盤面のセルと同じサイズで描画して、ユーザが「実際の大きさ」で
+// 次のツモを把握できるようにする。
 export function NextQueue() {
   const queue = useGameStore((s) => s.game.nextQueue);
   const next = queue[0];
   const nextNext = queue[1];
+  const cell = useBoardCellSize();
   return (
-    <div className="flex flex-col gap-3 items-center">
-      <PairDisplay pair={next} dotSize={28} />
-      <PairDisplay pair={nextNext} dotSize={20} />
+    <div className="flex flex-col gap-3 items-start">
+      <PairDisplay pair={next} dotSize={cell} />
+      <PairDisplay pair={nextNext} dotSize={cell} />
     </div>
   );
 }
@@ -36,8 +38,9 @@ function Dot({ color, size }: { color: Color | undefined; size: number }) {
   const style: React.CSSProperties = { width: size, height: size };
   if (!color) return <div className="rounded-full bg-slate-700" style={style} />;
 
-  // Board.tsx の drawPuyo と同じ見た目。CSS radial-gradient + 暗色 border +
-  // 中央に頭文字。光源は左上に置いて canvas 側と揃える。
+  // Same look as drawPuyo in Board.tsx: CSS radial-gradient + dark border +
+  // initial letter in the center. Light source is at the upper-left to
+  // match the canvas rendering.
   const fontSize = Math.round(size * 0.5);
   const borderWidth = Math.max(1, Math.round(size * 0.08));
   return (

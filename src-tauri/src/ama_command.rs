@@ -5,10 +5,19 @@ use crate::ama_ffi::{ensure_init, suggest, AmaError, Suggestion};
 
 #[derive(Debug, Deserialize)]
 pub struct SuggestInput {
+    /// Weight preset name (e.g. "build", "gtr", "kaidan"). Drives which
+    /// shape-pattern set ama is biased toward — same surface as the WASM path.
+    /// Default to "build" by serde if omitted.
+    #[serde(default = "default_preset")]
+    pub preset: String,
     pub field: String,
     pub current: [String; 2],
     pub next1: [String; 2],
     pub next2: [String; 2],
+}
+
+fn default_preset() -> String {
+    "build".to_string()
 }
 
 #[command]
@@ -26,8 +35,8 @@ pub async fn ama_suggest(
         .map_err(|e| format!("resource_dir: {e}"))?
         .join("vendor/ama/config.json");
 
-    ensure_init("build", &config_path)
-        .map_err(|e| format!("{e} (config_path={})", config_path.display()))?;
+    ensure_init(&input.preset, &config_path)
+        .map_err(|e| format!("{e} (preset={}, config_path={})", input.preset, config_path.display()))?;
 
     if input.field.len() != 78 {
         return Err("field must be exactly 78 chars".into());

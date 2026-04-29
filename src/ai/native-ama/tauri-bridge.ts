@@ -8,6 +8,10 @@ export interface NativeSuggestion {
 }
 
 export interface NativeSuggestInput {
+  // Weight preset name (build / gtr / kaidan / ...). Default is "build" if
+  // omitted; the Rust side serde-defaults the field too. Trainer mode in the
+  // UI flips this without recreating the AI instance.
+  preset?: string;
   field: string;
   current: [string, string];
   next1: [string, string];

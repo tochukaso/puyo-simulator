@@ -13,7 +13,7 @@
     "bench:ama": "tsx scripts/bench-ama.ts",
     "lint": "eslint . --ext ts,tsx",
     "format": "prettier --write .",
-    "preview": "vite preview",
+    "preview": "npm run build && wrangler dev",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
@@ -21,6 +21,7 @@
     "selfplay": "tsx scripts/selfplay.ts",
     "ama-selfplay": "tsx scripts/ama-selfplay.ts",
     "eval": "tsx scripts/eval-ai.ts",
+    "deploy": "npm run build && wrangler deploy",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:dev:android": "tauri android dev",
@@ -31,11 +32,13 @@
   },
   "dependencies": {
     "@tensorflow/tfjs": "^4.22.0",
+    "qrcode": "^1.5.4",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.33.2",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.59.1",
     "@tauri-apps/api": "^2.10.1",
@@ -46,6 +49,7 @@
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/node": "^24.12.2",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
@@ -66,6 +70,7 @@
     "typescript-eslint": "^8.58.2",
     "vite": "^8.0.10",
     "vite-plugin-pwa": "^1.2.0",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.5",
+    "wrangler": "^4.85.0"
   }
 }

@@ -6,13 +6,13 @@ describe('useGameStore', () => {
     useGameStore.getState().reset(1);
   });
 
-  it('reset でゲームが初期化される', () => {
+  it('reset initializes the game', () => {
     const s = useGameStore.getState();
     expect(s.game.status).toBe('playing');
     expect(s.game.current).not.toBeNull();
   });
 
-  it('dispatch(moveLeft) で axisCol が減る', () => {
+  it('dispatch(moveLeft) decreases axisCol', () => {
     const before = useGameStore.getState().game.current!.axisCol;
     useGameStore.getState().dispatch({ type: 'moveLeft' });
     const after = useGameStore.getState().game.current!.axisCol;
@@ -25,11 +25,11 @@ describe('useGameStore undo', () => {
     useGameStore.getState().reset(1);
   });
 
-  it('reset 直後は canUndo=false', () => {
+  it('canUndo=false right after reset', () => {
     expect(useGameStore.getState().canUndo()).toBe(false);
   });
 
-  it('commit 後に canUndo=true、undo で元に戻る', async () => {
+  it('canUndo=true after commit, and undo restores the state', async () => {
     const before = useGameStore.getState().game;
     const firstTsumo = before.current!.pair;
 
@@ -38,7 +38,7 @@ describe('useGameStore undo', () => {
 
     const afterCommit = useGameStore.getState();
     expect(afterCommit.canUndo()).toBe(true);
-    // ツモが進んでいる(新しい ActivePair の pair が current でなくなった or 別物)
+    // The pair has advanced (the new ActivePair's pair is no longer the same as before).
     expect(afterCommit.history.length).toBe(1);
 
     useGameStore.getState().undo();
@@ -48,7 +48,7 @@ describe('useGameStore undo', () => {
     expect(afterUndo.canUndo()).toBe(false);
   });
 
-  it('複数回 commit 後に undo(N) で N 手戻る', async () => {
+  it('after multiple commits, undo(N) rewinds N moves', async () => {
     const { commit } = useGameStore.getState();
     const s0 = useGameStore.getState().game;
 
@@ -60,16 +60,16 @@ describe('useGameStore undo', () => {
     expect(useGameStore.getState().history.length).toBe(3);
 
     useGameStore.getState().undo(2);
-    // 2 手戻したので history は 1 残る
+    // We rewound 2 moves, so 1 history entry should remain.
     expect(useGameStore.getState().history.length).toBe(1);
 
     useGameStore.getState().undo(1);
-    // 完全に初期状態に戻る
+    // We're fully back to the initial state.
     expect(useGameStore.getState().history.length).toBe(0);
     expect(useGameStore.getState().game.current!.pair).toEqual(s0.current!.pair);
   });
 
-  it('undo の steps が履歴数より大きい場合は最古まで戻る', async () => {
+  it('when undo steps exceeds the history length, rewinds to the oldest entry', async () => {
     const { commit } = useGameStore.getState();
     const s0 = useGameStore.getState().game;
 
@@ -82,15 +82,15 @@ describe('useGameStore undo', () => {
     expect(useGameStore.getState().game.current!.pair).toEqual(s0.current!.pair);
   });
 
-  it('履歴が空のとき undo しても何も起きない', () => {
+  it('undo does nothing when the history is empty', () => {
     const before = useGameStore.getState().game;
     useGameStore.getState().undo();
     expect(useGameStore.getState().game).toBe(before);
   });
 
-  it('履歴は 100 件で打ち切られる', async () => {
+  it('history is capped at 100 entries', async () => {
     const { commit } = useGameStore.getState();
-    // 盤面が埋まって gameover 前に stop するよう、置けなくなったら break
+    // Stop before the board fills up and triggers game over: break when no piece can be placed.
     for (let i = 0; i < 120; i++) {
       const st = useGameStore.getState().game;
       if (!st.current) break;
@@ -99,23 +99,24 @@ describe('useGameStore undo', () => {
     expect(useGameStore.getState().history.length).toBeLessThanOrEqual(100);
   });
 
-  it('softDrop で current.axisRow がズレていても commit(AI推奨手)が適用される', async () => {
+  it('commit (AI-recommended move) applies even when current.axisRow has shifted from softDrop', async () => {
     const { commit, dispatch } = useGameStore.getState();
     for (let i = 0; i < 5; i++) dispatch({ type: 'softDrop' });
     const st = useGameStore.getState().game;
     expect(st.current!.axisRow).toBeGreaterThan(0);
 
-    // AI 推奨手として別の列・別の回転を指定。以前のバグでは canPlace が
-    // current.axisRow 基準で評価されてこのコミットが silently 失敗した。
+    // Specify a different column and rotation as the AI's recommended move. A
+    // previous bug evaluated canPlace against current.axisRow, causing this
+    // commit to silently fail.
     await commit({ axisCol: 0, rotation: 1 });
     expect(useGameStore.getState().history.length).toBe(1);
   });
 
-  it('初期状態の maxChain は 0', () => {
+  it('maxChain is 0 in the initial state', () => {
     expect(useGameStore.getState().game.maxChain).toBe(0);
   });
 
-  it('reset で履歴がクリアされる', async () => {
+  it('reset clears the history', async () => {
     const { commit } = useGameStore.getState();
     const st = useGameStore.getState().game;
     await commit({ axisCol: st.current!.axisCol, rotation: st.current!.rotation });

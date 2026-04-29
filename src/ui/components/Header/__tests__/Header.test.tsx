@@ -2,45 +2,55 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Header } from '../Header';
+import { setTrainerMode } from '../../../hooks/useTrainerMode';
 
 vi.mock('../../../hooks/useAiSuggestion', () => ({
   setAiKind: vi.fn(),
   useAiSuggestion: () => ({ moves: [], loading: false }),
 }));
 
-describe('Header AI selector (3-way)', () => {
+// Header refactor: ghost/ceiling/trainer/language controls were moved into the
+// HamburgerMenu dropdown. These tests render Header (which mounts the menu)
+// and open the hamburger first before asserting on the moved controls.
+describe('Header', () => {
   beforeEach(() => {
     localStorage.clear();
+    setTrainerMode('gtr');
   });
 
-  it('defaults to ml-ama-v1 when localStorage is empty', () => {
+  it('does not render an AI model selector', () => {
     render(<Header />);
-    const select = screen.getByLabelText('AI') as HTMLSelectElement;
-    expect(select.value).toBe('ml-ama-v1');
+    expect(screen.queryByLabelText('AI')).toBeNull();
+    expect(screen.queryByLabelText('訓練')).toBeNull();
   });
 
-  it('reads ml-v1 from localStorage', () => {
-    localStorage.setItem('puyo.ai.kind', 'ml-v1');
+  it('renders Ghost and Ceiling checkboxes inside the hamburger menu', async () => {
     render(<Header />);
-    const select = screen.getByLabelText('AI') as HTMLSelectElement;
-    expect(select.value).toBe('ml-v1');
+    await userEvent.click(screen.getByLabelText('Menu'));
+    expect(screen.getByLabelText('Ghost')).toBeInTheDocument();
+    expect(screen.getByLabelText('Ceiling')).toBeInTheDocument();
   });
 
-  it('reads heuristic from localStorage', () => {
-    localStorage.setItem('puyo.ai.kind', 'heuristic');
+  it('defaults trainer template select to GTR', async () => {
     render(<Header />);
-    const select = screen.getByLabelText('AI') as HTMLSelectElement;
-    expect(select.value).toBe('heuristic');
+    await userEvent.click(screen.getByLabelText('Menu'));
+    const select = screen.getByLabelText('Template') as HTMLSelectElement;
+    expect(select.value).toBe('gtr');
   });
 
-  it('persists change to localStorage and calls setAiKind', async () => {
+  it('switches preset on the unified ama-wasm when trainer template changes', async () => {
     const { setAiKind } = (await import('../../../hooks/useAiSuggestion')) as unknown as {
       setAiKind: ReturnType<typeof vi.fn>;
     };
+    setAiKind.mockClear();
     render(<Header />);
-    await userEvent.selectOptions(screen.getByLabelText('AI'), 'ml-v1');
-    expect(localStorage.getItem('puyo.ai.kind')).toBe('ml-v1');
-    // 訓練 off の通常時は default バリアント + preset='build' で AI が反映される
-    expect(setAiKind).toHaveBeenCalledWith('ml-v1', 'build', 'default');
+    // Initial effect should call setAiKind with preset='gtr' (no menu open needed).
+    expect(setAiKind).toHaveBeenLastCalledWith('ama-wasm', 'gtr');
+
+    await userEvent.click(screen.getByLabelText('Menu'));
+    await userEvent.selectOptions(screen.getByLabelText('Template'), 'off');
+    expect(setAiKind).toHaveBeenLastCalledWith('ama-wasm', 'build');
+    await userEvent.selectOptions(screen.getByLabelText('Template'), 'kaidan');
+    expect(setAiKind).toHaveBeenLastCalledWith('ama-wasm', 'kaidan');
   });
 });

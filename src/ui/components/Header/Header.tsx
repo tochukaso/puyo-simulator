@@ -1,132 +1,123 @@
 import { useEffect, useState } from 'react';
 import { setAiKind } from '../../hooks/useAiSuggestion';
-import {
-  useGhostEnabled,
-  setGhostEnabled,
-  useCeilingVisible,
-  setCeilingVisible,
-} from '../../hooks/useUiPrefs';
-import {
-  useTrainerMode,
-  setTrainerMode,
-  type TrainerMode,
-} from '../../hooks/useTrainerMode';
-import {
-  LANGUAGES,
-  LANGUAGE_LABELS,
-  setLang,
-  useLang,
-  useT,
-  type Lang,
-} from '../../../i18n';
-import type { AiKind as Kind } from '../../../ai/types';
+import { ShareDialog } from '../ShareDialog/ShareDialog';
+import { HamburgerMenu } from '../HamburgerMenu/HamburgerMenu';
+import { useTrainerMode } from '../../hooks/useTrainerMode';
+import { useGameStore, type GameMode, type MatchTurnLimit } from '../../store';
+import { useT } from '../../../i18n';
 import { NativeAmaAI } from '../../../ai/native-ama/native-ama-ai';
+import type { AiKind } from '../../../ai/types';
 
-const STORAGE_KEY = 'puyo.ai.kind';
-const VALID: readonly Kind[] = [
-  'heuristic', 'ml-v1', 'ml-ama-v1', 'ml-ama-v2-search', 'ama-wasm', 'ama-native',
-] as const;
-
-function readInitialKind(): Kind {
-  const v =
-    typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
-  return (VALID as readonly string[]).includes(v ?? '') ? (v as Kind) : 'ml-ama-v1';
-}
+// In a Tauri build the same beam search runs as a native static-linked C++
+// library (ama-native, < 200ms p99 on Intel Mac), bypassing the worker. In
+// the PWA there's no native binary, so we keep ama-wasm. setAiKind() falls
+// back transparently if a Tauri-only kind is requested in the browser, but
+// resolving here avoids the warning log on every trainer change.
+const AMA_KIND: AiKind = NativeAmaAI.isAvailable() ? 'ama-native' : 'ama-wasm';
 
 export function Header() {
-  const [kind, setKind] = useState<Kind>(readInitialKind);
-  const ghost = useGhostEnabled();
-  const ceiling = useCeilingVisible();
   const trainer = useTrainerMode();
-  const lang = useLang();
   const t = useT();
+  const mode = useGameStore((s) => s.mode);
+  const matchTurnLimit = useGameStore((s) => s.matchTurnLimit);
+  const setGameMode = useGameStore((s) => s.setGameMode);
+  const setMatchTurnLimit = useGameStore((s) => s.setMatchTurnLimit);
+  const startMatch = useGameStore((s) => s.startMatch);
+  const editing = useGameStore((s) => s.editing);
+  const enterEditMode = useGameStore((s) => s.enterEditMode);
+  const exitEditMode = useGameStore((s) => s.exitEditMode);
+  const [shareOpen, setShareOpen] = useState(false);
 
-  // 訓練モードが gtr のときは GTR 専用ビルドの ama-wasm(gtr プリセット)を強制使用する。
-  // 専用ビルドは form::list を { GTR } に絞ってあるので、AI が GTR を作る方向にしか
-  // 評価しない。それ以外のときは default ビルド + preset='build'。
+  // ama に統一(Tauri なら ama-native、PWA なら ama-wasm)。trainer mode に
+  // 応じて preset (form 集合 + weight) を切替。セレクタ自体は HamburgerMenu
+  // に移したが、trainer state はグローバル (useTrainerMode hook) なので、
+  // ここで購読していても問題ない。
   useEffect(() => {
-    if (trainer === 'gtr') {
-      setAiKind('ama-wasm', 'gtr', 'gtr-only');
-    } else {
-      setAiKind(kind, 'build', 'default');
-    }
-  }, [kind, trainer]);
+    const preset =
+      trainer === 'gtr' ? 'gtr' : trainer === 'kaidan' ? 'kaidan' : 'build';
+    setAiKind(AMA_KIND, preset);
+  }, [trainer]);
 
   return (
-    <header className="p-3 border-b border-slate-800 flex justify-between items-center gap-3">
-      <span className="text-lg">{t('app.title')}</span>
-      <div className="flex items-center gap-3">
-        <label className="text-sm flex items-center gap-1 select-none">
-          <input
-            type="checkbox"
-            aria-label={t('header.ghost')}
-            checked={ghost}
-            onChange={(e) => setGhostEnabled(e.target.checked)}
-            className="accent-blue-500"
-          />
-          {t('header.ghost')}
-        </label>
-        <label className="text-sm flex items-center gap-1 select-none">
-          <input
-            type="checkbox"
-            aria-label="天井"
-            checked={ceiling}
-            onChange={(e) => setCeilingVisible(e.target.checked)}
-            className="accent-blue-500"
-          />
-          天井
-        </label>
-        <label className="text-sm flex items-center gap-2">
-          訓練
+    <header className="relative p-3 border-b border-slate-800 flex flex-wrap justify-between items-center gap-3">
+      <span className="text-lg flex items-baseline gap-2">
+        {t('app.title')}
+        <span
+          className="text-xs text-slate-500 font-mono"
+          title={`Built ${__BUILD_TIME__}`}
+        >
+          v{__BUILD_SHA__}
+        </span>
+      </span>
+      <div className="flex flex-wrap items-center gap-3">
+        <select
+          aria-label={t('header.gameMode')}
+          value={mode}
+          onChange={(e) => {
+            const next = e.target.value as GameMode;
+            if (next === 'match' && mode !== 'match') {
+              startMatch({ turnLimit: matchTurnLimit });
+            } else {
+              setGameMode(next);
+            }
+          }}
+          className="bg-slate-800 text-slate-100 border border-slate-700 rounded px-2 py-1 text-sm"
+        >
+          <option value="free">{t('header.modeFree')}</option>
+          <option value="match">{t('header.modeMatch')}</option>
+        </select>
+        {mode === 'match' && (
           <select
-            aria-label="訓練"
-            value={trainer}
-            onChange={(e) => setTrainerMode(e.target.value as TrainerMode)}
-            className="bg-slate-800 text-slate-100 border border-slate-700 rounded px-2 py-1"
-          >
-            <option value="off">off</option>
-            <option value="gtr">GTR</option>
-          </select>
-        </label>
-        <label className="text-sm flex items-center gap-2">
-          {t('header.ai')}
-          <select
-            aria-label="AI"
-            value={kind}
+            aria-label={t('header.turnLimit')}
+            value={matchTurnLimit}
             onChange={(e) => {
-              const next = e.target.value as Kind;
-              setKind(next);
-              localStorage.setItem(STORAGE_KEY, next);
+              const limit = (Number(e.target.value) as MatchTurnLimit);
+              setMatchTurnLimit(limit);
+              startMatch({ turnLimit: limit });
             }}
-            disabled={trainer === 'gtr'}
-            title={trainer === 'gtr' ? '訓練モード中は ama-wasm(GTR プリセット)を使用' : undefined}
-            className="bg-slate-800 text-slate-100 border border-slate-700 rounded px-2 py-1 disabled:opacity-50"
+            className="bg-slate-800 text-slate-100 border border-slate-700 rounded px-2 py-1 text-sm"
           >
-            <option value="heuristic">Heuristic</option>
-            <option value="ml-v1">ML (policy-v1)</option>
-            <option value="ml-ama-v1">ML (ama-distilled-v1)</option>
-            <option value="ml-ama-v2-search">ML (ama-v2 + search)</option>
-            <option value="ama-wasm">ama (WASM)</option>
-            {NativeAmaAI.isAvailable() && (
-              <option value="ama-native">ama (Native) ⚡</option>
-            )}
+            <option value="30">30</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
           </select>
-        </label>
-        <label className="text-sm flex items-center gap-2">
-          <span className="sr-only">{t('header.language')}</span>
-          <select
-            aria-label={t('header.language')}
-            value={lang}
-            onChange={(e) => setLang(e.target.value as Lang)}
-            className="bg-slate-800 text-slate-100 border border-slate-700 rounded px-2 py-1"
-          >
-            {LANGUAGES.map((code) => (
-              <option key={code} value={code}>
-                {LANGUAGE_LABELS[code]}
-              </option>
-            ))}
-          </select>
-        </label>
+        )}
+        {/* 編集モードトグル。マッチ中に編集に入ろうとしたら 1 回だけ確認を出す
+            (マッチを抜けて編集に入る方針。盤面が変わるので再開不可)。 */}
+        <button
+          type="button"
+          onClick={() => {
+            if (editing) {
+              exitEditMode(true);
+              return;
+            }
+            if (mode === 'match') {
+              if (!confirm(t('edit.matchExitConfirm'))) return;
+              setGameMode('free');
+            }
+            enterEditMode();
+          }}
+          aria-pressed={editing}
+          className={`px-3 py-1 rounded text-sm border ${
+            editing
+              ? 'bg-blue-600 border-blue-400 text-white'
+              : 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700'
+          }`}
+        >
+          {editing ? t('edit.editing') : t('edit.edit')}
+        </button>
+        <button
+          type="button"
+          onClick={() => setShareOpen(true)}
+          aria-label={t('share.button')}
+          className="px-3 py-1 rounded text-sm border bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700"
+        >
+          {t('share.button')}
+        </button>
+        {shareOpen && <ShareDialog onClose={() => setShareOpen(false)} />}
+        {/* 設定 (ghost / ceiling / trainer / 言語) と解析起動はハンバーガーへ。
+            Header を主要アクション (mode 切替・編集・共有) のみに圧縮した。 */}
+        <HamburgerMenu />
       </div>
     </header>
   );

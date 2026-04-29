@@ -1,6 +1,6 @@
 import type { Move, Field, ActivePair } from '../../../game/types';
 import { ROWS, COLS } from '../../../game/constants';
-import { lockActive } from '../../../game/landing';
+import { pairCells } from '../../../game/pair';
 
 export interface GhostPos {
   row: number;
@@ -21,32 +21,34 @@ export function ghostCells(
     rotation: bestMove.rotation,
     axisRow: 0,
   };
-  const after = lockActive(field, placed);
+  const { axisPos, childPos } = pairCells(placed);
 
-  const axisColor = current.pair.axis;
-  const newCells: Array<{ row: number; col: number; color: string }> = [];
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      const before = field.cells[r]![c]!;
-      const now = after.cells[r]![c]!;
-      if (before === null && now !== null) {
-        newCells.push({ row: r, col: c, color: now });
-      }
-    }
+  // For each column, initialize "the lowest empty row that can be stacked next" from the field.
+  const colTop: number[] = new Array(COLS);
+  for (let c = 0; c < COLS; c++) {
+    let r = ROWS - 1;
+    while (r >= 0 && field.cells[r]![c]! !== null) r--;
+    colTop[c] = r;
   }
-  // When a piece overflows the ceiling row both pieces may not appear in the
-  // diff (one is silently discarded). Skip ghost render in that case rather
-  // than guessing positions.
-  if (newCells.length !== 2) return null;
 
-  let axisIdx = newCells.findIndex(
-    (cell) => cell.col === bestMove.axisCol && cell.color === axisColor,
-  );
-  if (axisIdx === -1) axisIdx = 0;
-  const childIdx = 1 - axisIdx;
+  // Process pieces in the same drop order as lockActive (larger startRow =
+  // lower piece first). This ensures that when both pieces fall into the same
+  // column (rot 0/2), the upper piece stacks on top of the lower one.
+  const pieces = [
+    { kind: 'axis' as const, col: axisPos.col, startRow: axisPos.row },
+    { kind: 'child' as const, col: childPos.col, startRow: childPos.row },
+  ].sort((a, b) => b.startRow - a.startRow);
 
-  return [
-    { row: newCells[axisIdx]!.row, col: newCells[axisIdx]!.col, kind: 'axis' },
-    { row: newCells[childIdx]!.row, col: newCells[childIdx]!.col, kind: 'child' },
-  ];
+  const result: GhostPos[] = [];
+  for (const p of pieces) {
+    const r = colTop[p.col]!;
+    // If the column is filled up to the ceiling and the piece can't fit,
+    // silently drop it just like lockActive does (matching the original
+    // game's behavior). Still display the ghost of the remaining piece.
+    if (r < 0) continue;
+    result.push({ row: r, col: p.col, kind: p.kind });
+    colTop[p.col] = r - 1;
+  }
+
+  return result.length > 0 ? result : null;
 }

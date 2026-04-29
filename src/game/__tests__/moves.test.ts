@@ -25,25 +25,25 @@ describe('applyInput move', () => {
     axisRow: 5, axisCol: 2, rotation: 0,
   };
 
-  it('moveLeft で 1 列左', () => {
+  it('moveLeft moves one column left', () => {
     const s = makeState(current);
     const s2 = applyInput(s, { type: 'moveLeft' });
     expect(s2.current!.axisCol).toBe(1);
   });
 
-  it('moveRight で 1 列右', () => {
+  it('moveRight moves one column right', () => {
     const s = makeState(current);
     const s2 = applyInput(s, { type: 'moveRight' });
     expect(s2.current!.axisCol).toBe(3);
   });
 
-  it('壁を越えては動かない', () => {
+  it('does not move past the wall', () => {
     const s = makeState({ ...current, axisCol: 0 });
     const s2 = applyInput(s, { type: 'moveLeft' });
     expect(s2.current!.axisCol).toBe(0);
   });
 
-  it('rotateCW で rotation が +1', () => {
+  it('rotateCW increments rotation by 1', () => {
     const s = makeState(current);
     const s2 = applyInput(s, { type: 'rotateCW' });
     expect(s2.current!.rotation).toBe(1);
@@ -51,7 +51,7 @@ describe('applyInput move', () => {
 });
 
 describe('hardDrop', () => {
-  it('着地後に current が null、status が resolving', () => {
+  it('after landing, current is null and status is resolving', () => {
     const s = makeState({
       pair: { axis: 'R', child: 'B' }, axisRow: 0, axisCol: 2, rotation: 0,
     });
@@ -63,7 +63,7 @@ describe('hardDrop', () => {
 });
 
 describe('enumerateLegalMoves', () => {
-  it('空盤面では約22手返す', () => {
+  it('returns about 22 moves on an empty board', () => {
     const s = makeState({
       pair: { axis: 'R', child: 'B' }, axisRow: 0, axisCol: 2, rotation: 0,
     });
@@ -71,7 +71,7 @@ describe('enumerateLegalMoves', () => {
     expect(moves.length).toBe(22);
   });
 
-  it('current が null なら空配列', () => {
+  it('returns an empty array when current is null', () => {
     const s = { ...makeState({
       pair: { axis: 'R', child: 'B' }, axisRow: 0, axisCol: 2, rotation: 0,
     }), current: null };

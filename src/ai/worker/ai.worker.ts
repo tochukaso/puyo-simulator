@@ -2,24 +2,27 @@ import { HeuristicAI } from '../heuristic';
 import { MlAI } from '../ml/ml-policy-ai';
 import { MlSearchAI } from '../ml/ml-search-ai';
 import { WasmAmaAI } from '../wasm-ama/wasm-ama-ai';
-import type { AmaVariant } from '../wasm-ama/wasm-loader';
 import type { AiKind as Kind, PuyoAI } from '../types';
 import type { GameState, Move } from '../../game/types';
 
 export type WorkerMessage =
   | { type: 'suggest'; id: number; state: GameState; topK: number }
-  | { type: 'set-ai'; kind: Kind; preset?: string; variant?: AmaVariant };
+  // 1-shot suggest: bypasses the player UI's shared subscription. Used by
+  // the match driver to fetch the AI's auto-play move for an arbitrary state
+  // without disturbing the player-side suggestion stream.
+  | { type: 'suggest-once'; id: number; state: GameState; topK: number }
+  | { type: 'set-ai'; kind: Kind; preset?: string };
 
 export type WorkerResponse =
   | { type: 'suggest'; id: number; moves: Move[] }
+  | { type: 'suggest-once'; id: number; moves: Move[]; error?: string }
   | { type: 'set-ai'; kind: Kind; ok: boolean; error?: string };
 
 const heuristic = new HeuristicAI();
 let active: PuyoAI = heuristic;
 const mlInstances: Partial<Record<'ml-v1' | 'ml-ama-v1', MlAI>> = {};
-// バリアント別にインスタンスを持つ。各 WasmAmaAI は固定の variant に紐付く
-// (heap 上のバッファが variant 固有なため使い回せない)。
-const amaWasmInstances: Partial<Record<AmaVariant, WasmAmaAI>> = {};
+// 単一 WASM のみで preset 切り替え方式に統一。
+let amaWasmInstance: WasmAmaAI | null = null;
 
 let mlSearchInstance: MlSearchAI | null = null;
 
@@ -44,24 +47,19 @@ async function getOrInitMl(kind: 'ml-v1' | 'ml-ama-v1'): Promise<MlAI> {
   return inst;
 }
 
-async function getOrInitAmaWasm(
-  preset: string = 'build',
-  variant: AmaVariant = 'default',
-): Promise<WasmAmaAI> {
-  let inst = amaWasmInstances[variant];
-  if (!inst) {
-    console.log(`[ama-wasm worker] creating WasmAmaAI variant=${variant} preset=${preset}`);
-    inst = new WasmAmaAI(preset, variant);
-    amaWasmInstances[variant] = inst;
-  } else if (inst.preset !== preset) {
-    console.log(`[ama-wasm worker] switching preset ${inst.preset} -> ${preset} on variant=${variant}`);
-    await inst.setPreset(preset);
+async function getOrInitAmaWasm(preset: string = 'build'): Promise<WasmAmaAI> {
+  if (!amaWasmInstance) {
+    console.log(`[ama-wasm worker] creating WasmAmaAI preset=${preset}`);
+    amaWasmInstance = new WasmAmaAI(preset);
+  } else if (amaWasmInstance.preset !== preset) {
+    console.log(`[ama-wasm worker] switching preset ${amaWasmInstance.preset} -> ${preset}`);
+    await amaWasmInstance.setPreset(preset);
   }
-  console.log(`[ama-wasm worker] init() start variant=${variant}`);
+  console.log(`[ama-wasm worker] init() start`);
   const t0 = performance.now();
-  await inst.init();
+  await amaWasmInstance.init();
   console.log(`[ama-wasm worker] init() done in ${(performance.now() - t0).toFixed(0)}ms`);
-  return inst;
+  return amaWasmInstance;
 }
 
 export async function handleMessage(
@@ -76,7 +74,7 @@ export async function handleMessage(
         return;
       }
       if (msg.kind === 'ama-wasm') {
-        active = await getOrInitAmaWasm(msg.preset ?? 'build', msg.variant ?? 'default');
+        active = await getOrInitAmaWasm(msg.preset ?? 'build');
         console.log('[ama-wasm worker] active set, sending set-ai ok=true');
         send({ type: 'set-ai', kind: 'ama-wasm', ok: true });
         return;
@@ -116,6 +114,21 @@ export async function handleMessage(
     await active.init();
     const moves = await active.suggest(msg.state, msg.topK);
     send({ type: 'suggest', id: msg.id, moves });
+    return;
+  }
+  if (msg.type === 'suggest-once') {
+    try {
+      await active.init();
+      const moves = await active.suggest(msg.state, msg.topK);
+      send({ type: 'suggest-once', id: msg.id, moves });
+    } catch (err) {
+      send({
+        type: 'suggest-once',
+        id: msg.id,
+        moves: [],
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 }
 

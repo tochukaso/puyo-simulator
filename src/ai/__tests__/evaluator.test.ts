@@ -3,11 +3,11 @@ import { columnHeights, heightVariance, dangerPenalty, chainPotential, connectio
 import { createEmptyField, withCell } from '../../game/field';
 
 describe('columnHeights', () => {
-  it('空盤面は全列 0', () => {
+  it('all columns are 0 on an empty board', () => {
     const f = createEmptyField();
     expect(columnHeights(f)).toEqual([0, 0, 0, 0, 0, 0]);
   });
-  it('各列の最高地点を正しく返す', () => {
+  it('returns the correct highest point for each column', () => {
     let f = createEmptyField();
     f = withCell(f, 12, 0, 'R');
     f = withCell(f, 10, 2, 'B');
@@ -18,7 +18,7 @@ describe('columnHeights', () => {
 });
 
 describe('heightVariance', () => {
-  it('差が大きいほど大きい', () => {
+  it('larger height differences give larger variance', () => {
     const flat = [3, 3, 3, 3, 3, 3];
     const bumpy = [0, 6, 0, 6, 0, 6];
     expect(heightVariance(bumpy)).toBeGreaterThan(heightVariance(flat));
@@ -26,32 +26,32 @@ describe('heightVariance', () => {
 });
 
 describe('dangerPenalty', () => {
-  it('3列目が高いほど大きい', () => {
+  it('the higher the third column, the larger the penalty', () => {
     expect(dangerPenalty([0, 0, 0, 0, 0, 0])).toBe(0);
     expect(dangerPenalty([0, 0, 10, 0, 0, 0])).toBeGreaterThan(0);
   });
 });
 
-describe('chainPotential (仮想ドロップで測る)', () => {
-  it('3個つながっていれば仮想 R の落下で発火できて potential > 0', () => {
+describe('chainPotential (measured via virtual drop)', () => {
+  it('with 3 connected, a virtual R drop can trigger and potential > 0', () => {
     let f = createEmptyField();
     f = withCell(f, 12, 0, 'R');
     f = withCell(f, 12, 1, 'R');
     f = withCell(f, 12, 2, 'R');
     expect(chainPotential(f)).toBeGreaterThan(0);
   });
-  it('何もない盤面は 0', () => {
+  it('an empty board returns 0', () => {
     expect(chainPotential(createEmptyField())).toBe(0);
   });
-  it('分離した3個(隣接不能)では potential=0', () => {
+  it('three separated puyos (cannot become adjacent) give potential=0', () => {
     let f = createEmptyField();
     f = withCell(f, 12, 0, 'R');
     f = withCell(f, 12, 3, 'R');
     f = withCell(f, 12, 5, 'R');
     expect(chainPotential(f)).toBe(0);
   });
-  it('大きな連鎖の種ほど potential が大きい', () => {
-    // 2連鎖の種: 下段 R×3、上段(縦) B×3, 隣接して B×1
+  it('a larger chain seed gives larger potential', () => {
+    // 2-chain seed: bottom row R×3, upper row (vertical) B×3, plus an adjacent B×1.
     let twoChain = createEmptyField();
     twoChain = withCell(twoChain, 12, 0, 'R');
     twoChain = withCell(twoChain, 12, 1, 'R');
@@ -61,7 +61,7 @@ describe('chainPotential (仮想ドロップで測る)', () => {
     twoChain = withCell(twoChain, 11, 2, 'B');
     twoChain = withCell(twoChain, 10, 3, 'B');
 
-    // 1連鎖だけ: 下段 R×3
+    // 1-chain only: bottom row R×3.
     let oneChain = createEmptyField();
     oneChain = withCell(oneChain, 12, 0, 'R');
     oneChain = withCell(oneChain, 12, 1, 'R');
@@ -72,7 +72,7 @@ describe('chainPotential (仮想ドロップで測る)', () => {
 });
 
 describe('connectionSeed', () => {
-  it('2〜3 連結が多いほど大きい', () => {
+  it('more 2- and 3-connected groups give a larger seed score', () => {
     let f1 = createEmptyField();
     f1 = withCell(f1, 12, 0, 'R'); f1 = withCell(f1, 12, 1, 'R');
     let f2 = createEmptyField();
@@ -82,7 +82,7 @@ describe('connectionSeed', () => {
 });
 
 describe('evaluateField', () => {
-  it('高い盤面は低スコア、平らな盤面は高スコア', () => {
+  it('a tall board scores lower, a flat board scores higher', () => {
     let flat = createEmptyField();
     flat = withCell(flat, 12, 0, 'R');
     flat = withCell(flat, 12, 1, 'B');

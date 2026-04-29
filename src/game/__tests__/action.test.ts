@@ -47,7 +47,7 @@ describe('action index', () => {
 });
 
 describe('legalActionMask', () => {
-  it('空盤面では 22 個すべて 1', () => {
+  it('all 22 entries are 1 on an empty board', () => {
     const field = createEmptyField();
     const mask = legalActionMask(field, {
       pair: { axis: 'R', child: 'B' },
@@ -59,7 +59,7 @@ describe('legalActionMask', () => {
     for (let i = 0; i < 22; i++) expect(mask[i]).toBe(1);
   });
 
-  it('col=5 を塞ぐと col=5 関連のアクションが 0', () => {
+  it('blocking col=5 sets all col=5 actions to 0', () => {
     let field = createEmptyField();
     for (let r = 0; r < 13; r++) field = withCell(field, r, 5, 'R');
     const mask = legalActionMask(field, {

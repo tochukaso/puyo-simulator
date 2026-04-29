@@ -1,8 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useGameStore, type PoppingCell, type LandedCell, LANDING_BOUNCE_MS } from '../../store';
-import { useGestures } from '../../hooks/useGestures';
 import { useAiSuggestion } from '../../hooks/useAiSuggestion';
-import { useGhostEnabled, useCeilingVisible } from '../../hooks/useUiPrefs';
+import {
+  useGhostEnabled,
+  useCeilingVisible,
+  useBoardCellSize,
+  setBoardCellSize,
+} from '../../hooks/useUiPrefs';
 import { usePreviewMove } from '../../hooks/useAiPreview';
 import { useT } from '../../../i18n';
 import { ROWS, COLS, SPAWN_COL, VISIBLE_ROW_START } from '../../../game/constants';
@@ -10,39 +14,74 @@ import { PUYO_COLORS, PUYO_LIGHT, PUYO_DARK, BG_COLOR, GRID_COLOR, DANGER_COLOR 
 import type { Color, Field, ActivePair, Move } from '../../../game/types';
 import { ghostCells } from './ghost';
 
+// Module-level frozen empty references used while spectating the AI side, so
+// the Board memoization sees a stable identity instead of a fresh `[]` per render.
+const EMPTY_POPPING: PoppingCell[] = [];
+const EMPTY_CHAIN_TEXTS: ReturnType<typeof useGameStore.getState>['chainTexts'] = [];
+const EMPTY_LANDED: LandedCell[] = [];
+
 export function Board() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const [cell, setCell] = useState(32);
-  const game = useGameStore((s) => s.game);
-  const poppingCells = useGameStore((s) => s.poppingCells);
-  const chainTexts = useGameStore((s) => s.chainTexts);
-  const landedCells = useGameStore((s) => s.landedCells);
-  const { moves } = useAiSuggestion(5);
+  const cell = useBoardCellSize();
+  const playerGame = useGameStore((s) => s.game);
+  const aiGame = useGameStore((s) => s.aiGame);
+  const aiHistory = useGameStore((s) => s.aiHistory);
+  const aiHistoryViewIndex = useGameStore((s) => s.aiHistoryViewIndex);
+  const viewing = useGameStore((s) => s.viewing);
+  const editing = useGameStore((s) => s.editing);
+  const paintCell = useGameStore((s) => s.paintCell);
+  // While viewing the AI side, swap the game source. If the user scrubbed
+  // the AI history slider (aiHistoryViewIndex set), render that snapshot.
+  const game =
+    viewing === 'ai'
+      ? aiHistoryViewIndex !== null
+        ? (aiHistory[aiHistoryViewIndex] ?? aiGame ?? playerGame)
+        : (aiGame ?? playerGame)
+      : playerGame;
+  // The pop / landing animations only fire on the player side; if the user is
+  // spectating the AI we don't drive those overlays. Read raw store fields and
+  // gate locally so the selector returns a stable reference (avoids the
+  // infinite-update loop you'd hit by returning a fresh `[]` per render).
+  const playerPoppingCells = useGameStore((s) => s.poppingCells);
+  const playerChainTexts = useGameStore((s) => s.chainTexts);
+  const playerLandedCells = useGameStore((s) => s.landedCells);
+  const poppingCells = viewing === 'player' ? playerPoppingCells : EMPTY_POPPING;
+  const chainTexts = viewing === 'player' ? playerChainTexts : EMPTY_CHAIN_TEXTS;
+  const landedCells = viewing === 'player' ? playerLandedCells : EMPTY_LANDED;
+  const mode = useGameStore((s) => s.mode);
+  // match モードでは候補手リスト・ゴースト・「AI 最善手」ボタンを全部隠して
+  // いるので、worker への suggest 投げそのものを止める (WASM 全幅探索は重い
+  // ので生かしっぱなしは計算資源の無駄)。
+  const { moves } = useAiSuggestion(5, mode !== 'match');
   const ghostEnabled = useGhostEnabled();
   const ceilingVisible = useCeilingVisible();
   const previewMove = usePreviewMove();
   const t = useT();
-  // CandidateList で hover/選択している候補があればそれを優先表示。なければ
-  // トップ候補にフォールバック。
-  const bestMove = ghostEnabled ? (previewMove ?? moves[0] ?? null) : null;
+  // If a candidate is hovered/selected in CandidateList, prefer it. Otherwise
+  // fall back to the top candidate. Suppress in match mode (the ghost would
+  // give away the answer in a player-vs-ama score race) and when viewing the
+  // AI side (suggestions are computed for the player's state, not the AI's).
+  const bestMove =
+    ghostEnabled && viewing === 'player' && mode !== 'match'
+      ? (previewMove ?? moves[0] ?? null)
+      : null;
 
-  // 天井(row 0)を隠すときは描画全体を 1 セル分上にずらして、
-  // canvas / wrapper の高さも 1 セル縮める。row 0 由来の描画(背景帯・
-  // DANGER 枠・天井段に居る軸ぷよなど)はクリップで自然に切れる。
+  // When hiding the ceiling (row 0), shift the entire drawing up by one cell
+  // and shrink the canvas/wrapper height by one cell. Anything originating in
+  // row 0 (background strip, DANGER frame, an axis puyo on the ceiling row) is
+  // naturally clipped out.
   const visibleRows = ceilingVisible ? ROWS : ROWS - 1;
   const yOffset = ceilingVisible ? 0 : -cell;
   const boardWidth = COLS * cell;
   const boardHeight = visibleRows * cell;
-
-  useGestures(wrapperRef);
 
   useLayoutEffect(() => {
     const ro = new ResizeObserver((entries) => {
       const w = entries[0]!.contentRect.width;
       const maxCellByWidth = Math.floor(w / COLS);
       const maxCellByHeight = Math.floor((window.innerHeight * 0.6) / ROWS);
-      setCell(Math.max(16, Math.min(maxCellByWidth, maxCellByHeight, 48)));
+      setBoardCellSize(Math.max(16, Math.min(maxCellByWidth, maxCellByHeight, 48)));
     });
     if (wrapperRef.current) ro.observe(wrapperRef.current);
     return () => ro.disconnect();
@@ -68,7 +107,8 @@ export function Board() {
         yOffset,
         now,
       );
-      // 着地アニメ・点滅アニメのどちらかが進行中なら次フレームを予約。
+      // If either the landing animation or the pop-flash animation is still
+      // running, schedule the next frame.
       const hasLandingActive = landedCells.some(
         (c) => now - c.landedAt < LANDING_BOUNCE_MS,
       );
@@ -82,8 +122,60 @@ export function Board() {
     };
   }, [game, cell, bestMove, poppingCells, landedCells, yOffset]);
 
+  // Edit-mode: tap & drag-paint. Track which cells we already painted in the
+  // current pointer stroke so re-entering a cell on the same drag doesn't
+  // trigger the "same color → erase" toggle (that toggle is intended for
+  // discrete taps only).
+  const paintedThisStrokeRef = useRef<Set<string>>(new Set());
+  const pointerToCell = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    // Convert canvas-pixel coords back to logical (row, col), accounting for
+    // the optional ceiling-row hidden offset.
+    const c = Math.floor((x / rect.width) * COLS);
+    const visibleH = visibleRows;
+    const rVisible = Math.floor((y / rect.height) * visibleH);
+    const r = ceilingVisible ? rVisible : rVisible + 1;
+    if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return null;
+    return { row: r, col: c };
+  };
+  const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!editing) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    paintedThisStrokeRef.current = new Set();
+    const pos = pointerToCell(e);
+    if (!pos) return;
+    paintedThisStrokeRef.current.add(`${pos.row},${pos.col}`);
+    paintCell(pos.row, pos.col);
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!editing) return;
+    if (e.buttons === 0 && e.pointerType === 'mouse') return; // only paint while held
+    const pos = pointerToCell(e);
+    if (!pos) return;
+    const key = `${pos.row},${pos.col}`;
+    if (paintedThisStrokeRef.current.has(key)) return;
+    paintedThisStrokeRef.current.add(key);
+    paintCell(pos.row, pos.col);
+  };
+  const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!editing) return;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      // ignore: capture may have already been lost
+    }
+    paintedThisStrokeRef.current = new Set();
+  };
+
   return (
-    <div ref={wrapperRef} className="w-full max-w-sm">
+    <div
+      ref={wrapperRef}
+      className="w-full max-w-sm select-none"
+      style={{ touchAction: 'none' }}
+    >
       <div
         className="relative mx-auto"
         style={{ width: boardWidth, height: boardHeight }}
@@ -92,7 +184,11 @@ export function Board() {
           ref={canvasRef}
           width={boardWidth}
           height={boardHeight}
-          className="bg-slate-900 block"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          className={`bg-slate-900 block ${editing ? 'cursor-crosshair ring-2 ring-blue-500/60' : ''}`}
         />
         {chainTexts.map((entry) => (
           <div
@@ -119,8 +215,9 @@ function draw(
   yOffset: number,
   now: number,
 ) {
-  // 全体を yOffset (0 or -cell) ずらす。天井隠し時は row 0 由来の描画が
-  // canvas 上端より上に逃げ、自動的にクリップされる。
+  // Translate everything by yOffset (0 or -cell). When the ceiling is hidden,
+  // anything coming from row 0 escapes above the canvas top edge and is
+  // automatically clipped.
   ctx.save();
   ctx.translate(0, yOffset);
 
@@ -149,11 +246,12 @@ function draw(
   ctx.lineWidth = 2;
   ctx.strokeRect(SPAWN_COL * cell + 1, 1, cell - 2, cell - 2);
 
-  // Popping ハイライト用の点滅係数。`Date.now()` ベースで rAF から毎フレーム呼ばれる。
+  // Pulse coefficient for the popping highlight. Driven by `Date.now()` and
+  // called per frame from rAF.
   const popPulse = 0.55 + 0.45 * Math.sin(now / 80);
   const popKey = (r: number, c: number) => r * COLS + c;
   const poppingSet = new Set(poppingCells.map((p) => popKey(p.row, p.col)));
-  // (r,c) → 一番新しい着地時刻。複数候補があれば一番新しいものを採用。
+  // (r,c) → most recent landing time. If multiple candidates exist, take the latest.
   const landedAtMap = new Map<number, number>();
   for (const c of landedCells) {
     const k = popKey(c.row, c.col);
@@ -161,9 +259,12 @@ function draw(
     if (c.landedAt > prev) landedAtMap.set(k, c.landedAt);
   }
 
-  // 同色隣接の接続バーを先に描く(ぷよ円より下に置きたい)。
-  drawConnectors(ctx, field, cell);
-
+  // Render order is split into 3 passes so connector lenses sit between body
+  // and symbol layers — keeps the lens shape independent of how wide it
+  // happens to be (a future tweak that pushes it close to the symbol's area
+  // would otherwise hide the color letter).
+  // Pass 1: bodies (with outline clipped at connecting wedges so the lens'
+  // body-side arc replaces the outline cleanly).
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       const color = field.cells[r]![c]!;
@@ -173,7 +274,22 @@ function draw(
       const landedAt = landedAtMap.get(k);
       const scale =
         landedAt !== undefined ? landingScale(now - landedAt) : ONE_SCALE;
-      drawPuyo(ctx, r, c, color, baseAlpha, cell, scale);
+      drawPuyoBody(ctx, r, c, color, baseAlpha, cell, scale, buildConnMask(field, r, c));
+    }
+  }
+  // Pass 2: connector lenses fill the gap between same-color neighbors.
+  drawConnectors(ctx, field, cell);
+  // Pass 3: symbols + pop highlights on top of connectors.
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const color = field.cells[r]![c]!;
+      if (color === null) continue;
+      const baseAlpha = r < VISIBLE_ROW_START ? 0.5 : 1;
+      const k = popKey(r, c);
+      const landedAt = landedAtMap.get(k);
+      const scale =
+        landedAt !== undefined ? landingScale(now - landedAt) : ONE_SCALE;
+      drawPuyoSymbol(ctx, r, c, color, baseAlpha, cell, scale);
       if (poppingSet.has(k)) {
         drawPopHighlight(ctx, r, c, cell, popPulse);
       }
@@ -194,12 +310,19 @@ function draw(
       3: [0, -1],
     };
     const [dr, dc] = offsets[rotation]!;
-    // row 0 (高さ13、天井段) は半透明で描画して「ここは実質見えない領域」を示す
+    // Row 0 (height 13, ceiling row) is drawn semi-transparent to indicate
+    // that "this is effectively invisible territory".
     const axisAlpha = axisRow < VISIBLE_ROW_START ? 0.5 : 1;
     const childRow = axisRow + dr;
     const childAlpha = childRow < VISIBLE_ROW_START ? 0.5 : 1;
-    drawPuyo(ctx, axisRow, axisCol, pair.axis, axisAlpha, cell);
-    drawPuyo(ctx, childRow, axisCol + dc, pair.child, childAlpha, cell);
+    // 薄い白のハロー(スポットライト)を本体の下に敷いて、フィールドの他の
+    // ぷよと「これは今操作中」だと一目で区別できるようにする。
+    drawActiveHalo(ctx, axisRow, axisCol, cell, axisAlpha);
+    drawActiveHalo(ctx, childRow, axisCol + dc, cell, childAlpha);
+    drawPuyoBody(ctx, axisRow, axisCol, pair.axis, axisAlpha, cell);
+    drawPuyoBody(ctx, childRow, axisCol + dc, pair.child, childAlpha, cell);
+    drawPuyoSymbol(ctx, axisRow, axisCol, pair.axis, axisAlpha, cell);
+    drawPuyoSymbol(ctx, childRow, axisCol + dc, pair.child, childAlpha, cell);
   }
 
   const ghost = ghostCells(field, current as ActivePair | null, bestMove);
@@ -214,38 +337,165 @@ function draw(
   ctx.restore();
 }
 
-// 隣接する同色ぷよ同士を太いバーで繋ぐ(本家ぷよぷよの「連結表現」)。
-// バーはぷよ円より下に重ねたいので drawPuyo より先に呼ぶ。
+// Connect adjacent same-color puyos with a soap-bubble-fusion lens shape.
+// The lens fills the gap between two bodies. It is bounded on the body sides
+// by each body's actual outline arc and on the gap-facing sides by concave
+// quadratic Bezier curves (the "saddle"), giving the "two bubbles fusing"
+// silhouette of the original Puyo Puyo title.
+// Drawn AFTER bodies (so it lines up with the bodies' clipped-outline wedges)
+// and BEFORE symbols (so the color letter never gets hidden).
 function drawConnectors(ctx: CanvasRenderingContext2D, field: Field, cell: number) {
-  const W = cell * 0.55; // バーの太さ。ぷよ円の直径より細くして「首」に見せる。
   const alphaOf = (r: number) => (r < VISIBLE_ROW_START ? 0.5 : 1);
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       const color = field.cells[r]![c]!;
-      if (color === null) continue;
-      const hex = PUYO_COLORS[color];
+      if (color === null || color === 'G') continue;
       const cx = c * cell + cell / 2;
       const cy = r * cell + cell / 2;
       if (c + 1 < COLS && field.cells[r]![c + 1] === color) {
-        ctx.save();
-        ctx.globalAlpha = alphaOf(r);
-        ctx.fillStyle = hex;
-        ctx.fillRect(cx, cy - W / 2, cell, W);
-        ctx.restore();
+        drawNeckLens(ctx, color, alphaOf(r), cx, cy, cell, 'horizontal');
       }
       if (r + 1 < ROWS && field.cells[r + 1]![c] === color) {
-        ctx.save();
-        ctx.globalAlpha = Math.min(alphaOf(r), alphaOf(r + 1));
-        ctx.fillStyle = hex;
-        ctx.fillRect(cx - W / 2, cy, W, cell);
-        ctx.restore();
+        drawNeckLens(
+          ctx,
+          color,
+          Math.min(alphaOf(r), alphaOf(r + 1)),
+          cx,
+          cy,
+          cell,
+          'vertical',
+        );
       }
     }
   }
 }
 
-// セル中央に「色の頭文字記号」を描画。fontSize はセルの 45%、
-// 白文字 + 暗色シャドウでコントラストを確保する。scale で squash 中も変形する。
+// Draws the saddle-shaped fusion neck between two adjacent same-color puyos.
+// `cx`,`cy` are the *first* puyo's center (the upstream cell). `direction`
+// picks horizontal (→ neighbor at cx+cell, cy) or vertical (→ neighbor at cx, cy+cell).
+//
+// The lens is bounded on the body sides by the puyos' actual outline arcs and
+// on the gap-facing sides by concave Bezier curves (the "saddle"). It NEVER
+// extends into body interior, so the body's own gradient and outline elsewhere
+// stay completely intact — only the small wedge of outline at the connecting
+// direction is hidden (handled by drawPuyoBody's clip).
+function drawNeckLens(
+  ctx: CanvasRenderingContext2D,
+  color: Color | 'G',
+  alpha: number,
+  cx: number,
+  cy: number,
+  cell: number,
+  direction: 'horizontal' | 'vertical',
+) {
+  const r = cell / 2 - 2;
+  // Half-width at the body interface — measured perpendicular to the join axis.
+  // Sized close to the body radius (not 0.5 — slightly less so we don't degenerate
+  // the outline arc). Matches how the original Puyo Puyo title joins two bodies
+  // along almost their full edge so they read as one continuous blob.
+  const halfWAtBody = Math.min(cell * 0.42, r * 0.92);
+  // Saddle pinch — only a subtle inward bow at the middle, like the original.
+  const halfWAtSaddle = halfWAtBody * 0.92;
+  // Body outline x-coordinate at y = ±halfWAtBody (relative to body center).
+  // We use this to land the lens endpoints exactly ON the body outline.
+  const sqrtPart = Math.sqrt(Math.max(0, r * r - halfWAtBody * halfWAtBody));
+  // Half-angle that the lens occupies on each body's outline (in radians).
+  const bodyArcAngle = Math.asin(halfWAtBody / r);
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  // Solid mid color (PUYO_COLORS) — same as the body's mid-radius shading.
+  // The neck reads as "same color as the body" rather than its own lit surface.
+  ctx.fillStyle = PUYO_COLORS[color];
+
+  ctx.beginPath();
+  if (direction === 'horizontal') {
+    // Lens between body A (left, center cx,cy) and body B (right, center cx+cell,cy).
+    const yTop = cy - halfWAtBody;
+    const yBot = cy + halfWAtBody;
+    const xA = cx + sqrtPart; // body A right outline at y = cy ± halfWAtBody
+    const xB = cx + cell - sqrtPart; // body B left outline
+    const saddleX = cx + cell / 2;
+    // Solve quadratic Bezier control y so the saddle lands at cy ± halfWAtSaddle:
+    //   B(0.5).y = (P0.y + 2*ctrl.y + P1.y) / 4. With P0.y == P1.y == yTop:
+    //     B(0.5).y = (yTop + ctrl.y) / 2 → ctrl.y = 2*saddle.y - yTop.
+    const ctrlYTop = 2 * (cy - halfWAtSaddle) - yTop; // = cy - 2*halfWAtSaddle + halfWAtBody
+    const ctrlYBot = 2 * (cy + halfWAtSaddle) - yBot;
+    ctx.moveTo(xA, yTop);
+    // Top side: concave saddle from (xA,yTop) to (xB,yTop).
+    ctx.quadraticCurveTo(saddleX, ctrlYTop, xB, yTop);
+    // Right side: body B's left outline arc, from (xB,yTop) through (cx+cell-r, cy) to (xB,yBot).
+    // Endpoint angles from body B center (cx+cell, cy):
+    //   (xB, yTop): atan2(-halfW, -sqrt) = -(π - bodyArcAngle) = bodyArcAngle - π
+    //   (xB, yBot): π - bodyArcAngle
+    // Going through angle ±π (leftmost point) requires anticlockwise (decreasing) wrap.
+    ctx.arc(cx + cell, cy, r, bodyArcAngle - Math.PI, Math.PI - bodyArcAngle, true);
+    // Bottom side: concave saddle from (xB,yBot) back to (xA,yBot).
+    ctx.quadraticCurveTo(saddleX, ctrlYBot, xA, yBot);
+    // Left side: body A's right outline arc, from (xA,yBot) through (cx+r, cy) to (xA,yTop).
+    // Endpoint angles from body A center (cx, cy):
+    //   (xA, yBot): bodyArcAngle, (xA, yTop): -bodyArcAngle.
+    // Going through angle 0 (rightmost) means decreasing angle (anticlockwise).
+    ctx.arc(cx, cy, r, bodyArcAngle, -bodyArcAngle, true);
+  } else {
+    // Lens between body A (top, center cx,cy) and body B (bottom, center cx,cy+cell).
+    const xLeft = cx - halfWAtBody;
+    const xRight = cx + halfWAtBody;
+    const yA = cy + sqrtPart; // body A bottom outline at x = cx ± halfWAtBody
+    const yB = cy + cell - sqrtPart; // body B top outline
+    const saddleY = cy + cell / 2;
+    const ctrlXLeft = 2 * (cx - halfWAtSaddle) - xLeft;
+    const ctrlXRight = 2 * (cx + halfWAtSaddle) - xRight;
+    ctx.moveTo(xLeft, yA);
+    // Top side: body A's bottom (south) outline arc, from (xLeft,yA) through (cx, cy+r) to (xRight,yA).
+    // Endpoint angles from body A center:
+    //   (xLeft, yA): atan2(sqrt, -halfW) = π/2 + bodyArcAngle
+    //   (xRight, yA): atan2(sqrt, halfW) = π/2 - bodyArcAngle
+    // Going through π/2 (= bottom of A): decreasing angle = anticlockwise.
+    ctx.arc(cx, cy, r, Math.PI / 2 + bodyArcAngle, Math.PI / 2 - bodyArcAngle, true);
+    // Right side: concave saddle from (xRight,yA) to (xRight,yB).
+    ctx.quadraticCurveTo(ctrlXRight, saddleY, xRight, yB);
+    // Bottom side: body B's top (north) outline arc, from (xRight,yB) through (cx, cy+cell-r) to (xLeft,yB).
+    // Endpoint angles from body B center (cx, cy+cell):
+    //   (xRight, yB): atan2(-sqrt, halfW) = -(π/2 - bodyArcAngle) = -π/2 + bodyArcAngle
+    //   (xLeft, yB): -π/2 - bodyArcAngle
+    // Going through -π/2 (= top of B): decreasing angle = anticlockwise.
+    ctx.arc(cx, cy + cell, r, -Math.PI / 2 + bodyArcAngle, -Math.PI / 2 - bodyArcAngle, true);
+    // Left side: concave saddle from (xLeft,yB) back to (xLeft,yA).
+    ctx.quadraticCurveTo(ctrlXLeft, saddleY, xLeft, yA);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+interface ConnMask {
+  right: boolean;
+  down: boolean;
+  left: boolean;
+  up: boolean;
+}
+
+const NO_CONN: ConnMask = { right: false, down: false, left: false, up: false };
+// Width of the rectangular outline-clip strip in drawPuyoBody. Matches the
+// lens's half-width at the body interface (drawNeckLens.halfWAtBody) so the
+// outline is hidden exactly under the wedge that the lens replaces.
+const CONNECTOR_HALF_W_FRAC = 0.42;
+
+function buildConnMask(field: Field, r: number, c: number): ConnMask {
+  const color = field.cells[r]![c];
+  if (color === null || color === 'G') return NO_CONN;
+  return {
+    right: c + 1 < COLS && field.cells[r]![c + 1] === color,
+    down: r + 1 < ROWS && field.cells[r + 1]![c] === color,
+    left: c - 1 >= 0 && field.cells[r]![c - 1] === color,
+    up: r - 1 >= 0 && field.cells[r - 1]![c] === color,
+  };
+}
+
+// Draw the color's initial letter in the center of the cell. fontSize is 45%
+// of the cell; we use white text with a dark shadow to keep contrast. scale
+// makes the symbol deform along with the puyo during squash.
 function drawSymbol(
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -277,39 +527,49 @@ interface PuyoScale {
 }
 const ONE_SCALE: PuyoScale = { sx: 1, sy: 1 };
 
-// 着地直後の squash-stretch。減衰サイン波で 0→0.6 (squish) →1.1 (rebound) →1。
-// セルの底に重心がある感じを出すため、変形は底辺基準。
+// Squash-and-stretch right after landing. Damped sine wave: 0 → 0.6 (squish)
+// → 1.1 (rebound) → 1. The deformation is anchored at the bottom edge so the
+// puyo feels weighted at the base of the cell.
 function landingScale(elapsedMs: number): PuyoScale {
   if (elapsedMs <= 0) return { sx: 1.2, sy: 0.65 };
   if (elapsedMs >= LANDING_BOUNCE_MS) return ONE_SCALE;
   const t = elapsedMs / LANDING_BOUNCE_MS;
-  // 減衰係数を強めにして「短く軽い弾み」にする。
+  // Stronger damping for a "short, light bounce".
   const offset = -0.35 * Math.exp(-4.5 * t) * Math.cos(8 * t);
   const sy = 1 + offset;
   const sx = 1 - offset * 0.6;
   return { sx, sy };
 }
 
-function drawPuyo(
-  ctx: CanvasRenderingContext2D,
-  row: number,
-  col: number,
-  color: Color,
-  alpha: number,
-  cell: number,
-  scale: PuyoScale = ONE_SCALE,
-) {
-  if (row < 0) return;
+// Geometry helper: where the body ellipse actually lives. The body is anchored
+// to the cell bottom (bouncing tomato style) so we cannot just take the cell center.
+function bodyGeometry(row: number, col: number, cell: number, scale: PuyoScale) {
   const cx = col * cell + cell / 2;
-  // 「弾むときも底辺は床に貼り付いている」見せ方:変形の中心をセル底にする。
   const baseY = row * cell + cell - 2;
   const r = cell / 2 - 2;
   const ry = r * scale.sy;
   const rx = r * scale.sx;
   const centerY = baseY - ry;
+  return { cx, centerY, rx, ry };
+}
 
-  // ラジアルグラデで本体に立体感。中心を少し上にオフセットして光が上から
-  // 当たっているように見せる(本家ぷよ寄り)。
+// Body fill + outline, no symbol. Split out so we can draw the connector bars
+// on top of the bodies (covering the dark rim) but UNDER the symbols.
+function drawPuyoBody(
+  ctx: CanvasRenderingContext2D,
+  row: number,
+  col: number,
+  color: Color | 'G',
+  alpha: number,
+  cell: number,
+  scale: PuyoScale = ONE_SCALE,
+  connections: ConnMask = NO_CONN,
+) {
+  if (row < 0) return;
+  const { cx, centerY, rx, ry } = bodyGeometry(row, col, cell, scale);
+
+  // Radial gradient for body shading. Offset the highlight slightly up to
+  // suggest light coming from above (matching the original Puyo Puyo style).
   const grad = ctx.createRadialGradient(
     cx - rx * 0.25,
     centerY - ry * 0.35,
@@ -328,13 +588,98 @@ function drawPuyo(
   ctx.beginPath();
   ctx.ellipse(cx, centerY, rx, ry, 0, 0, Math.PI * 2);
   ctx.fill();
-  // 暗色アウトライン
+  ctx.restore();
+
+  // Dark outline. Clip out the wedge that faces a same-color neighbor — the
+  // connector lens drawn next traces that exact body-outline arc, so without
+  // this clip the outline would show as a thin dark seam between body and lens.
+  ctx.save();
+  ctx.globalAlpha = alpha;
   ctx.lineWidth = Math.max(1, cell * 0.04);
   ctx.strokeStyle = PUYO_DARK[color];
+  if (
+    connections.right ||
+    connections.down ||
+    connections.left ||
+    connections.up
+  ) {
+    const halfW = cell * CONNECTOR_HALF_W_FRAC;
+    ctx.beginPath();
+    ctx.rect(cx - cell * 2, centerY - cell * 2, cell * 4, cell * 4);
+    if (connections.right) ctx.rect(cx, centerY - halfW, cell, halfW * 2);
+    if (connections.left) ctx.rect(cx - cell, centerY - halfW, cell, halfW * 2);
+    if (connections.down) ctx.rect(cx - halfW, centerY, halfW * 2, cell);
+    if (connections.up) ctx.rect(cx - halfW, centerY - cell, halfW * 2, cell);
+    ctx.clip('evenodd');
+  }
+  ctx.beginPath();
+  ctx.ellipse(cx, centerY, rx, ry, 0, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
 
+  // Garbage gets a tiny highlight in lieu of a letter. Drawn here (with the
+  // body) — drawPuyoSymbol skips garbage entirely.
+  if (color === 'G') {
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.85;
+    ctx.fillStyle = PUYO_LIGHT[color];
+    ctx.beginPath();
+    ctx.ellipse(
+      cx - rx * 0.25,
+      centerY - ry * 0.3,
+      Math.max(2, rx * 0.18),
+      Math.max(2, ry * 0.18),
+      0,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// Color-letter symbol only (centered on the body). Drawn AFTER connector bars
+// so the symbol is never hidden by a same-color connection that crosses it.
+function drawPuyoSymbol(
+  ctx: CanvasRenderingContext2D,
+  row: number,
+  col: number,
+  color: Color | 'G',
+  alpha: number,
+  cell: number,
+  scale: PuyoScale = ONE_SCALE,
+) {
+  if (row < 0) return;
+  if (color === 'G') return;
+  const { cx, centerY } = bodyGeometry(row, col, cell, scale);
   drawSymbol(ctx, cx, centerY, color, cell, scale, alpha);
+}
+
+// 操作中ペアの後光。本体より一回り大きい白の放射グラデーションで、
+// 中心は半透明 → 外周はゼロにフェード。本体の下に敷いて、本体エッジから
+// わずかにはみ出した部分が「光ってる感」になる。隣接セルへ少しだけ滲ませる
+// ことで、フィールドの落ち着いた色と確実に視差が出る。
+function drawActiveHalo(
+  ctx: CanvasRenderingContext2D,
+  row: number,
+  col: number,
+  cell: number,
+  alpha: number,
+) {
+  if (row < 0) return;
+  const cx = col * cell + cell / 2;
+  const cy = row * cell + cell / 2;
+  const inner = cell * 0.35;
+  const outer = cell * 0.7;
+  const grad = ctx.createRadialGradient(cx, cy, inner, cx, cy, outer);
+  grad.addColorStop(0, `rgba(255, 255, 255, ${0.45 * alpha})`);
+  grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.save();
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, outer, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawPopHighlight(
@@ -347,7 +692,7 @@ function drawPopHighlight(
   if (row < 0) return;
   const cx = col * cell + cell / 2;
   const cy = row * cell + cell / 2;
-  // 白い光をぷよの上に重ねて「いま消えるぞ」という視覚的強調
+  // Overlay a white glow on the puyo to visually emphasize "this is about to pop".
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   ctx.globalAlpha = pulse * 0.6;
@@ -357,7 +702,7 @@ function drawPopHighlight(
   ctx.fill();
   ctx.restore();
 
-  // 外側に広がるリング
+  // Ring expanding outward
   ctx.save();
   ctx.strokeStyle = `rgba(255, 255, 255, ${pulse})`;
   ctx.lineWidth = 2;
@@ -386,7 +731,8 @@ function drawPuyoGhost(
   ctx.arc(cx, cy, cell / 2 - 2, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
-  // ゴーストにも色の頭文字を表示(本体より薄く)。setLineDash の影響を
-  // drawSymbol は受けない(restore してから呼ぶ + drawSymbol 内部で save)。
+  // Show the color initial on ghosts too (more transparent than the body).
+  // drawSymbol is not affected by setLineDash because it is called after
+  // restore, and drawSymbol does its own save internally.
   drawSymbol(ctx, cx, cy, color, cell, ONE_SCALE, 0.55);
 }

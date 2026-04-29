@@ -26,15 +26,16 @@ describe('useTrainerMode singleton', () => {
 
   it('notifies listeners on change', () => {
     const seen: string[] = [];
-    // listeners は内部 Set。setTrainerMode の値が変わったときだけ呼ばれる。
+    // listeners is an internal Set; it is only invoked when setTrainerMode's value actually changes.
     const sub = (v: string) => seen.push(v);
-    // 直接 listeners に触れず、setState 経由の挙動だけ確認するため
-    // useTrainerMode hook 経由ではなくここでは setTrainerMode の変更検出のみテストする。
+    // We don't touch listeners directly; we exercise the behavior through
+    // setState only. We also don't go through the useTrainerMode hook here —
+    // we just verify setTrainerMode's change detection.
     setTrainerMode('off');
     setTrainerMode('gtr');
-    setTrainerMode('gtr'); // 同値なので listener 呼ばれない
+    setTrainerMode('gtr'); // Same value, so listeners are not called.
     setTrainerMode('off');
-    // ここでは "重複呼び出しでは状態変わらない" だけ間接的に検証
+    // Here we just indirectly verify that "redundant calls don't change state".
     expect(getTrainerMode()).toBe('off');
     void sub;
     void seen;

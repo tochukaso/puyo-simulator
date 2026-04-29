@@ -15,14 +15,38 @@ export interface NativeAmaResult {
 
 export class NativeAmaAI implements PuyoAI {
   readonly name = 'ama-native';
-  readonly version = 'ama-native-build-v1';
+  get version(): string {
+    return `ama-native-${this.preset}-v1`;
+  }
+
+  preset: string = 'build';
 
   static isAvailable(): boolean {
     return isTauri();
   }
 
   async init(): Promise<void> {
-    // Rust side OnceLock initialises on first invoke; nothing to do here.
+    // Rust ensures init lazily on first suggest with the active preset.
+  }
+
+  async setPreset(preset: string): Promise<void> {
+    this.preset = preset;
+    // Eagerly trigger init for the new preset so AI-ready can flip true.
+    // We do a no-op suggest with an empty field; the Rust side will
+    // ensure_init the new preset before returning. This costs ~100ms but
+    // happens only on trainer-mode change, not per move.
+    const empty = '.'.repeat(78);
+    try {
+      await invokeAmaSuggest({
+        preset,
+        field: empty,
+        current: ['R', 'B'],
+        next1: ['Y', 'P'],
+        next2: ['R', 'Y'],
+      });
+    } catch (e) {
+      console.error('[ama-native] setPreset prime failed:', e);
+    }
   }
 
   async suggest(state: GameState, topK: number): Promise<Move[]> {
@@ -62,6 +86,7 @@ export class NativeAmaAI implements PuyoAI {
 
     try {
       return await invokeAmaSuggest({
+        preset: this.preset,
         field,
         current: [cur.axis, cur.child],
         next1: [n1.axis, n1.child],

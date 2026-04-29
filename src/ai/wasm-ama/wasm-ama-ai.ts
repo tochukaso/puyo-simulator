@@ -4,7 +4,6 @@ import {
   loadAmaModule,
   setAmaPreset,
   type AmaModule,
-  type AmaVariant,
 } from './wasm-loader';
 import {
   FIELD_BUFFER_BYTES,
@@ -18,14 +17,17 @@ const CHAR_R = 82;
 const CHAR_B = 66;
 const CHAR_Y = 89;
 const CHAR_P = 80;
+// Garbage / ojama. ama の wasm_api は現状 'G' を NONE 扱いするが、将来的に
+// 'G' → cell::Type::GARBAGE の認識が入ったら自動で活きるよう、こちら側で
+// 先に文字を送っておく (`docs/TODO.md` 参照)。
+const CHAR_G = 71;
 
-// 1 つの WasmAmaAI インスタンスは 1 つの WASM バリアント (default / gtr-only) に
-// バインドされる。fieldBuf/outBuf は variant 固有の Module ヒープ上に malloc されるため、
-// バリアントを跨いで使い回すことはできない。preset(重み)は variant 内で切替可能。
+// 単一 WASM バイナリで全 form (GTR / FRON / SGTR / KAIDAN) をカバーし、
+// preset (weights + 有効 form) を実行時に切り替える。
 export class WasmAmaAI implements PuyoAI {
   readonly name = 'ama-wasm';
   get version(): string {
-    return `ama-wasm-${this.variant}-${this.preset}-v1`;
+    return `ama-wasm-${this.preset}-v1`;
   }
 
   private module: AmaModule | null = null;
@@ -34,25 +36,23 @@ export class WasmAmaAI implements PuyoAI {
   private outBuf = 0;
   private loading: Promise<void> | null = null;
   preset: string;
-  readonly variant: AmaVariant;
 
-  constructor(preset: string = 'build', variant: AmaVariant = 'default') {
+  constructor(preset: string = 'build') {
     this.preset = preset;
-    this.variant = variant;
   }
 
   async init(): Promise<void> {
     if (this.module) {
-      await setAmaPreset(this.variant, this.preset);
+      await setAmaPreset(this.preset);
       return;
     }
     if (this.loading) {
       await this.loading;
-      await setAmaPreset(this.variant, this.preset);
+      await setAmaPreset(this.preset);
       return;
     }
     this.loading = (async () => {
-      const m = await loadAmaModule(this.variant, this.preset);
+      const m = await loadAmaModule(this.preset);
       this.suggestFn = m.cwrap('ama_suggest', 'number', [
         'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number',
       ]);
@@ -65,12 +65,12 @@ export class WasmAmaAI implements PuyoAI {
     } finally {
       this.loading = null;
     }
-    await setAmaPreset(this.variant, this.preset);
+    await setAmaPreset(this.preset);
   }
 
   async setPreset(preset: string): Promise<void> {
     this.preset = preset;
-    if (this.module) await setAmaPreset(this.variant, preset);
+    if (this.module) await setAmaPreset(preset);
   }
 
   // Encodes the state into the WASM buffers and calls ama_suggest.
@@ -88,6 +88,7 @@ export class WasmAmaAI implements PuyoAI {
         else if (cell === 'B') ch = CHAR_B;
         else if (cell === 'Y') ch = CHAR_Y;
         else if (cell === 'P') ch = CHAR_P;
+        else if (cell === 'G') ch = CHAR_G;
         heap[this.fieldBuf + r * 6 + c] = ch;
       }
     }
@@ -117,7 +118,7 @@ export class WasmAmaAI implements PuyoAI {
     const moves: Move[] = [];
     for (let i = 0; i < n; i++) {
       const p = this.outBuf + i * 8;
-      // out バッファ内訳: [axisCol, rotation, score(int32 LE), expectedChain, _]
+      // out buffer layout: [axisCol, rotation, score(int32 LE), expectedChain, _]
       const score =
         heap[p + 2]! |
         (heap[p + 3]! << 8) |

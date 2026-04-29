@@ -1,20 +1,22 @@
 import { useEffect, useState } from 'react';
 
-// 訓練モード。'gtr' のとき Header の「AI 選択」を上書きして ama-wasm + gtr プリセットを使い、
-// Board に GTR テンプレを薄く重ね、Stats 周辺に達成度メーターを出す。
-// 複数コンポーネントで共有するシングルトン + listener(useUiPrefs と同じ流儀)。
+// Trainer mode. Selects which form preset is loaded into ama-wasm.
+//   off    : preset='build'   — default play, all forms active
+//   gtr    : preset='gtr'     — only GTR matched, AI is guided to build GTR
+//   kaidan : preset='kaidan'  — only KAIDAN (staircase) matched
+// Shared across components via a singleton + listener (same approach as useUiPrefs).
 
-export type TrainerMode = 'off' | 'gtr';
+export type TrainerMode = 'off' | 'gtr' | 'kaidan';
 
 const STORAGE_KEY = 'puyo.trainer.mode';
-const VALID: readonly TrainerMode[] = ['off', 'gtr'] as const;
+const VALID: readonly TrainerMode[] = ['off', 'gtr', 'kaidan'] as const;
 
 function readInitial(): TrainerMode {
   try {
     const v = localStorage.getItem(STORAGE_KEY);
-    return (VALID as readonly string[]).includes(v ?? '') ? (v as TrainerMode) : 'off';
+    return (VALID as readonly string[]).includes(v ?? '') ? (v as TrainerMode) : 'gtr';
   } catch {
-    return 'off';
+    return 'gtr';
   }
 }
 
@@ -27,7 +29,7 @@ export function setTrainerMode(v: TrainerMode): void {
   try {
     localStorage.setItem(STORAGE_KEY, v);
   } catch {
-    // localStorage 未対応環境では永続化をスキップ。
+    // Skip persistence when localStorage is unsupported.
   }
   for (const h of listeners) h(v);
 }

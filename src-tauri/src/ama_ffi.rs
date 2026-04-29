@@ -1,7 +1,7 @@
 use std::ffi::CString;
 use std::os::raw::{c_char, c_int};
 use std::path::Path;
-use std::sync::OnceLock;
+use std::sync::Mutex;
 
 use thiserror::Error;
 
@@ -41,28 +41,31 @@ pub struct Suggestion {
     pub expected_chain: u8,
 }
 
-static INIT_RESULT: OnceLock<Result<(), i32>> = OnceLock::new();
+// Tracks the preset most recently loaded by ama_native_init_preset. None means
+// not initialized yet. The mutex serializes init vs. suggest at the Rust layer
+// so we can safely call init multiple times when the trainer mode flips
+// preset (build / gtr / kaidan / ...). The C++ side allows re-init by design;
+// it just resets g_weight in place.
+static INIT_STATE: Mutex<Option<String>> = Mutex::new(None);
 
 pub fn ensure_init(preset: &str, config_path: &Path) -> Result<(), AmaError> {
-    let result = INIT_RESULT.get_or_init(|| {
-        let preset_c = match CString::new(preset) {
-            Ok(s) => s,
-            Err(_) => return Err(-100),
-        };
-        let path_str = config_path.to_string_lossy();
-        let path_c = match CString::new(path_str.as_bytes()) {
-            Ok(s) => s,
-            Err(_) => return Err(-101),
-        };
-        let ret = unsafe {
-            ama_native_init_preset(preset_c.as_ptr(), path_c.as_ptr())
-        };
-        if ret == 0 { Ok(()) } else { Err(ret) }
-    });
-    match result {
-        Ok(()) => Ok(()),
-        Err(code) => Err(AmaError::InitFailed(*code)),
+    let mut state = INIT_STATE.lock().expect("INIT_STATE poisoned");
+    if state.as_deref() == Some(preset) {
+        return Ok(());
     }
+    let preset_c = CString::new(preset)
+        .map_err(|_| AmaError::InitFailed(-100))?;
+    let path_str = config_path.to_string_lossy();
+    let path_c = CString::new(path_str.as_bytes())
+        .map_err(|_| AmaError::InitFailed(-101))?;
+    let ret = unsafe {
+        ama_native_init_preset(preset_c.as_ptr(), path_c.as_ptr())
+    };
+    if ret != 0 {
+        return Err(AmaError::InitFailed(ret));
+    }
+    *state = Some(preset.to_string());
+    Ok(())
 }
 
 pub fn suggest(
@@ -118,5 +121,12 @@ mod tests {
     fn double_init_idempotent() {
         ensure_init("build", &config_path()).expect("init 1");
         ensure_init("build", &config_path()).expect("init 2");
+    }
+
+    #[test]
+    fn preset_switching_works() {
+        ensure_init("build", &config_path()).expect("init build");
+        ensure_init("gtr", &config_path()).expect("switch to gtr");
+        ensure_init("build", &config_path()).expect("switch back to build");
     }
 }

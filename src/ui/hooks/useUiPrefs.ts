@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 
-// UI 表示設定。複数コンポーネント(Header の切替・Board の描画)が同じ値を
-// 共有するためのモジュールローカルなシングルトン + listener。aiKind と同じ流儀。
+// UI display preferences. A module-local singleton + listener pattern so
+// multiple components (the Header toggles and the Board renderer) share the
+// same value. Same approach as aiKind.
 const STORAGE_KEY_GHOST = 'puyo.ghost.enabled';
 const STORAGE_KEY_CEILING = 'puyo.ceiling.visible';
 
@@ -10,7 +11,7 @@ function readBoolPref(key: string, fallback: boolean): boolean {
     const v = localStorage.getItem(key);
     return v === null ? fallback : v === 'true';
   } catch {
-    // テスト環境(jsdom)で localStorage が未実装の場合は fallback。
+    // Fall back when localStorage is unimplemented (e.g. jsdom in tests).
     return fallback;
   }
 }
@@ -19,7 +20,7 @@ function writeBoolPref(key: string, v: boolean): void {
   try {
     localStorage.setItem(key, String(v));
   } catch {
-    // localStorage 未対応環境では永続化をスキップ。
+    // Skip persistence when localStorage is unsupported.
   }
 }
 
@@ -43,8 +44,9 @@ export function useGhostEnabled(): boolean {
   return v;
 }
 
-// 天井段(row 0)の表示。本家ぷよぷよ準拠で本来は隠れているので
-// default は ON にしておくが、隠して 12 段だけ見せるモードも選べる。
+// Visibility of the ceiling row (row 0). In the original Puyo Puyo this row
+// is normally hidden, so the default is ON, but a mode that hides it and
+// shows only the 12 visible rows is also selectable.
 let ceilingVisible = readBoolPref(STORAGE_KEY_CEILING, true);
 const ceilingListeners = new Set<(v: boolean) => void>();
 
@@ -62,5 +64,29 @@ export function useCeilingVisible(): boolean {
       ceilingListeners.delete(setV);
     };
   }, []);
+  return v;
+}
+
+// 盤面のセルサイズ(px)。Board が ResizeObserver で計算した最新値を
+// 公開して、NextQueue など他の UI が「普通のぷよと同じサイズ」で
+// 描画できるようにする。useGhostEnabled / useCeilingVisible と同じ流儀。
+let boardCellSize = 32;
+const cellSizeListeners = new Set<(v: number) => void>();
+
+export function setBoardCellSize(v: number): void {
+  if (boardCellSize === v) return;
+  boardCellSize = v;
+  for (const h of cellSizeListeners) h(v);
+}
+
+export function useBoardCellSize(): number {
+  const [v, setV] = useState(boardCellSize);
+  useEffect(() => {
+    cellSizeListeners.add(setV);
+    if (v !== boardCellSize) setV(boardCellSize);
+    return () => {
+      cellSizeListeners.delete(setV);
+    };
+  }, [v]);
   return v;
 }

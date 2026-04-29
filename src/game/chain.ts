@@ -6,7 +6,8 @@ import type { ChainStep } from './types';
 export interface PoppedCell {
   row: number;
   col: number;
-  color: Color;
+  /** 'G' indicates garbage cleared by adjacency to a color group pop. */
+  color: Color | 'G';
 }
 
 export interface ConnectedGroup {
@@ -14,7 +15,7 @@ export interface ConnectedGroup {
   cells: PoppedCell[];
 }
 
-// Standard Puyo rules: row 0 (ceiling, 13段目) puyos exist for stacking but
+// Standard Puyo rules: row 0 (ceiling, the 13th row) puyos exist for stacking but
 // do NOT participate in 4-connection pops. Restricting the search to
 // VISIBLE_ROW_START..ROWS keeps clusters that cross the ceiling row from
 // counting that ceiling cell, matching native ama / Puyo eSports behavior.
@@ -25,13 +26,14 @@ export function findConnectedGroups(field: Field): ConnectedGroup[] {
   for (let r = VISIBLE_ROW_START; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       if (visited[r]![c]!) continue;
-      const color = field.cells[r]![c]!;
-      if (color === null) {
+      const v = field.cells[r]![c]!;
+      // Empty cells and garbage never form groups themselves.
+      if (v === null || v === 'G') {
         visited[r]![c] = true;
         continue;
       }
-      const cluster = bfs(field, r, c, color, visited);
-      if (cluster.length >= 4) groups.push({ color, cells: cluster });
+      const cluster = bfs(field, r, c, v, visited);
+      if (cluster.length >= 4) groups.push({ color: v, cells: cluster });
     }
   }
   return groups;
@@ -92,7 +94,11 @@ export function resolveChain(field: Field): {
     const groups = findConnectedGroups(current);
     if (groups.length === 0) break;
     chainIndex++;
-    const popped = groups.flatMap(g => g.cells);
+    const colorPopped = groups.flatMap(g => g.cells);
+    // Standard puyo: garbage adjacent (orthogonally) to any popping color cell
+    // is cleared in the same step. Score is unaffected (only color cells score).
+    const garbagePopped = findAdjacentGarbage(current, colorPopped);
+    const popped = [...colorPopped, ...garbagePopped];
     const before = current;
     const afterPop = removePoppedCells(current, popped);
     const afterGravity = applyGravity(afterPop);
@@ -110,4 +116,22 @@ export function resolveChain(field: Field): {
   }
 
   return { finalField: current, steps, totalScore: total };
+}
+
+function findAdjacentGarbage(field: Field, popped: ReadonlyArray<PoppedCell>): PoppedCell[] {
+  const seen = new Set<string>();
+  const out: PoppedCell[] = [];
+  for (const p of popped) {
+    for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as const) {
+      const nr = p.row + dr;
+      const nc = p.col + dc;
+      if (nr < VISIBLE_ROW_START || nr >= ROWS || nc < 0 || nc >= COLS) continue;
+      if (field.cells[nr]![nc]! !== 'G') continue;
+      const key = `${nr},${nc}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ row: nr, col: nc, color: 'G' });
+    }
+  }
+  return out;
 }

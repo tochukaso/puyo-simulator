@@ -14,80 +14,54 @@ type AmaModuleFactory = (config?: {
   locateFile?: (path: string) => string;
 }) => Promise<AmaModule>;
 
-// バリアント = どの WASM バイナリをロードするか。
-//   'default'  : ama.wasm — 通常 ama(form::list = { GTR, FRON, SGTR })
-//   'gtr-only' : ama-gtr.wasm — 訓練用(form::list = { GTR } のみ。GTR を作る AI)
-export type AmaVariant = 'default' | 'gtr-only';
+// 単一の WASM バイナリ。form 集合 (GTR / FRON / SGTR / KAIDAN) は
+// 実行時に preset の "forms" で切り替えるので、別ビルドは不要。
+const PATHS = {
+  glueUrl: '/wasm/ama.js',
+  glueRel: 'src/ai/wasm-ama/_glue/ama.js',
+  wasmRel: 'public/wasm/ama.wasm',
+} as const;
 
-interface VariantPaths {
-  // browser fetch 用の URL(public/wasm/...)
-  glueUrl: string;
-  // node 用の絶対パス
-  glueRel: string; // src/ai/wasm-ama/_glue/<file>
-  wasmRel: string; // public/wasm/<file>
-}
-
-const VARIANT_PATHS: Readonly<Record<AmaVariant, VariantPaths>> = {
-  default: {
-    glueUrl: '/wasm/ama.js',
-    glueRel: 'src/ai/wasm-ama/_glue/ama.js',
-    wasmRel: 'public/wasm/ama.wasm',
-  },
-  'gtr-only': {
-    glueUrl: '/wasm/ama-gtr.js',
-    glueRel: 'src/ai/wasm-ama/_glue/ama-gtr.js',
-    wasmRel: 'public/wasm/ama-gtr.wasm',
-  },
-};
-
-const cached: Partial<Record<AmaVariant, Promise<AmaModule>>> = {};
-const currentPresetByVariant: Partial<Record<AmaVariant, string>> = {};
+let cached: Promise<AmaModule> | null = null;
+let currentPreset: string | null = null;
 
 function isVitest(): boolean {
   return typeof process !== 'undefined' && process.env.VITEST === 'true';
 }
 
 function isBrowser(): boolean {
-  // Browser main: window + self defined.
-  // Browser/dedicated worker: self defined, window undefined.
-  // Node: neither defined.
-  // Vitest (jsdom): both defined AND process defined — gated by VITEST env.
   if (isVitest()) return false;
   return typeof self !== 'undefined' && typeof process === 'undefined';
 }
 
-async function loadFactoryAndPaths(variant: AmaVariant): Promise<{
+async function loadFactoryAndPaths(): Promise<{
   factory: AmaModuleFactory;
   nodeWasmPath: string | null;
   browserWasmUrl: string;
 }> {
-  const paths = VARIANT_PATHS[variant];
   if (isBrowser()) {
-    // Fetch the glue from public/wasm/ 直接(Vite import path を経由しない)。
-    // Any Vite-aware import (even ?url) hangs in worker context. fetch +
-    // Blob URL bypasses Vite entirely.
-    console.log(`[ama-wasm:${variant}] step 1: fetching ${paths.glueUrl}`);
-    const res = await fetch(paths.glueUrl);
+    console.log(`[ama-wasm] step 1: fetching ${PATHS.glueUrl}`);
+    const res = await fetch(PATHS.glueUrl);
     if (!res.ok) {
-      throw new Error(`failed to fetch ama glue (${variant}): ${res.status} ${res.statusText}`);
+      throw new Error(`failed to fetch ama glue: ${res.status} ${res.statusText}`);
     }
     const code = await res.text();
-    console.log(`[ama-wasm:${variant}] step 2: glue text fetched (${code.length} bytes)`);
+    console.log(`[ama-wasm] step 2: glue text fetched (${code.length} bytes)`);
 
     const blob = new Blob([code], { type: 'application/javascript' });
     const blobUrl = URL.createObjectURL(blob);
-    console.log(`[ama-wasm:${variant}] step 3: blob URL created`);
+    console.log(`[ama-wasm] step 3: blob URL created`);
 
     try {
-      console.log(`[ama-wasm:${variant}] step 4: dynamic-importing blob URL`);
+      console.log(`[ama-wasm] step 4: dynamic-importing blob URL`);
       const mod = (await import(/* @vite-ignore */ blobUrl)) as {
         default: AmaModuleFactory;
       };
-      console.log(`[ama-wasm:${variant}] step 5: blob imported, factory type = ${typeof mod.default}`);
+      console.log(`[ama-wasm] step 5: blob imported, factory type = ${typeof mod.default}`);
       return {
         factory: mod.default,
         nodeWasmPath: null,
-        browserWasmUrl: paths.glueUrl.replace(/\.js$/, '.wasm'),
+        browserWasmUrl: PATHS.glueUrl.replace(/\.js$/, '.wasm'),
       };
     } finally {
       URL.revokeObjectURL(blobUrl);
@@ -95,84 +69,72 @@ async function loadFactoryAndPaths(variant: AmaVariant): Promise<{
   }
   const { pathToFileURL } = await import('node:url');
   const { resolve } = await import('node:path');
-  const jsPath = resolve(process.cwd(), paths.glueRel);
-  const wasmPath = resolve(process.cwd(), paths.wasmRel);
+  const jsPath = resolve(process.cwd(), PATHS.glueRel);
+  const wasmPath = resolve(process.cwd(), PATHS.wasmRel);
   const mod = (await import(/* @vite-ignore */ pathToFileURL(jsPath).href)) as {
     default: AmaModuleFactory;
   };
   return {
     factory: mod.default,
     nodeWasmPath: wasmPath,
-    browserWasmUrl: paths.glueUrl.replace(/\.js$/, '.wasm'),
+    browserWasmUrl: PATHS.glueUrl.replace(/\.js$/, '.wasm'),
   };
 }
 
 export const DEFAULT_PRESET = 'build';
-export const DEFAULT_VARIANT: AmaVariant = 'default';
 
-export function loadAmaModule(
-  variant: AmaVariant = DEFAULT_VARIANT,
-  preset: string = DEFAULT_PRESET,
-): Promise<AmaModule> {
-  let p = cached[variant];
-  if (!p) {
-    p = (async () => {
-      console.log(`[ama-wasm:${variant}] loadAmaModule: loading factory…`);
+export function loadAmaModule(preset: string = DEFAULT_PRESET): Promise<AmaModule> {
+  if (!cached) {
+    cached = (async () => {
+      console.log(`[ama-wasm] loadAmaModule: loading factory…`);
       const t0 = performance.now();
-      const { factory, nodeWasmPath, browserWasmUrl } = await loadFactoryAndPaths(variant);
-      console.log(`[ama-wasm:${variant}] factory loaded in ${(performance.now() - t0).toFixed(0)}ms`);
+      const { factory, nodeWasmPath, browserWasmUrl } = await loadFactoryAndPaths();
+      console.log(`[ama-wasm] factory loaded in ${(performance.now() - t0).toFixed(0)}ms`);
 
       const t1 = performance.now();
       const Module = await factory({
         locateFile: (path: string) => {
           if (!path.endsWith('.wasm')) return path;
           const url = nodeWasmPath ?? browserWasmUrl;
-          console.log(`[ama-wasm:${variant}] locateFile -> ${url}`);
+          console.log(`[ama-wasm] locateFile -> ${url}`);
           return url;
         },
       });
-      console.log(`[ama-wasm:${variant}] WASM instantiated in ${(performance.now() - t1).toFixed(0)}ms`);
+      console.log(`[ama-wasm] WASM instantiated in ${(performance.now() - t1).toFixed(0)}ms`);
 
       const t2 = performance.now();
       const initRet = Module.ccall('ama_init_preset', 'number', ['string'], [preset]);
-      console.log(`[ama-wasm:${variant}] ama_init_preset(${preset}) returned ${initRet} in ${(performance.now() - t2).toFixed(0)}ms`);
+      console.log(`[ama-wasm] ama_init_preset(${preset}) returned ${initRet} in ${(performance.now() - t2).toFixed(0)}ms`);
       if (initRet < 0) {
-        throw new Error(`ama_init_preset(${preset}) failed on ${variant}: ${initRet}`);
+        throw new Error(`ama_init_preset(${preset}) failed: ${initRet}`);
       }
       if (initRet === 0) {
-        throw new Error(`ama_init_preset(${preset}) read empty weight on ${variant}`);
+        throw new Error(`ama_init_preset(${preset}) read empty weight`);
       }
-      currentPresetByVariant[variant] = preset;
+      currentPreset = preset;
       return Module;
     })();
-    cached[variant] = p;
   }
-  return p;
+  return cached;
 }
 
-// Switch g_weight on the given variant's loaded WASM to a different preset.
-// Each variant has its own currentPreset state since they're separate Modules.
-export async function setAmaPreset(
-  variant: AmaVariant,
-  preset: string,
-): Promise<number> {
-  const m = await loadAmaModule(variant, preset);
-  if (preset === currentPresetByVariant[variant]) return -1;
+// 既にロード済みの WASM の g_weight (と form active_mask) を別 preset に切り替える。
+export async function setAmaPreset(preset: string): Promise<number> {
+  const m = await loadAmaModule(preset);
+  if (preset === currentPreset) return -1;
   const ret = m.ccall('ama_init_preset', 'number', ['string'], [preset]);
-  console.log(`[ama-wasm:${variant}] setAmaPreset(${preset}) -> ${ret}`);
-  if (ret < 0) throw new Error(`ama_init_preset(${preset}) failed on ${variant}: ${ret}`);
-  if (ret === 0) throw new Error(`ama_init_preset(${preset}) read empty weight on ${variant}`);
-  currentPresetByVariant[variant] = preset;
+  console.log(`[ama-wasm] setAmaPreset(${preset}) -> ${ret}`);
+  if (ret < 0) throw new Error(`ama_init_preset(${preset}) failed: ${ret}`);
+  if (ret === 0) throw new Error(`ama_init_preset(${preset}) read empty weight`);
+  currentPreset = preset;
   return ret;
 }
 
-export function getAmaPreset(variant: AmaVariant = DEFAULT_VARIANT): string {
-  return currentPresetByVariant[variant] ?? DEFAULT_PRESET;
+export function getAmaPreset(): string {
+  return currentPreset ?? DEFAULT_PRESET;
 }
 
 export function _resetAmaModuleCache(): void {
-  for (const k of Object.keys(cached) as AmaVariant[]) {
-    delete cached[k];
-    delete currentPresetByVariant[k];
-  }
+  cached = null;
+  currentPreset = null;
 }

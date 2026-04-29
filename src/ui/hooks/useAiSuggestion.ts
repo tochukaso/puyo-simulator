@@ -1,20 +1,57 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useGameStore } from '../store';
-import type { Move } from '../../game/types';
+import type { GameState, Move } from '../../game/types';
 import type { AiKind as Kind } from '../../ai/types';
-import type { AmaVariant } from '../../ai/wasm-ama/wasm-loader';
 import { NativeAmaAI } from '../../ai/native-ama/native-ama-ai';
 
-// シングルトン Worker: Header のセレクタと Suggestion Hook が同じ Worker を
-// 共有し、set-ai で AI を切り替えると次の suggest からそれが使われる。
+// Singleton Worker: the Header selector and the Suggestion hook share the
+// same Worker; when set-ai switches the AI, the next suggest uses the new one.
 let workerSingleton: Worker | null = null;
-const suggestHandlers = new Set<(msg: { id: number; moves: Move[] }) => void>();
+
+// suggest for the current pair is wanted concurrently from three places
+// (Board / CandidateList / Controls). The WASM ama_suggest does a full search
+// regardless of topK, so issuing it three times costs ~3x the latency (this
+// is what causes the staggered "ghost → candidate list → AI Best" appearance
+// the user perceives as lag). We therefore coalesce Worker dispatch at module
+// level — one request per game state — and have hooks subscribe to the result.
+const SHARED_TOPK = 5;
+
+type SharedState = {
+  moves: Move[];
+  loading: boolean;
+  // Marker used to suppress re-sending for the same GameState (compared by reference).
+  requestedFor: GameState | null;
+  pendingId: number;
+};
+
+let shared: SharedState = {
+  moves: [],
+  loading: false,
+  requestedFor: null,
+  pendingId: 0,
+};
+
+const subscribers = new Set<() => void>();
+function notify(): void {
+  for (const cb of subscribers) cb();
+}
+function subscribe(cb: () => void): () => void {
+  subscribers.add(cb);
+  return () => {
+    subscribers.delete(cb);
+  };
+}
+
+let nextSuggestId = 0;
 
 type AiReadyHandler = (kind: Kind, ok: boolean) => void;
 const aiReadyHandlers = new Set<AiReadyHandler>();
 let currentAiKind: Kind = 'ml-ama-v1';
 let currentAiReady = false;
 
+// Tauri-only path — the same conceptual AI (ama beam search) runs as a native
+// static-linked C++ library called via Rust FFI on the main thread, instead of
+// inside the Web Worker. Bypasses the worker entirely.
 let nativeAi: NativeAmaAI | null = null;
 
 function getNativeAi(): NativeAmaAI | null {
@@ -22,6 +59,10 @@ function getNativeAi(): NativeAmaAI | null {
   if (!nativeAi) nativeAi = new NativeAmaAI();
   return nativeAi;
 }
+
+// One-shot suggest pending resolvers, keyed by request id.
+const suggestOnceResolvers = new Map<number, (moves: Move[]) => void>();
+let nextSuggestOnceId = 1_000_000; // Disjoint from regular suggest ids.
 
 function getWorker(): Worker {
   if (workerSingleton) return workerSingleton;
@@ -36,7 +77,25 @@ function getWorker(): Worker {
     ok?: boolean;
   }>) => {
     if (e.data.type === 'suggest' && typeof e.data.id === 'number' && e.data.moves) {
-      for (const h of suggestHandlers) h({ id: e.data.id, moves: e.data.moves });
+      // Drop responses for stale game states (a newer requestSuggestFor ran in between).
+      if (e.data.id !== shared.pendingId) return;
+      shared = {
+        moves: e.data.moves,
+        loading: false,
+        requestedFor: shared.requestedFor,
+        pendingId: shared.pendingId,
+      };
+      notify();
+    } else if (
+      e.data.type === 'suggest-once' &&
+      typeof e.data.id === 'number' &&
+      e.data.moves
+    ) {
+      const r = suggestOnceResolvers.get(e.data.id);
+      if (r) {
+        suggestOnceResolvers.delete(e.data.id);
+        r(e.data.moves);
+      }
     } else if (e.data.type === 'set-ai' && e.data.kind && typeof e.data.ok === 'boolean') {
       if (e.data.kind === currentAiKind) currentAiReady = e.data.ok;
       for (const h of aiReadyHandlers) h(e.data.kind, e.data.ok);
@@ -46,7 +105,23 @@ function getWorker(): Worker {
   return w;
 }
 
-export function setAiKind(kind: Kind, preset?: string, variant?: AmaVariant): void {
+// Fire-and-await suggest for an arbitrary state. Returns whatever the active
+// AI produces (top `topK` candidates ranked best-first). Does not affect the
+// shared player-UI subscription stream. Resolves to [] on worker error.
+export function suggestForState(state: GameState, topK: number = 1): Promise<Move[]> {
+  if (currentAiKind === 'ama-native') {
+    const ai = getNativeAi();
+    if (ai) return ai.suggest(state, topK);
+    // Fall through to worker if native unavailable (shouldn't happen post-setAiKind).
+  }
+  const id = nextSuggestOnceId++;
+  return new Promise<Move[]>((resolve) => {
+    suggestOnceResolvers.set(id, resolve);
+    getWorker().postMessage({ type: 'suggest-once', id, state, topK });
+  });
+}
+
+export function setAiKind(kind: Kind, preset?: string): void {
   currentAiKind = kind;
   currentAiReady = false;
   for (const h of aiReadyHandlers) h(kind, false);
@@ -54,40 +129,88 @@ export function setAiKind(kind: Kind, preset?: string, variant?: AmaVariant): vo
   if (kind === 'ama-native') {
     const ai = getNativeAi();
     if (!ai) {
+      // Not in Tauri — fall back to ama-wasm transparently so trainer-mode
+      // callers don't need to know which environment they're in.
       console.warn('[ai] ama-native unavailable, falling back to ama-wasm');
       currentAiKind = 'ama-wasm';
-      getWorker().postMessage({ type: 'set-ai', kind: 'ama-wasm', preset, variant });
+      getWorker().postMessage({ type: 'set-ai', kind: 'ama-wasm', preset });
       return;
     }
-    void ai.init().then(() => {
+    void ai.setPreset(preset ?? 'build').then(() => {
       currentAiReady = true;
       for (const h of aiReadyHandlers) h('ama-native', true);
     });
     return;
   }
 
-  getWorker().postMessage({ type: 'set-ai', kind, preset, variant });
+  getWorker().postMessage({ type: 'set-ai', kind, preset });
 }
 
-export function useAiSuggestion(topK = 5) {
+function requestSuggestFor(state: GameState): void {
+  // Already requested for this exact state (another hook beat us to it) — no-op.
+  if (shared.requestedFor === state) return;
+  const id = ++nextSuggestId;
+  shared = {
+    moves: [],
+    loading: true,
+    requestedFor: state,
+    pendingId: id,
+  };
+  notify();
+
+  if (currentAiKind === 'ama-native') {
+    const ai = getNativeAi();
+    if (!ai) {
+      // Defensive — setAiKind would have already fallen back. Mark not-loading.
+      shared = { moves: [], loading: false, requestedFor: state, pendingId: id };
+      notify();
+      return;
+    }
+    void ai.suggest(state, SHARED_TOPK).then((moves) => {
+      if (id !== shared.pendingId) return;
+      shared = { moves, loading: false, requestedFor: state, pendingId: id };
+      notify();
+    });
+    return;
+  }
+
+  getWorker().postMessage({ type: 'suggest', id, state, topK: SHARED_TOPK });
+}
+
+function clearShared(): void {
+  if (
+    shared.moves.length === 0 &&
+    !shared.loading &&
+    shared.requestedFor === null
+  ) {
+    return;
+  }
+  // Bumping pendingId ensures that any suggest dispatched before the AI
+  // switch won't be merged into shared once its response arrives after the clear.
+  shared = { moves: [], loading: false, requestedFor: null, pendingId: ++nextSuggestId };
+  notify();
+}
+
+const getMovesSnapshot = (): Move[] => shared.moves;
+const getLoadingSnapshot = (): boolean => shared.loading;
+
+/**
+ * `enabled = false` だと shared state の購読は続けるが worker への suggest 投げ
+ * は行わない。match モードでは player 側 AI 候補手の表示・最善手機能を完全に
+ * 隠しているので計算する意味が無い。worker への WASM 呼び出しは決して安く
+ * ないため、不要なら必ず止める。
+ */
+export function useAiSuggestion(topK: number = SHARED_TOPK, enabled: boolean = true) {
   const field = useGameStore((s) => s.game.field);
   const currentPair = useGameStore((s) => s.game.current?.pair);
   const nextQueue = useGameStore((s) => s.game.nextQueue);
   const status = useGameStore((s) => s.game.status);
   const fullGame = useGameStore((s) => s.game);
 
-  const [moves, setMoves] = useState<Move[]>([]);
-  const [loading, setLoading] = useState(false);
+  const allMoves = useSyncExternalStore(subscribe, getMovesSnapshot, getMovesSnapshot);
+  const loading = useSyncExternalStore(subscribe, getLoadingSnapshot, getLoadingSnapshot);
   const [aiKind, setAiKindState] = useState<Kind>(currentAiKind);
   const [aiReady, setAiReady] = useState<boolean>(currentAiReady);
-  const idRef = useRef(0);
-
-  const handleSuggest = useCallback((msg: { id: number; moves: Move[] }) => {
-    if (msg.id === idRef.current) {
-      setMoves(msg.moves);
-      setLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
     const handler: AiReadyHandler = (kind, ok) => {
@@ -101,47 +224,28 @@ export function useAiSuggestion(topK = 5) {
   }, []);
 
   useEffect(() => {
+    if (!enabled) return;
     getWorker();
-    suggestHandlers.add(handleSuggest);
-    return () => {
-      suggestHandlers.delete(handleSuggest);
-    };
-  }, [handleSuggest]);
+  }, [enabled]);
 
   useEffect(() => {
+    if (!enabled) return;
     if (!currentPair || status !== 'playing') return;
     if (!aiReady) {
-      // AI がロード中の間は suggest を送らない。古い AI(別 kind)から suggest が
-      // 戻ってくるのを避けるため、moves はクリアしておく。
-      setMoves([]);
-      setLoading(false);
+      // While the AI is loading, don't send suggest requests. Clear shared
+      // state so we don't keep showing results from the previous AI (a
+      // different kind).
+      clearShared();
       return;
     }
-    const id = ++idRef.current;
-    // Clear stale moves so the candidate list and board ghost don't display
-    // the previous turn's suggestion while ama recomputes.
-    setMoves([]);
-
-    if (currentAiKind === 'ama-native') {
-      const ai = getNativeAi();
-      if (!ai) {
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      void ai.suggest(fullGame, topK).then((m) => {
-        if (id === idRef.current) {
-          setMoves(m);
-          setLoading(false);
-        }
-      });
-      return;
-    }
-
-    getWorker().postMessage({ type: 'suggest', id, state: fullGame, topK });
-    setLoading(true);
+    requestSuggestFor(fullGame);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [field, currentPair, nextQueue, status, topK, aiReady]);
+  }, [field, currentPair, nextQueue, status, aiReady, enabled]);
+
+  const moves = useMemo(
+    () => (topK >= allMoves.length ? allMoves : allMoves.slice(0, topK)),
+    [allMoves, topK],
+  );
 
   return { moves, loading, aiKind, aiReady };
 }

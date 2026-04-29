@@ -1,28 +1,36 @@
 import type { Color } from '../../../game/types';
 
-// ぷよ本体は本家寄りの彩度に微調整。中心はラジアルグラデーションで明るく、
-// 縁は暗く、アウトラインはさらに暗く落とす。
-export const PUYO_COLORS: Record<Color, string> = {
+// 'G' = 配色つきセル + おじゃま (灰色)。レンダリング上は他の色と同じ
+// ラジアルグラデーション + 縁を使う。
+type DrawableCell = Color | 'G';
+
+// Puyo body saturation is fine-tuned to be close to the original game.
+// The center is brighter via a radial gradient; the edge is darker, and
+// the outline is darker still.
+export const PUYO_COLORS: Record<DrawableCell, string> = {
   R: '#ff5252',
   B: '#4ea4ff',
   Y: '#ffd93d',
   P: '#b66cff',
+  G: '#94a3b8',
 };
 
-// グラデの中心(明るい側)。HSL の lightness を +18% 程度上げた値。
-export const PUYO_LIGHT: Record<Color, string> = {
+// Gradient center (the bright side). HSL lightness raised by ~+18%.
+export const PUYO_LIGHT: Record<DrawableCell, string> = {
   R: '#ff8b8b',
   B: '#8ec6ff',
   Y: '#ffe88a',
   P: '#d4a3ff',
+  G: '#cbd5e1',
 };
 
-// グラデの縁 / アウトライン(暗い側)。lightness を -25% 程度下げた値。
-export const PUYO_DARK: Record<Color, string> = {
+// Gradient edge / outline (the dark side). HSL lightness reduced by ~-25%.
+export const PUYO_DARK: Record<DrawableCell, string> = {
   R: '#a01f1f',
   B: '#1f5fa8',
   Y: '#9e7a00',
   P: '#6e2db5',
+  G: '#475569',
 };
 
 export const BG_COLOR = '#0f172a';

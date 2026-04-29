@@ -75,6 +75,16 @@ export interface Dict {
   'stats.analyze': string;
   'stats.analyzing': string;
   'stats.analyzeTitle': string;
+  'menu.toggle': string;
+  'analysis.title': string;
+  'analysis.close': string;
+  'analysis.start': string;
+  'analysis.reanalyze': string;
+  'analysis.analyzing': string;
+  'analysis.noMoves': string;
+  'analysis.matchInProgress': string;
+  'analysis.notAnalyzedYet': string;
+  'analysis.note': string;
   'controls.moveLeft': string;
   'controls.moveRight': string;
   'controls.softDrop': string;
@@ -164,6 +174,16 @@ export const translations: Record<Lang, Dict> = {
     'stats.analyze': '解析',
     'stats.analyzing': '解析中…',
     'stats.analyzeTitle': '今までの自分の手を ama に再評価させ、AI 一致率と AI 評価値を算出します。手数によっては数秒〜数十秒かかります。',
+    'menu.toggle': 'メニュー',
+    'analysis.title': '解析結果',
+    'analysis.close': '閉じる',
+    'analysis.start': '解析を開始',
+    'analysis.reanalyze': '再解析',
+    'analysis.analyzing': '解析中… しばらくお待ちください',
+    'analysis.noMoves': 'まだ解析できる手がありません。',
+    'analysis.matchInProgress': 'マッチが終了してから解析できます。',
+    'analysis.notAnalyzedYet': 'まだ解析していません。',
+    'analysis.note': 'AI 一致 = 自分の手が ama の最善手と一致した割合。AI 評価 = 自分の手が ama の最善手のスコアに対して何 % だったかの平均(top 5 に入った手のみ)。',
     'controls.moveLeft': '← 左',
     'controls.moveRight': '右 →',
     'controls.softDrop': '↓ 1段下',
@@ -251,6 +271,16 @@ export const translations: Record<Lang, Dict> = {
     'stats.analyze': 'Analyze',
     'stats.analyzing': 'Analyzing…',
     'stats.analyzeTitle': 'Re-evaluate every move you played with ama, then compute AI match% and AI eval%. Takes a few seconds for short games.',
+    'menu.toggle': 'Menu',
+    'analysis.title': 'Analysis result',
+    'analysis.close': 'Close',
+    'analysis.start': 'Run analysis',
+    'analysis.reanalyze': 'Re-analyze',
+    'analysis.analyzing': 'Analyzing… please wait',
+    'analysis.noMoves': 'No moves to analyze yet.',
+    'analysis.matchInProgress': 'Available after the match ends.',
+    'analysis.notAnalyzedYet': 'Not analyzed yet.',
+    'analysis.note': "AI match = how often your move matched ama's best. AI eval = average of your move's score vs ama's best (only counts moves that fell within ama's top 5).",
     'controls.moveLeft': '← Left',
     'controls.moveRight': 'Right →',
     'controls.softDrop': '↓ Down',
@@ -338,6 +368,16 @@ export const translations: Record<Lang, Dict> = {
     'stats.analyze': '解析',
     'stats.analyzing': '解析中…',
     'stats.analyzeTitle': '让 ama 重新评估你的每一手，计算 AI 一致率和 AI 评分。手数多时可能需要几秒到几十秒。',
+    'menu.toggle': '菜单',
+    'analysis.title': '解析结果',
+    'analysis.close': '关闭',
+    'analysis.start': '开始解析',
+    'analysis.reanalyze': '重新解析',
+    'analysis.analyzing': '解析中… 请稍候',
+    'analysis.noMoves': '尚无可解析的落点。',
+    'analysis.matchInProgress': '对战结束后可解析。',
+    'analysis.notAnalyzedYet': '尚未解析。',
+    'analysis.note': 'AI 一致 = 你的落点与 ama 最佳手一致的比例。AI 评分 = 你的落点对 ama 最佳分数的占比平均(仅统计落入 top 5 的手)。',
     'controls.moveLeft': '← 左移',
     'controls.moveRight': '右移 →',
     'controls.softDrop': '↓ 下移',
@@ -425,6 +465,16 @@ export const translations: Record<Lang, Dict> = {
     'stats.analyze': '해석',
     'stats.analyzing': '해석 중…',
     'stats.analyzeTitle': '지금까지의 수를 ama 가 다시 평가해 AI 일치율과 AI 평가값을 계산합니다. 수가 많으면 수 초~수십 초 걸릴 수 있습니다.',
+    'menu.toggle': '메뉴',
+    'analysis.title': '해석 결과',
+    'analysis.close': '닫기',
+    'analysis.start': '해석 시작',
+    'analysis.reanalyze': '재해석',
+    'analysis.analyzing': '해석 중… 잠시 기다려 주세요',
+    'analysis.noMoves': '아직 해석할 수가 없습니다.',
+    'analysis.matchInProgress': '매치가 끝난 뒤 해석할 수 있습니다.',
+    'analysis.notAnalyzedYet': '아직 해석하지 않았습니다.',
+    'analysis.note': 'AI 일치 = 당신의 수가 ama 의 최선수와 일치한 비율. AI 평가 = ama 의 최선수 점수에 대한 비율 평균 (top 5 에 든 수만 합산).',
     'controls.moveLeft': '← 좌',
     'controls.moveRight': '우 →',
     'controls.softDrop': '↓ 한칸',

@@ -9,6 +9,9 @@ vi.mock('../../../hooks/useAiSuggestion', () => ({
   useAiSuggestion: () => ({ moves: [], loading: false }),
 }));
 
+// Header refactor: ghost/ceiling/trainer/language controls were moved into the
+// HamburgerMenu dropdown. These tests render Header (which mounts the menu)
+// and open the hamburger first before asserting on the moved controls.
 describe('Header', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -17,20 +20,20 @@ describe('Header', () => {
 
   it('does not render an AI model selector', () => {
     render(<Header />);
-    // No "AI" or legacy "訓練" (training) label exists, so a <select> with
-    // either aria-label is not present.
     expect(screen.queryByLabelText('AI')).toBeNull();
     expect(screen.queryByLabelText('訓練')).toBeNull();
   });
 
-  it('renders Ghost and Ceiling checkboxes', () => {
+  it('renders Ghost and Ceiling checkboxes inside the hamburger menu', async () => {
     render(<Header />);
+    await userEvent.click(screen.getByLabelText('Menu'));
     expect(screen.getByLabelText('Ghost')).toBeInTheDocument();
     expect(screen.getByLabelText('Ceiling')).toBeInTheDocument();
   });
 
-  it('defaults trainer template select to GTR', () => {
+  it('defaults trainer template select to GTR', async () => {
     render(<Header />);
+    await userEvent.click(screen.getByLabelText('Menu'));
     const select = screen.getByLabelText('Template') as HTMLSelectElement;
     expect(select.value).toBe('gtr');
   });
@@ -41,8 +44,10 @@ describe('Header', () => {
     };
     setAiKind.mockClear();
     render(<Header />);
-    // The initial effect should call setAiKind with preset='gtr'.
+    // Initial effect should call setAiKind with preset='gtr' (no menu open needed).
     expect(setAiKind).toHaveBeenLastCalledWith('ama-wasm', 'gtr');
+
+    await userEvent.click(screen.getByLabelText('Menu'));
     await userEvent.selectOptions(screen.getByLabelText('Template'), 'off');
     expect(setAiKind).toHaveBeenLastCalledWith('ama-wasm', 'build');
     await userEvent.selectOptions(screen.getByLabelText('Template'), 'kaidan');

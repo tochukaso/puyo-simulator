@@ -292,6 +292,10 @@ function draw(
     const axisAlpha = axisRow < VISIBLE_ROW_START ? 0.5 : 1;
     const childRow = axisRow + dr;
     const childAlpha = childRow < VISIBLE_ROW_START ? 0.5 : 1;
+    // 薄い白のハロー(スポットライト)を本体の下に敷いて、フィールドの他の
+    // ぷよと「これは今操作中」だと一目で区別できるようにする。
+    drawActiveHalo(ctx, axisRow, axisCol, cell, axisAlpha);
+    drawActiveHalo(ctx, childRow, axisCol + dc, cell, childAlpha);
     drawPuyo(ctx, axisRow, axisCol, pair.axis, axisAlpha, cell);
     drawPuyo(ctx, childRow, axisCol + dc, pair.child, childAlpha, cell);
   }
@@ -454,6 +458,33 @@ function drawPuyo(
     return;
   }
   drawSymbol(ctx, cx, centerY, color, cell, scale, alpha);
+}
+
+// 操作中ペアの後光。本体より一回り大きい白の放射グラデーションで、
+// 中心は半透明 → 外周はゼロにフェード。本体の下に敷いて、本体エッジから
+// わずかにはみ出した部分が「光ってる感」になる。隣接セルへ少しだけ滲ませる
+// ことで、フィールドの落ち着いた色と確実に視差が出る。
+function drawActiveHalo(
+  ctx: CanvasRenderingContext2D,
+  row: number,
+  col: number,
+  cell: number,
+  alpha: number,
+) {
+  if (row < 0) return;
+  const cx = col * cell + cell / 2;
+  const cy = row * cell + cell / 2;
+  const inner = cell * 0.35;
+  const outer = cell * 0.7;
+  const grad = ctx.createRadialGradient(cx, cy, inner, cx, cy, outer);
+  grad.addColorStop(0, `rgba(255, 255, 255, ${0.45 * alpha})`);
+  grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.save();
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, outer, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawPopHighlight(

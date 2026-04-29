@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { setAiKind } from '../../hooks/useAiSuggestion';
-import { ShareDialog } from '../ShareDialog/ShareDialog';
 import { HamburgerMenu } from '../HamburgerMenu/HamburgerMenu';
 import { useTrainerMode } from '../../hooks/useTrainerMode';
 import { useGameStore, type GameMode, type MatchTurnLimit } from '../../store';
@@ -17,7 +16,6 @@ export function Header() {
   const editing = useGameStore((s) => s.editing);
   const enterEditMode = useGameStore((s) => s.enterEditMode);
   const exitEditMode = useGameStore((s) => s.exitEditMode);
-  const [shareOpen, setShareOpen] = useState(false);
 
   // ama-wasm に統一。trainer mode に応じて preset (form 集合 + weight) を切替。
   // セレクタ自体は HamburgerMenu に移したが、trainer state はグローバル
@@ -100,17 +98,8 @@ export function Header() {
         >
           {editing ? t('edit.editing') : t('edit.edit')}
         </button>
-        <button
-          type="button"
-          onClick={() => setShareOpen(true)}
-          aria-label={t('share.button')}
-          className="px-3 py-1 rounded text-sm border bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700"
-        >
-          {t('share.button')}
-        </button>
-        {shareOpen && <ShareDialog onClose={() => setShareOpen(false)} />}
-        {/* 設定 (ghost / ceiling / trainer / 言語) と解析起動はハンバーガーへ。
-            Header を主要アクション (mode 切替・編集・共有) のみに圧縮した。 */}
+        {/* 設定 (ghost / ceiling / trainer / 言語) と share / 解析起動はハンバーガーへ。
+            Header を主要アクション (mode 切替・編集) のみに圧縮した。 */}
         <HamburgerMenu />
       </div>
     </header>

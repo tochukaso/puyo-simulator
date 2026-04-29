@@ -28,17 +28,29 @@ export function Board() {
   const aiGame = useGameStore((s) => s.aiGame);
   const aiHistory = useGameStore((s) => s.aiHistory);
   const aiHistoryViewIndex = useGameStore((s) => s.aiHistoryViewIndex);
+  const playerHistory = useGameStore((s) => s.playerHistory);
+  const playerHistoryViewIndex = useGameStore((s) => s.playerHistoryViewIndex);
+  const historyAnim = useGameStore((s) => s.historyAnim);
   const viewing = useGameStore((s) => s.viewing);
   const editing = useGameStore((s) => s.editing);
   const paintCell = useGameStore((s) => s.paintCell);
-  // While viewing the AI side, swap the game source. If the user scrubbed
-  // the AI history slider (aiHistoryViewIndex set), render that snapshot.
-  const game =
+  // While viewing the AI side, swap the game source. If the user scrubbed the
+  // history slider, render that snapshot. Player side does the same against
+  // playerHistory so the user can review their own turns post-match.
+  const snapshot =
     viewing === 'ai'
       ? aiHistoryViewIndex !== null
         ? (aiHistory[aiHistoryViewIndex] ?? aiGame ?? playerGame)
         : (aiGame ?? playerGame)
-      : playerGame;
+      : playerHistoryViewIndex !== null
+        ? (playerHistory[playerHistoryViewIndex] ?? playerGame)
+        : playerGame;
+  // While a chain replay is running for the side we're viewing, override the
+  // snapshot's field/current so the animation phases are visible.
+  const animActive = historyAnim !== null && historyAnim.side === viewing;
+  const game = animActive
+    ? { ...snapshot, field: historyAnim!.field, current: historyAnim!.current }
+    : snapshot;
   // The pop / landing animations only fire on the player side; if the user is
   // spectating the AI we don't drive those overlays. Read raw store fields and
   // gate locally so the selector returns a stable reference (avoids the
@@ -46,9 +58,22 @@ export function Board() {
   const playerPoppingCells = useGameStore((s) => s.poppingCells);
   const playerChainTexts = useGameStore((s) => s.chainTexts);
   const playerLandedCells = useGameStore((s) => s.landedCells);
-  const poppingCells = viewing === 'player' ? playerPoppingCells : EMPTY_POPPING;
-  const chainTexts = viewing === 'player' ? playerChainTexts : EMPTY_CHAIN_TEXTS;
-  const landedCells = viewing === 'player' ? playerLandedCells : EMPTY_LANDED;
+  // When scrubbing the player's own history, the live animation overlays would
+  // be misleading (they belong to the live game state, not the snapshot).
+  // During a chain replay we substitute the replay's overlays instead.
+  const playerLive =
+    viewing === 'player' && playerHistoryViewIndex === null && !animActive;
+  const poppingCells = animActive
+    ? historyAnim!.poppingCells
+    : playerLive
+      ? playerPoppingCells
+      : EMPTY_POPPING;
+  const chainTexts = animActive
+    ? historyAnim!.chainTexts
+    : playerLive
+      ? playerChainTexts
+      : EMPTY_CHAIN_TEXTS;
+  const landedCells = playerLive ? playerLandedCells : EMPTY_LANDED;
   const mode = useGameStore((s) => s.mode);
   // match モードでは候補手リスト・ゴースト・「AI 最善手」ボタンを全部隠して
   // いるので、worker への suggest 投げそのものを止める (WASM 全幅探索は重い

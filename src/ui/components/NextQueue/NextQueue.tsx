@@ -6,10 +6,46 @@ import type { Color } from '../../../game/types';
 // 盤面右側に NEXT(直近)を上、NEXT-NEXT(その次)を下に縦並びで表示する。
 // 両方とも盤面のセルと同じサイズで描画して、ユーザが「実際の大きさ」で
 // 次のツモを把握できるようにする。
+//
+// ama 観戦中 (viewing === 'ai') は ama 側の next queue を表示する。プレイヤー側
+// も Board と同じく history index でスクラブされていればそのスナップショットの
+// queue を読む。これで NEXT/NEXT-NEXT が当時の手番のツモと一致する。
+//
+// match モードでは規定手数 (matchTurnLimit) を超えるツモは表示しない。queue[i]
+// は (turnsPlayedAtView + 2 + i) 手目のペア — その手番が規定内のときだけ表示。
 export function NextQueue() {
-  const queue = useGameStore((s) => s.game.nextQueue);
-  const next = queue[0];
-  const nextNext = queue[1];
+  const playerQueue = useGameStore((s) => s.game.nextQueue);
+  const viewing = useGameStore((s) => s.viewing);
+  const aiQueue = useGameStore((s) => s.aiGame?.nextQueue);
+  const aiHistory = useGameStore((s) => s.aiHistory);
+  const aiHistoryViewIndex = useGameStore((s) => s.aiHistoryViewIndex);
+  const playerHistory = useGameStore((s) => s.playerHistory);
+  const playerHistoryViewIndex = useGameStore((s) => s.playerHistoryViewIndex);
+  const mode = useGameStore((s) => s.mode);
+  const matchTurnLimit = useGameStore((s) => s.matchTurnLimit);
+  const matchTurnsPlayed = useGameStore((s) => s.matchTurnsPlayed);
+  const queue =
+    viewing === 'ai'
+      ? aiHistoryViewIndex !== null
+        ? (aiHistory[aiHistoryViewIndex]?.nextQueue ?? aiQueue ?? playerQueue)
+        : (aiQueue ?? playerQueue)
+      : playerHistoryViewIndex !== null
+        ? (playerHistory[playerHistoryViewIndex]?.nextQueue ?? playerQueue)
+        : playerQueue;
+  // 表示中スナップショットの時点で「何手消化済みか」。history[k] は post-move-(k+1)
+  // = (k+1) 手消化済みなので k+1。live はそのまま matchTurnsPlayed / aiHistory.length。
+  const turnsPlayedAtView =
+    viewing === 'ai'
+      ? aiHistoryViewIndex !== null
+        ? aiHistoryViewIndex + 1
+        : aiHistory.length
+      : playerHistoryViewIndex !== null
+        ? playerHistoryViewIndex + 1
+        : matchTurnsPlayed;
+  const beyondLimit = (i: number) =>
+    mode === 'match' && turnsPlayedAtView + 2 + i > matchTurnLimit;
+  const next = beyondLimit(0) ? undefined : queue[0];
+  const nextNext = beyondLimit(1) ? undefined : queue[1];
   const cell = useBoardCellSize();
   return (
     <div className="flex flex-col gap-3 items-start">

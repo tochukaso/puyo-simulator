@@ -19,6 +19,8 @@ export function MatchPanel() {
   const aiGame = useGameStore((s) => s.aiGame);
   const aiHistory = useGameStore((s) => s.aiHistory);
   const aiHistoryViewIndex = useGameStore((s) => s.aiHistoryViewIndex);
+  const playerHistory = useGameStore((s) => s.playerHistory);
+  const playerHistoryViewIndex = useGameStore((s) => s.playerHistoryViewIndex);
   const viewing = useGameStore((s) => s.viewing);
   const matchEnded = useGameStore((s) => s.matchEnded);
   const matchResult = useGameStore((s) => s.matchResult);
@@ -28,8 +30,12 @@ export function MatchPanel() {
   const matchAiMoves = useGameStore((s) => s.matchAiMoves);
   const setViewing = useGameStore((s) => s.setViewing);
   const setAiHistoryViewIndex = useGameStore((s) => s.setAiHistoryViewIndex);
+  const setPlayerHistoryViewIndex = useGameStore(
+    (s) => s.setPlayerHistoryViewIndex,
+  );
+  const playHistoryChain = useGameStore((s) => s.playHistoryChain);
+  const historyAnim = useGameStore((s) => s.historyAnim);
   const startMatch = useGameStore((s) => s.startMatch);
-  const resignMatch = useGameStore((s) => s.resignMatch);
   const t = useT();
 
   // 保存済みレコードの一覧 (IndexedDB から非同期に読む)。
@@ -52,12 +58,30 @@ export function MatchPanel() {
   const aiScore = aiGame?.score ?? 0;
   const remaining = Math.max(0, matchTurnLimit - matchTurnsPlayed);
   const aiTurns = aiHistory.length;
-  // Slider only meaningful when there's at least one AI snapshot.
-  const sliderMax = Math.max(0, aiTurns - 1);
-  const sliderValue =
+  const playerTurns = playerHistory.length;
+  // Slider only meaningful when there's at least one snapshot on that side.
+  const aiSliderMax = Math.max(0, aiTurns - 1);
+  const aiSliderValue =
     aiHistoryViewIndex !== null
-      ? Math.min(aiHistoryViewIndex, sliderMax)
-      : sliderMax;
+      ? Math.min(aiHistoryViewIndex, aiSliderMax)
+      : aiSliderMax;
+  const playerSliderMax = Math.max(0, playerTurns - 1);
+  const playerSliderValue =
+    playerHistoryViewIndex !== null
+      ? Math.min(playerHistoryViewIndex, playerSliderMax)
+      : playerSliderMax;
+
+  // The snapshot at slider position p is post-move-(p+1) (= the active pair on
+  // top is the one for move p+2). To match what the user perceives — "this is
+  // the move whose pair is about to drop" — the replay button targets the NEXT
+  // history entry: chain on move (p+2) is recorded in history[p+1].chainCount.
+  // After the replay finishes we auto-advance the slider by 1 so the post-chain
+  // state stays on screen instead of snapping back to the pre-state.
+  const aiNext = aiHistory[aiSliderValue + 1];
+  const playerNext = playerHistory[playerSliderValue + 1];
+  const aiHasChain = !!aiNext && aiNext.chainCount > 0;
+  const playerHasChain = !!playerNext && playerNext.chainCount > 0;
+  const animating = historyAnim !== null;
 
   return (
     <div
@@ -87,9 +111,7 @@ export function MatchPanel() {
       {/* マッチ進行中は ama 盤面の覗き見を許さない (「ama の打ち方を真似る」が
           できてしまう)。プレイヤーが top-out (status === 'gameover') した後は
           もう打てないので公平性は問題にならず、振り返り UI を解禁する。終了後
-          も同様に view 切替・スクラバーを出す。
-          投了ボタンは matchEnded になるまで一貫して表示 (top-out 後も「ama の
-          完走を待たず即終了」できるように)。 */}
+          も同様に view 切替・スクラバーを出す。 */}
       {(matchEnded || playerStatus === 'gameover') && (
         <div className="flex flex-wrap gap-2 items-center">
           <div className="inline-flex rounded overflow-hidden border border-slate-700">
@@ -122,14 +144,29 @@ export function MatchPanel() {
                 aria-label={t('match.scrub')}
                 type="range"
                 min={0}
-                max={sliderMax}
-                value={sliderValue}
+                max={aiSliderMax}
+                value={aiSliderValue}
                 onChange={(e) => setAiHistoryViewIndex(Number(e.target.value))}
                 className="grow accent-blue-500 min-w-0"
               />
               <span className="text-slate-500 tabular-nums whitespace-nowrap">
-                {sliderValue + 1}/{aiTurns}
+                {aiSliderValue + 1}/{aiTurns}
               </span>
+              {aiHasChain && (
+                <button
+                  type="button"
+                  disabled={animating}
+                  onClick={async () => {
+                    const target = aiSliderValue + 1;
+                    const completed = await playHistoryChain('ai', target);
+                    if (completed) setAiHistoryViewIndex(target);
+                  }}
+                  className="px-2 py-0.5 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
+                  title={t('match.playChainTitle')}
+                >
+                  {t('match.playChain')}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setAiHistoryViewIndex(null)}
@@ -139,22 +176,48 @@ export function MatchPanel() {
               </button>
             </div>
           )}
+          {viewing === 'player' && playerTurns > 0 && (
+            <div className="flex flex-wrap items-center gap-1 grow min-w-0">
+              <input
+                aria-label={t('match.scrub')}
+                type="range"
+                min={0}
+                max={playerSliderMax}
+                value={playerSliderValue}
+                onChange={(e) =>
+                  setPlayerHistoryViewIndex(Number(e.target.value))
+                }
+                className="grow accent-blue-500 min-w-0"
+              />
+              <span className="text-slate-500 tabular-nums whitespace-nowrap">
+                {playerSliderValue + 1}/{playerTurns}
+              </span>
+              {playerHasChain && (
+                <button
+                  type="button"
+                  disabled={animating}
+                  onClick={async () => {
+                    const target = playerSliderValue + 1;
+                    const completed = await playHistoryChain('player', target);
+                    if (completed) setPlayerHistoryViewIndex(target);
+                  }}
+                  className="px-2 py-0.5 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
+                  title={t('match.playChainTitle')}
+                >
+                  {t('match.playChain')}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setPlayerHistoryViewIndex(null)}
+                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-xs"
+              >
+                {t('match.live')}
+              </button>
+            </div>
+          )}
         </div>
       )}
-      {!matchEnded && (
-        <div className="flex flex-wrap gap-2 items-center">
-          <button
-            type="button"
-            onClick={() => {
-              if (confirm(t('match.resignConfirm'))) resignMatch();
-            }}
-            className="px-2 py-1 bg-red-600 hover:bg-red-500 active:bg-red-400 rounded text-xs"
-          >
-            {t('match.resign')}
-          </button>
-        </div>
-      )}
-
       {matchEnded && matchResult && (
         <div className="border-t border-slate-700 pt-2 flex flex-wrap items-center gap-3">
           <span className="text-base">

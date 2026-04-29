@@ -15,8 +15,18 @@ function isTauri(): boolean {
 
 export async function confirmDialog(message: string): Promise<boolean> {
   if (isTauri()) {
-    const { confirm } = await import('@tauri-apps/plugin-dialog');
-    return await confirm(message);
+    try {
+      const { confirm } = await import('@tauri-apps/plugin-dialog');
+      return await confirm(message);
+    } catch (error) {
+      // Plugin import / native bridge failure shouldn't make Reset / Resign /
+      // Edit-clear silently uncallable. Fall back to whatever WebView's
+      // window.confirm does (in current Tauri 2 builds, that's a silent false,
+      // but explicit fallback at least keeps the call site predictable).
+      console.error('[dialog] native confirm unavailable:', error);
+    }
   }
-  return window.confirm(message);
+  return typeof window !== 'undefined' && typeof window.confirm === 'function'
+    ? window.confirm(message)
+    : false;
 }

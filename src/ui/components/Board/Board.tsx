@@ -254,10 +254,12 @@ function draw(
     if (c.landedAt > prev) landedAtMap.set(k, c.landedAt);
   }
 
-  // Render order is split into 3 passes so the connector bars can sit on top
-  // of bodies (covering the dark rim where two same-color puyos meet) but
-  // UNDER the symbols (so the color letter never gets hidden by a connector).
-  // Pass 1: bodies (with outline clipped at connection directions).
+  // Render order is split into 3 passes so connector lenses sit between body
+  // and symbol layers — keeps the lens shape independent of how wide it
+  // happens to be (a future tweak that pushes it close to the symbol's area
+  // would otherwise hide the color letter).
+  // Pass 1: bodies (with outline clipped at connecting wedges so the lens'
+  // body-side arc replaces the outline cleanly).
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       const color = field.cells[r]![c]!;
@@ -270,8 +272,7 @@ function draw(
       drawPuyoBody(ctx, r, c, color, baseAlpha, cell, scale, buildConnMask(field, r, c));
     }
   }
-  // Pass 2: connector bars on top of bodies (paints over dark gradient rim
-  // and clipped outline → two bodies merge into one blob along the bar).
+  // Pass 2: connector lenses fill the gap between same-color neighbors.
   drawConnectors(ctx, field, cell);
   // Pass 3: symbols + pop highlights on top of connectors.
   for (let r = 0; r < ROWS; r++) {
@@ -332,18 +333,12 @@ function draw(
 }
 
 // Connect adjacent same-color puyos with a soap-bubble-fusion lens shape.
-// Drawn AFTER bodies (overlay) so the bar paints over the bodies' dark
-// outermost-gradient ring at the connection band — making two bodies read as
-// a single fused blob. Drawn BEFORE symbols so color letters stay visible.
-//
-// Geometry: instead of a flat rectangle, the connector is a "lens" with
-//   - endpoints inside both bodies (so we cover their dark rim near the join),
-//   - concave top/bottom (or left/right for vertical) curves that pinch in at
-//     the saddle — the visual cue that says "two bodies fusing", as in the
-//     original Puyo Puyo title.
-// The fill uses the SAME radial gradient as the body, centered on the saddle;
-// this means the neck reads as part of the same shaded surface, not a glued-on
-// strap.
+// The lens fills the gap between two bodies. It is bounded on the body sides
+// by each body's actual outline arc and on the gap-facing sides by concave
+// quadratic Bezier curves (the "saddle"), giving the "two bubbles fusing"
+// silhouette of the original Puyo Puyo title.
+// Drawn AFTER bodies (so it lines up with the bodies' clipped-outline wedges)
+// and BEFORE symbols (so the color letter never gets hidden).
 function drawConnectors(ctx: CanvasRenderingContext2D, field: Field, cell: number) {
   const alphaOf = (r: number) => (r < VISIBLE_ROW_START ? 0.5 : 1);
   for (let r = 0; r < ROWS; r++) {
@@ -590,10 +585,9 @@ function drawPuyoBody(
   ctx.fill();
   ctx.restore();
 
-  // Dark outline. We additionally clip away arcs that face a same-color
-  // neighbor so the two outlines don't form a visible seam between them.
-  // (The connector overlay drawn later also paints over this region; the
-  // clip is belt-and-suspenders so anti-aliased edges don't peek through.)
+  // Dark outline. Clip out the wedge that faces a same-color neighbor — the
+  // connector lens drawn next traces that exact body-outline arc, so without
+  // this clip the outline would show as a thin dark seam between body and lens.
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.lineWidth = Math.max(1, cell * 0.04);

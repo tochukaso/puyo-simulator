@@ -14,6 +14,7 @@ export function MatchPanel() {
   const mode = useGameStore((s) => s.mode);
   const matchTurnLimit = useGameStore((s) => s.matchTurnLimit);
   const matchTurnsPlayed = useGameStore((s) => s.matchTurnsPlayed);
+  const playerStatus = useGameStore((s) => s.game.status);
   const playerScore = useGameStore((s) => s.game.score);
   const aiGame = useGameStore((s) => s.aiGame);
   const aiHistory = useGameStore((s) => s.aiHistory);
@@ -28,6 +29,7 @@ export function MatchPanel() {
   const setViewing = useGameStore((s) => s.setViewing);
   const setAiHistoryViewIndex = useGameStore((s) => s.setAiHistoryViewIndex);
   const startMatch = useGameStore((s) => s.startMatch);
+  const resignMatch = useGameStore((s) => s.resignMatch);
   const t = useT();
 
   // 保存済みレコードの一覧 (IndexedDB から非同期に読む)。
@@ -82,55 +84,76 @@ export function MatchPanel() {
         </span>
       </div>
 
-      <div className="flex flex-wrap gap-2 items-center">
-        <div className="inline-flex rounded overflow-hidden border border-slate-700">
-          <button
-            type="button"
-            onClick={() => setViewing('player')}
-            className={`px-2 py-1 text-xs ${
-              viewing === 'player'
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            {t('match.viewYou')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewing('ai')}
-            className={`px-2 py-1 text-xs ${
-              viewing === 'ai'
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-            }`}
-          >
-            {t('match.viewAi')}
-          </button>
-        </div>
-        {viewing === 'ai' && aiTurns > 0 && (
-          <div className="flex flex-wrap items-center gap-1 grow min-w-0">
-            <input
-              aria-label={t('match.scrub')}
-              type="range"
-              min={0}
-              max={sliderMax}
-              value={sliderValue}
-              onChange={(e) => setAiHistoryViewIndex(Number(e.target.value))}
-              className="grow accent-blue-500 min-w-0"
-            />
-            <span className="text-slate-500 tabular-nums whitespace-nowrap">
-              {sliderValue + 1}/{aiTurns}
-            </span>
+      {/* マッチ進行中は ama 盤面の覗き見を許さない (「ama の打ち方を真似る」が
+          できてしまう)。プレイヤーが top-out (status === 'gameover') した後は
+          もう打てないので公平性は問題にならず、振り返り UI を解禁する。終了後
+          も同様に view 切替・スクラバーを出す。
+          投了ボタンは matchEnded になるまで一貫して表示 (top-out 後も「ama の
+          完走を待たず即終了」できるように)。 */}
+      {(matchEnded || playerStatus === 'gameover') && (
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="inline-flex rounded overflow-hidden border border-slate-700">
             <button
               type="button"
-              onClick={() => setAiHistoryViewIndex(null)}
-              className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-xs"
+              onClick={() => setViewing('player')}
+              className={`px-2 py-1 text-xs ${
+                viewing === 'player'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
             >
-              {t('match.live')}
+              {t('match.viewYou')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewing('ai')}
+              className={`px-2 py-1 text-xs ${
+                viewing === 'ai'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              {t('match.viewAi')}
             </button>
           </div>
-        )}
-      </div>
+          {viewing === 'ai' && aiTurns > 0 && (
+            <div className="flex flex-wrap items-center gap-1 grow min-w-0">
+              <input
+                aria-label={t('match.scrub')}
+                type="range"
+                min={0}
+                max={sliderMax}
+                value={sliderValue}
+                onChange={(e) => setAiHistoryViewIndex(Number(e.target.value))}
+                className="grow accent-blue-500 min-w-0"
+              />
+              <span className="text-slate-500 tabular-nums whitespace-nowrap">
+                {sliderValue + 1}/{aiTurns}
+              </span>
+              <button
+                type="button"
+                onClick={() => setAiHistoryViewIndex(null)}
+                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-xs"
+              >
+                {t('match.live')}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      {!matchEnded && (
+        <div className="flex flex-wrap gap-2 items-center">
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm(t('match.resignConfirm'))) resignMatch();
+            }}
+            className="px-2 py-1 bg-red-600 hover:bg-red-500 active:bg-red-400 rounded text-xs"
+          >
+            {t('match.resign')}
+          </button>
+        </div>
+      )}
 
       {matchEnded && matchResult && (
         <div className="border-t border-slate-700 pt-2 flex flex-wrap items-center gap-3">

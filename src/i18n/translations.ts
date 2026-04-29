@@ -37,6 +37,8 @@ export interface Dict {
   'match.saved': string;
   'match.records': string;
   'match.deleteRecord': string;
+  'match.resign': string;
+  'match.resignConfirm': string;
   'edit.edit': string;
   'edit.editing': string;
   'edit.apply': string;
@@ -70,6 +72,9 @@ export interface Dict {
   'stats.aiMatchTitle': string;
   'stats.aiAvg': string;
   'stats.aiAvgTitle': string;
+  'stats.analyze': string;
+  'stats.analyzing': string;
+  'stats.analyzeTitle': string;
   'controls.moveLeft': string;
   'controls.moveRight': string;
   'controls.softDrop': string;
@@ -121,6 +126,8 @@ export const translations: Record<Lang, Dict> = {
     'match.saved': '保存済み',
     'match.records': '保存した対戦',
     'match.deleteRecord': 'レコードを削除',
+    'match.resign': '投了',
+    'match.resignConfirm': '本当に投了しますか? このマッチは ama の勝利として終了します。',
     'edit.edit': '編集',
     'edit.editing': '編集中',
     'edit.apply': '適用',
@@ -154,6 +161,9 @@ export const translations: Record<Lang, Dict> = {
     'stats.aiMatchTitle': '自分の手がAI最善手と一致した割合 (AI Best ボタン経由は除外)',
     'stats.aiAvg': 'AI評価',
     'stats.aiAvgTitle': '自分の手のAI評価値 (AI最善のスコアを100%として)。AI上位5候補に入った手のみ平均',
+    'stats.analyze': '解析',
+    'stats.analyzing': '解析中…',
+    'stats.analyzeTitle': '今までの自分の手を ama に再評価させ、AI 一致率と AI 評価値を算出します。手数によっては数秒〜数十秒かかります。',
     'controls.moveLeft': '← 左',
     'controls.moveRight': '右 →',
     'controls.softDrop': '↓ 1段下',
@@ -203,6 +213,8 @@ export const translations: Record<Lang, Dict> = {
     'match.saved': 'Saved',
     'match.records': 'Saved matches',
     'match.deleteRecord': 'Delete record',
+    'match.resign': 'Resign',
+    'match.resignConfirm': 'Resign this match? It will end as a loss for you.',
     'edit.edit': 'Edit',
     'edit.editing': 'Editing',
     'edit.apply': 'Apply',
@@ -236,6 +248,9 @@ export const translations: Record<Lang, Dict> = {
     'stats.aiMatchTitle': "How often your move matched the AI's best (AI Best button excluded)",
     'stats.aiAvg': 'AI eval',
     'stats.aiAvgTitle': "Your move's AI evaluation, with the AI's best as 100%. Averaged over moves that fell within the AI's top 5",
+    'stats.analyze': 'Analyze',
+    'stats.analyzing': 'Analyzing…',
+    'stats.analyzeTitle': 'Re-evaluate every move you played with ama, then compute AI match% and AI eval%. Takes a few seconds for short games.',
     'controls.moveLeft': '← Left',
     'controls.moveRight': 'Right →',
     'controls.softDrop': '↓ Down',
@@ -285,6 +300,8 @@ export const translations: Record<Lang, Dict> = {
     'match.saved': '已保存',
     'match.records': '已保存的对战',
     'match.deleteRecord': '删除记录',
+    'match.resign': '认输',
+    'match.resignConfirm': '确定要认输吗？本场对战将记为 ama 胜利。',
     'edit.edit': '编辑',
     'edit.editing': '编辑中',
     'edit.apply': '应用',
@@ -318,6 +335,9 @@ export const translations: Record<Lang, Dict> = {
     'stats.aiMatchTitle': '你的落点与AI最佳手一致的比例 (不计AI最佳按钮)',
     'stats.aiAvg': 'AI评分',
     'stats.aiAvgTitle': '你的落点的AI评分 (以AI最佳为100%)。仅平均落入AI前5候选的手',
+    'stats.analyze': '解析',
+    'stats.analyzing': '解析中…',
+    'stats.analyzeTitle': '让 ama 重新评估你的每一手，计算 AI 一致率和 AI 评分。手数多时可能需要几秒到几十秒。',
     'controls.moveLeft': '← 左移',
     'controls.moveRight': '右移 →',
     'controls.softDrop': '↓ 下移',
@@ -367,6 +387,8 @@ export const translations: Record<Lang, Dict> = {
     'match.saved': '저장됨',
     'match.records': '저장된 대전',
     'match.deleteRecord': '기록 삭제',
+    'match.resign': '기권',
+    'match.resignConfirm': '정말 기권하시겠습니까? 이 매치는 ama 승리로 종료됩니다.',
     'edit.edit': '편집',
     'edit.editing': '편집 중',
     'edit.apply': '적용',
@@ -400,6 +422,9 @@ export const translations: Record<Lang, Dict> = {
     'stats.aiMatchTitle': '당신의 수가 AI의 최선수와 일치한 비율 (AI Best 버튼 제외)',
     'stats.aiAvg': 'AI 평가',
     'stats.aiAvgTitle': '당신의 수의 AI 평가값 (AI 최선의 점수를 100%). AI 상위 5 후보에 든 수만 평균',
+    'stats.analyze': '해석',
+    'stats.analyzing': '해석 중…',
+    'stats.analyzeTitle': '지금까지의 수를 ama 가 다시 평가해 AI 일치율과 AI 평가값을 계산합니다. 수가 많으면 수 초~수십 초 걸릴 수 있습니다.',
     'controls.moveLeft': '← 좌',
     'controls.moveRight': '우 →',
     'controls.softDrop': '↓ 한칸',

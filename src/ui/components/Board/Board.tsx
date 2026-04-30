@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useGameStore, type PoppingCell, type LandedCell, LANDING_BOUNCE_MS } from '../../store';
 import { useAiSuggestion } from '../../hooks/useAiSuggestion';
 import {
@@ -46,11 +46,21 @@ export function Board() {
         ? (playerHistory[playerHistoryViewIndex] ?? playerGame)
         : playerGame;
   // While a chain replay is running for the side we're viewing, override the
-  // snapshot's field/current so the animation phases are visible.
+  // snapshot's field/current so the animation phases are visible. Memoize so
+  // the spread only allocates a new object when its inputs change — otherwise
+  // unrelated rerenders would invalidate the draw effect's deps every tick.
   const animActive = historyAnim !== null && historyAnim.side === viewing;
-  const game = animActive
-    ? { ...snapshot, field: historyAnim!.field, current: historyAnim!.current }
-    : snapshot;
+  const game = useMemo(
+    () =>
+      animActive
+        ? {
+            ...snapshot,
+            field: historyAnim!.field,
+            current: historyAnim!.current,
+          }
+        : snapshot,
+    [animActive, snapshot, historyAnim],
+  );
   // The pop / landing animations only fire on the player side; if the user is
   // spectating the AI we don't drive those overlays. Read raw store fields and
   // gate locally so the selector returns a stable reference (avoids the

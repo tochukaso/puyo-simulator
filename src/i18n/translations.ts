@@ -28,6 +28,7 @@ export interface Dict {
   'match.viewYou': string;
   'match.viewAi': string;
   'match.scrub': string;
+  'match.playerScrub': string;
   'match.live': string;
   'match.youWin': string;
   'match.amaWin': string;
@@ -129,6 +130,7 @@ export const translations: Record<Lang, Dict> = {
     'match.viewYou': '自分の盤面',
     'match.viewAi': 'amaの盤面',
     'match.scrub': 'amaヒストリー',
+    'match.playerScrub': '自分のヒストリー',
     'match.live': 'ライブ',
     'match.youWin': '勝利!',
     'match.amaWin': 'amaの勝ち',
@@ -228,6 +230,7 @@ export const translations: Record<Lang, Dict> = {
     'match.viewYou': 'Your board',
     'match.viewAi': "ama's board",
     'match.scrub': 'ama history',
+    'match.playerScrub': 'your history',
     'match.live': 'Live',
     'match.youWin': 'You win!',
     'match.amaWin': 'ama wins',
@@ -327,6 +330,7 @@ export const translations: Record<Lang, Dict> = {
     'match.viewYou': '你的棋盘',
     'match.viewAi': 'ama的棋盘',
     'match.scrub': 'ama历史',
+    'match.playerScrub': '我的历史',
     'match.live': '实时',
     'match.youWin': '你赢了!',
     'match.amaWin': 'ama获胜',
@@ -426,6 +430,7 @@ export const translations: Record<Lang, Dict> = {
     'match.viewYou': '내 보드',
     'match.viewAi': 'ama 보드',
     'match.scrub': 'ama 기록',
+    'match.playerScrub': '내 기록',
     'match.live': '실시간',
     'match.youWin': '승리!',
     'match.amaWin': 'ama 승',

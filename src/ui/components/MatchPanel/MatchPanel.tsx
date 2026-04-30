@@ -179,7 +179,7 @@ export function MatchPanel() {
           {viewing === 'player' && playerTurns > 0 && (
             <div className="flex flex-wrap items-center gap-1 grow min-w-0">
               <input
-                aria-label={t('match.scrub')}
+                aria-label={t('match.playerScrub')}
                 type="range"
                 min={0}
                 max={playerSliderMax}

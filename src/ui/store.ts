@@ -315,7 +315,11 @@ export const useGameStore = create<Store>((set, get) => ({
   editSnapshot: null,
   editPalette: 'R',
 
-  reset: (seed?: number) =>
+  reset: (seed?: number) => {
+    // Bump the history-replay token so any in-flight playHistoryChain aborts
+    // on its next sleep boundary instead of writing stale frames into the
+    // freshly reset state.
+    historyAnimSeq++;
     set((st) => {
       const newSeed = seed ?? (Date.now() | 0);
       const playerGame = createInitialState(newSeed);
@@ -346,7 +350,8 @@ export const useGameStore = create<Store>((set, get) => ({
         playerHistoryViewIndex: null,
         historyAnim: null,
       };
-    }),
+    });
+  },
   dispatch: (input: Input) => {
     const s = get();
     // While editing we don't want left/right/rotate to move the active pair —
@@ -571,6 +576,9 @@ export const useGameStore = create<Store>((set, get) => ({
   },
 
   startMatch: (opts) => {
+    // Same reasoning as reset(): a rematch replaces game state, so any
+    // in-flight history replay must be invalidated before we set new state.
+    historyAnimSeq++;
     const seed = opts?.seed ?? (Date.now() | 0);
     const turnLimit = opts?.turnLimit ?? get().matchTurnLimit;
     persistMode('match');
@@ -648,18 +656,13 @@ export const useGameStore = create<Store>((set, get) => ({
 
   setViewing: (side) => {
     // Toggling sides invalidates any in-flight chain replay (the overlay
-    // belongs to whichever side it was started on).
+    // belongs to whichever side it was started on). Preserve each side's
+    // scrub index so the user can flip back without losing their position.
     if (get().viewing !== side) {
       historyAnimSeq++;
       if (get().historyAnim) set({ historyAnim: null });
     }
-    set((st) => ({
-      viewing: side,
-      // Drop the inactive side's scrub index so the unrelated slider doesn't
-      // remember a stale position when the user toggles back.
-      aiHistoryViewIndex: side === 'player' ? null : st.aiHistoryViewIndex,
-      playerHistoryViewIndex: side === 'ai' ? null : st.playerHistoryViewIndex,
-    }));
+    set({ viewing: side });
   },
 
   setAiHistoryViewIndex: (index) => {

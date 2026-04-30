@@ -6,15 +6,23 @@ import { confirmDialog } from '../../utils/dialog';
 // なるのでここからは外し、ハンバーガーメニュー → 解析モーダル経由で見る形に。
 export function Stats() {
   const liveGame = useGameStore((s) => s.game);
+  const aiGame = useGameStore((s) => s.aiGame);
+  const aiHistory = useGameStore((s) => s.aiHistory);
+  const aiHistoryViewIndex = useGameStore((s) => s.aiHistoryViewIndex);
   const playerHistory = useGameStore((s) => s.playerHistory);
   const playerHistoryViewIndex = useGameStore((s) => s.playerHistoryViewIndex);
   const viewing = useGameStore((s) => s.viewing);
-  // 自分の history をスクラブ中はその時点の値を表示。盤面と数値がずれない
-  // ようにするため。観戦中 (viewing === 'ai') / live は今まで通り live 値。
+  // Board / NextQueue と同じ side-aware 選択。ama 観戦中はそちらの値、player
+  // スクラブ中はそのスナップショット、それ以外は live。これで数値と盤面が
+  // 食い違わない (ama 観戦中に player の score が出る、を防ぐ)。
   const snapshot =
-    viewing === 'player' && playerHistoryViewIndex !== null
-      ? (playerHistory[playerHistoryViewIndex] ?? liveGame)
-      : liveGame;
+    viewing === 'ai'
+      ? aiHistoryViewIndex !== null
+        ? (aiHistory[aiHistoryViewIndex] ?? aiGame ?? liveGame)
+        : (aiGame ?? liveGame)
+      : playerHistoryViewIndex !== null
+        ? (playerHistory[playerHistoryViewIndex] ?? liveGame)
+        : liveGame;
   const { score, chainCount, totalChains, maxChain, status } = snapshot;
   const mode = useGameStore((s) => s.mode);
   const matchEnded = useGameStore((s) => s.matchEnded);

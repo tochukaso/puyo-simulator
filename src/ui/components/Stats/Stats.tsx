@@ -1,5 +1,6 @@
 import { useGameStore } from '../../store';
 import { useT } from '../../../i18n';
+import { confirmDialog } from '../../utils/dialog';
 
 // プレイ中常時表示する基礎スタッツバー。AI Match% / AI Eval% は普段邪魔に
 // なるのでここからは外し、ハンバーガーメニュー → 解析モーダル経由で見る形に。
@@ -41,8 +42,8 @@ export function Stats() {
       {showResign && (
         <button
           type="button"
-          onClick={() => {
-            if (confirm(t('match.resignConfirm'))) resignMatch();
+          onClick={async () => {
+            if (await confirmDialog(t('match.resignConfirm'))) resignMatch();
           }}
           className="ml-auto px-2 py-1 bg-red-600 hover:bg-red-500 active:bg-red-400 rounded text-xs"
         >

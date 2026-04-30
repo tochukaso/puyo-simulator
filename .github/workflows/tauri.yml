@@ -1,0 +1,113 @@
+name: tauri
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src-tauri/**'
+      - 'src/ai/native-ama/**'
+      - 'scripts/build-ama-native.sh'
+      - 'scripts/collect-licenses.sh'
+      - '.github/workflows/tauri.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  # macOS universal バイナリビルド。事前に vendor/ama/* に .a が
+  # コミットされている前提で、CI 上では再ビルドしない(クロスツールチェーンを
+  # CI に持ち込まないため)。
+  tauri-macos:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+
+      - name: Setup Rust toolchain (apple-darwin targets)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: 'x86_64-apple-darwin,aarch64-apple-darwin'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify vendored .a is committed (no rebuild on CI)
+        run: |
+          test -f src-tauri/vendor/ama/x86_64-apple-darwin/libama_native.a
+          test -f src-tauri/vendor/ama/aarch64-apple-darwin/libama_native.a
+
+      - name: Install cargo-about
+        run: cargo install cargo-about --features cli --locked
+
+      - name: Collect third-party licenses
+        run: npm run licenses:collect
+
+      - name: Tauri build (universal-apple-darwin)
+        run: npm run tauri -- build --target universal-apple-darwin
+
+      - name: Upload macOS bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: puyo-trainer-macos
+          path: src-tauri/target/universal-apple-darwin/release/bundle/
+
+  # Android ビルドは Android toolchain (NDK / SDK / Java) のセットアップ完了を
+  # 待ってから有効化する。現状はオプション A (macOS first) のため `if: false`
+  # で無効化しているだけで、設定自体は残しておく。
+  tauri-android:
+    runs-on: ubuntu-latest
+    if: false # disabled until Android toolchain is set up; enable by removing this line
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: 'r26d'
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+
+      - name: Setup Rust toolchain (aarch64-linux-android)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: 'aarch64-linux-android'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify vendored .a is committed (no rebuild on CI)
+        run: |
+          test -f src-tauri/vendor/ama/aarch64-linux-android/libama_native.a
+
+      - name: Install cargo-about
+        run: cargo install cargo-about --features cli --locked
+
+      - name: Collect third-party licenses
+        run: npm run licenses:collect
+
+      - name: Tauri build (android)
+        run: npm run tauri:build:android
+
+      - name: Upload Android bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: puyo-trainer-android
+          path: src-tauri/gen/android/app/build/outputs/

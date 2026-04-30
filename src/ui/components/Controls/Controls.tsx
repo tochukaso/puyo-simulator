@@ -57,9 +57,9 @@ export function Controls() {
       >
         <button
           className={`${cellBase} bg-slate-700 hover:bg-slate-600 active:bg-slate-500`}
-          onClick={() => dispatch({ type: 'rotateCCW' })}
+          onClick={() => dispatch({ type: 'rotateCW' })}
         >
-          {t('controls.rotateCcw')}
+          {t('controls.rotateCw')}
         </button>
         <button
           className={`${cellBase} bg-blue-600 hover:bg-blue-500 active:bg-blue-400`}

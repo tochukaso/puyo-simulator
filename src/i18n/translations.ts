@@ -28,6 +28,7 @@ export interface Dict {
   'match.viewYou': string;
   'match.viewAi': string;
   'match.scrub': string;
+  'match.playerScrub': string;
   'match.live': string;
   'match.youWin': string;
   'match.amaWin': string;
@@ -39,6 +40,8 @@ export interface Dict {
   'match.deleteRecord': string;
   'match.resign': string;
   'match.resignConfirm': string;
+  'match.playChain': string;
+  'match.playChainTitle': string;
   'edit.edit': string;
   'edit.editing': string;
   'edit.apply': string;
@@ -88,7 +91,7 @@ export interface Dict {
   'controls.moveLeft': string;
   'controls.moveRight': string;
   'controls.softDrop': string;
-  'controls.rotateCcw': string;
+  'controls.rotateCw': string;
   'controls.commit': string;
   'controls.aiBest': string;
   'controls.aiBestTitle': string;
@@ -127,6 +130,7 @@ export const translations: Record<Lang, Dict> = {
     'match.viewYou': '自分の盤面',
     'match.viewAi': 'amaの盤面',
     'match.scrub': 'amaヒストリー',
+    'match.playerScrub': '自分のヒストリー',
     'match.live': 'ライブ',
     'match.youWin': '勝利!',
     'match.amaWin': 'amaの勝ち',
@@ -138,6 +142,8 @@ export const translations: Record<Lang, Dict> = {
     'match.deleteRecord': 'レコードを削除',
     'match.resign': '投了',
     'match.resignConfirm': '本当に投了しますか? このマッチは ama の勝利として終了します。',
+    'match.playChain': '▶ 連鎖',
+    'match.playChainTitle': 'このターンの連鎖をアニメーションで再生',
     'edit.edit': '編集',
     'edit.editing': '編集中',
     'edit.apply': '適用',
@@ -187,7 +193,7 @@ export const translations: Record<Lang, Dict> = {
     'controls.moveLeft': '← 左',
     'controls.moveRight': '右 →',
     'controls.softDrop': '↓ 1段下',
-    'controls.rotateCcw': '↻ 左回転',
+    'controls.rotateCw': '↻ 右回転',
     'controls.commit': '↓ 確定',
     'controls.aiBest': '★ AI最善',
     'controls.aiBestTitle': 'AI最善手: 列{col} / 回転{rot}',
@@ -224,6 +230,7 @@ export const translations: Record<Lang, Dict> = {
     'match.viewYou': 'Your board',
     'match.viewAi': "ama's board",
     'match.scrub': 'ama history',
+    'match.playerScrub': 'your history',
     'match.live': 'Live',
     'match.youWin': 'You win!',
     'match.amaWin': 'ama wins',
@@ -235,6 +242,8 @@ export const translations: Record<Lang, Dict> = {
     'match.deleteRecord': 'Delete record',
     'match.resign': 'Resign',
     'match.resignConfirm': 'Resign this match? It will end as a loss for you.',
+    'match.playChain': '▶ Chain',
+    'match.playChainTitle': "Replay this turn's chain animation",
     'edit.edit': 'Edit',
     'edit.editing': 'Editing',
     'edit.apply': 'Apply',
@@ -284,7 +293,7 @@ export const translations: Record<Lang, Dict> = {
     'controls.moveLeft': '← Left',
     'controls.moveRight': 'Right →',
     'controls.softDrop': '↓ Down',
-    'controls.rotateCcw': '↻ CCW',
+    'controls.rotateCw': '↻ CW',
     'controls.commit': '↓ Drop',
     'controls.aiBest': '★ AI Best',
     'controls.aiBestTitle': 'AI best: col {col} / rot {rot}',
@@ -321,6 +330,7 @@ export const translations: Record<Lang, Dict> = {
     'match.viewYou': '你的棋盘',
     'match.viewAi': 'ama的棋盘',
     'match.scrub': 'ama历史',
+    'match.playerScrub': '我的历史',
     'match.live': '实时',
     'match.youWin': '你赢了!',
     'match.amaWin': 'ama获胜',
@@ -332,6 +342,8 @@ export const translations: Record<Lang, Dict> = {
     'match.deleteRecord': '删除记录',
     'match.resign': '认输',
     'match.resignConfirm': '确定要认输吗？本场对战将记为 ama 胜利。',
+    'match.playChain': '▶ 连锁',
+    'match.playChainTitle': '回放本回合的连锁动画',
     'edit.edit': '编辑',
     'edit.editing': '编辑中',
     'edit.apply': '应用',
@@ -381,7 +393,7 @@ export const translations: Record<Lang, Dict> = {
     'controls.moveLeft': '← 左移',
     'controls.moveRight': '右移 →',
     'controls.softDrop': '↓ 下移',
-    'controls.rotateCcw': '↻ 左旋',
+    'controls.rotateCw': '↻ 右旋',
     'controls.commit': '↓ 确定',
     'controls.aiBest': '★ AI最佳',
     'controls.aiBestTitle': 'AI最佳: 列{col} / 旋转{rot}',
@@ -418,6 +430,7 @@ export const translations: Record<Lang, Dict> = {
     'match.viewYou': '내 보드',
     'match.viewAi': 'ama 보드',
     'match.scrub': 'ama 기록',
+    'match.playerScrub': '내 기록',
     'match.live': '실시간',
     'match.youWin': '승리!',
     'match.amaWin': 'ama 승',
@@ -429,6 +442,8 @@ export const translations: Record<Lang, Dict> = {
     'match.deleteRecord': '기록 삭제',
     'match.resign': '기권',
     'match.resignConfirm': '정말 기권하시겠습니까? 이 매치는 ama 승리로 종료됩니다.',
+    'match.playChain': '▶ 연쇄',
+    'match.playChainTitle': '이 턴의 연쇄 애니메이션을 재생',
     'edit.edit': '편집',
     'edit.editing': '편집 중',
     'edit.apply': '적용',
@@ -478,7 +493,7 @@ export const translations: Record<Lang, Dict> = {
     'controls.moveLeft': '← 좌',
     'controls.moveRight': '우 →',
     'controls.softDrop': '↓ 한칸',
-    'controls.rotateCcw': '↻ 좌회전',
+    'controls.rotateCw': '↻ 우회전',
     'controls.commit': '↓ 확정',
     'controls.aiBest': '★ AI 최선',
     'controls.aiBestTitle': 'AI 최선수: 열 {col} / 회전 {rot}',

@@ -13,6 +13,7 @@ import type {
 import { ROWS, COLS, SPAWN_AXIS_ROW, SPAWN_COL } from '../game/constants';
 import { createInitialState, spawnNext, commitMove } from '../game/state';
 import { applyInput } from '../game/moves';
+import { canPlace } from '../game/pair';
 import { resolveChain } from '../game/chain';
 import { lockActive } from '../game/landing';
 import { suggestForState } from './hooks/useAiSuggestion';
@@ -38,6 +39,21 @@ export interface LandedCell {
   col: number;
   /** Landing time based on Date.now(). Board's draw computes the scale from the elapsed time. */
   landedAt: number;
+}
+
+/**
+ * Overlay state used while replaying a chain animation from history. When set,
+ * Board reads `field` / `current` / `poppingCells` / `chainTexts` from here
+ * (instead of the snapshot) so the user sees the chain unfold step-by-step.
+ * `side` records which side the animation belongs to so we don't draw it on
+ * the wrong board if the user toggles `viewing` mid-animation.
+ */
+export interface HistoryAnim {
+  side: ViewSide;
+  field: Field;
+  current: ActivePair | null;
+  poppingCells: PoppingCell[];
+  chainTexts: ChainTextEntry[];
 }
 
 /**
@@ -132,10 +148,17 @@ interface Store {
   aiGame: GameState | null;
   /** AI's per-turn snapshots, captured AFTER each AI commit. Index = turn number (0-based). */
   aiHistory: GameState[];
+  /** Player's per-turn snapshots in match mode, captured AFTER each player commit + spawnNext.
+   *  Mirrors `aiHistory` so the user can scrub their own history post-match the same way. */
+  playerHistory: GameState[];
   /** Which side's board the user is currently viewing. */
   viewing: ViewSide;
   /** When viewing AI side: index into aiHistory to display, or null = live. */
   aiHistoryViewIndex: number | null;
+  /** When viewing player side: index into playerHistory to display, or null = live. */
+  playerHistoryViewIndex: number | null;
+  /** Active history-replay animation overlay; null when not animating. */
+  historyAnim: HistoryAnim | null;
   matchEnded: boolean;
   matchResult: MatchResult | null;
 
@@ -153,6 +176,14 @@ interface Store {
   applyAiMove(move: Move): void;
   setViewing(side: ViewSide): void;
   setAiHistoryViewIndex(index: number | null): void;
+  setPlayerHistoryViewIndex(index: number | null): void;
+  /** Replay the chain animation for the given history index on the given side.
+   *  Cancels any currently-playing replay. Resolves to true when the full
+   *  animation played out, false if it was cancelled (slider scrubbed, side
+   *  toggled, another replay started, etc.). */
+  playHistoryChain(side: ViewSide, index: number): Promise<boolean>;
+  /** Cancel any in-flight history replay and clear the overlay. */
+  cancelHistoryChain(): void;
   /** Mark match ended if either side has consumed all turns or topped out. Computes result. */
   finalizeMatchIfDone(): void;
   /** Player concedes the current match. Result is set with `winner: 'ai'` regardless of score. */
@@ -200,6 +231,12 @@ interface Store {
 const CHAIN_TEXT_LIFETIME_MS = 2000;
 export const LANDING_BOUNCE_MS = 280;
 let chainTextIdSeq = 1;
+
+// Monotonic token used to invalidate stale history-replay animations. Each
+// call to playHistoryChain bumps this; awaited steps re-check it before
+// committing further state, so a new replay (or a slider scrub / mode change)
+// cleanly cancels any in-flight animation without race conditions.
+let historyAnimSeq = 0;
 
 // Chain-step timing. Tuned so the user gets a sense of "the puyos are
 // gradually disappearing" rather than vanishing in a single frame.
@@ -266,8 +303,11 @@ export const useGameStore = create<Store>((set, get) => ({
   matchAiMoves: [],
   aiGame: null,
   aiHistory: [],
+  playerHistory: [],
   viewing: 'player',
   aiHistoryViewIndex: null,
+  playerHistoryViewIndex: null,
+  historyAnim: null,
   matchEnded: false,
   matchResult: null,
 
@@ -275,7 +315,11 @@ export const useGameStore = create<Store>((set, get) => ({
   editSnapshot: null,
   editPalette: 'R',
 
-  reset: (seed?: number) =>
+  reset: (seed?: number) => {
+    // Bump the history-replay token so any in-flight playHistoryChain aborts
+    // on its next sleep boundary instead of writing stale frames into the
+    // freshly reset state.
+    historyAnimSeq++;
     set((st) => {
       const newSeed = seed ?? (Date.now() | 0);
       const playerGame = createInitialState(newSeed);
@@ -294,6 +338,7 @@ export const useGameStore = create<Store>((set, get) => ({
         freePlayerMoves: [],
         aiGame,
         aiHistory: [],
+        playerHistory: [],
         matchSeed: st.mode === 'match' ? newSeed : null,
         matchTurnsPlayed: 0,
         matchPlayerMoves: [],
@@ -302,14 +347,33 @@ export const useGameStore = create<Store>((set, get) => ({
         matchResult: null,
         viewing: 'player',
         aiHistoryViewIndex: null,
+        playerHistoryViewIndex: null,
+        historyAnim: null,
       };
-    }),
-  dispatch: (input: Input) =>
-    set((s) =>
-      // While editing we don't want left/right/rotate to move the active pair —
-      // it's being recolored, not played.
-      s.editing ? {} : { game: applyInput(s.game, input) },
-    ),
+    });
+  },
+  dispatch: (input: Input) => {
+    const s = get();
+    // While editing we don't want left/right/rotate to move the active pair —
+    // it's being recolored, not played.
+    if (s.editing) return;
+    // softDrop が床 / 既存ぷよの上に達して降りられない場合は、Drop ボタンを
+    // 別途押させずにそのまま現在の (axisCol, rotation) で確定する。連続入力
+    // (キーリピート / 下フリック) でも自然に着地→確定の流れになる。
+    if (
+      input.type === 'softDrop' &&
+      s.game.status === 'playing' &&
+      s.game.current
+    ) {
+      const c = s.game.current;
+      const next: ActivePair = { ...c, axisRow: c.axisRow + 1 };
+      if (!canPlace(s.game.field, next)) {
+        void get().commit({ axisCol: c.axisCol, rotation: c.rotation });
+        return;
+      }
+    }
+    set((st) => ({ game: applyInput(st.game, input) }));
+  },
   commit: async (move: Move, opts?: { source?: CommitSource }) => {
     if (get().editing) return;
     const s = get().game;
@@ -408,7 +472,19 @@ export const useGameStore = create<Store>((set, get) => ({
       maxChain,
       status: 'resolving',
     };
-    set({ game: spawnNext(finalState), animatingSteps: [], poppingCells: [] });
+    // Match mode: if this commit consumes the regulated turn count, don't
+    // spawn the next pair. Leaving current=null prevents any further player
+    // input (dispatch / commit both no-op when current is null) and keeps a
+    // useless "ghost pair" out of the visual once the match is resolved.
+    const stHere = get();
+    const playerAtLimit =
+      stHere.mode === 'match' &&
+      !stHere.matchEnded &&
+      stHere.matchTurnsPlayed + 1 >= stHere.matchTurnLimit;
+    const nextGame: GameState = playerAtLimit
+      ? finalState
+      : spawnNext(finalState);
+    set({ game: nextGame, animatingSteps: [], poppingCells: [] });
 
     // Match-mode bookkeeping. Both 'user' and 'ai' sources count as a player
     // turn — clicking AI Best is the player's chosen action for this turn, just
@@ -420,6 +496,9 @@ export const useGameStore = create<Store>((set, get) => ({
           ...st.matchPlayerMoves,
           { axisCol: move.axisCol, rotation: move.rotation },
         ],
+        // post-spawn snapshot — mirrors aiHistory semantics so the player can
+        // scrub their own turns the same way after the match ends.
+        playerHistory: [...st.playerHistory, st.game],
       }));
       get().finalizeMatchIfDone();
     }
@@ -475,14 +554,18 @@ export const useGameStore = create<Store>((set, get) => ({
     // into the new mode's display. analyzeStats can be re-run on demand.
     set({ aiStats: { ...EMPTY_AI_STATS }, analyzing: false });
     if (mode === 'free') {
+      historyAnimSeq++;
       set({
         aiGame: null,
         aiHistory: [],
+        playerHistory: [],
         matchEnded: false,
         matchResult: null,
         matchTurnsPlayed: 0,
         viewing: 'player',
         aiHistoryViewIndex: null,
+        playerHistoryViewIndex: null,
+        historyAnim: null,
       });
     }
   },
@@ -493,6 +576,9 @@ export const useGameStore = create<Store>((set, get) => ({
   },
 
   startMatch: (opts) => {
+    // Same reasoning as reset(): a rematch replaces game state, so any
+    // in-flight history replay must be invalidated before we set new state.
+    historyAnimSeq++;
     const seed = opts?.seed ?? (Date.now() | 0);
     const turnLimit = opts?.turnLimit ?? get().matchTurnLimit;
     persistMode('match');
@@ -507,6 +593,7 @@ export const useGameStore = create<Store>((set, get) => ({
       game: playerGame,
       aiGame,
       aiHistory: [],
+      playerHistory: [],
       matchTurnsPlayed: 0,
       matchPlayerMoves: [],
       matchAiMoves: [],
@@ -514,6 +601,8 @@ export const useGameStore = create<Store>((set, get) => ({
       matchResult: null,
       viewing: 'player',
       aiHistoryViewIndex: null,
+      playerHistoryViewIndex: null,
+      historyAnim: null,
       animatingSteps: [],
       poppingCells: [],
       chainTexts: [],
@@ -528,7 +617,8 @@ export const useGameStore = create<Store>((set, get) => ({
   },
 
   applyAiMove: (move) => {
-    const { aiGame, mode, matchEnded } = get();
+    const st = get();
+    const { aiGame, mode, matchEnded } = st;
     if (mode !== 'match' || matchEnded || !aiGame || !aiGame.current) return;
     // Synchronous ama play: lock + resolve the chain in one step (no animation).
     // We still capture the post-spawn state so spectating uses normal puyo logic.
@@ -549,26 +639,175 @@ export const useGameStore = create<Store>((set, get) => ({
       maxChain: Math.max(aiGame.maxChain, steps.length),
       status: 'resolving',
     };
-    const nextAiGame = spawnNext(resolved);
-    set((st) => ({
+    // Symmetric with the player side: skip spawnNext on the regulated last
+    // turn so we don't dangle an unplayable pair on top of the AI board.
+    const aiAtLimit = st.aiHistory.length + 1 >= st.matchTurnLimit;
+    const nextAiGame = aiAtLimit ? resolved : spawnNext(resolved);
+    set((cur) => ({
       aiGame: nextAiGame,
-      aiHistory: [...st.aiHistory, nextAiGame],
+      aiHistory: [...cur.aiHistory, nextAiGame],
       matchAiMoves: [
-        ...st.matchAiMoves,
+        ...cur.matchAiMoves,
         { axisCol: move.axisCol, rotation: move.rotation },
       ],
     }));
     get().finalizeMatchIfDone();
   },
 
-  setViewing: (side) =>
-    set((st) => ({
-      viewing: side,
-      // When switching back to player (live) or to AI live tail, drop scrubbing.
-      aiHistoryViewIndex: side === 'player' ? null : st.aiHistoryViewIndex,
-    })),
+  setViewing: (side) => {
+    // Toggling sides invalidates any in-flight chain replay (the overlay
+    // belongs to whichever side it was started on). Preserve each side's
+    // scrub index so the user can flip back without losing their position.
+    if (get().viewing !== side) {
+      historyAnimSeq++;
+      if (get().historyAnim) set({ historyAnim: null });
+    }
+    set({ viewing: side });
+  },
 
-  setAiHistoryViewIndex: (index) => set({ aiHistoryViewIndex: index }),
+  setAiHistoryViewIndex: (index) => {
+    // Scrubbing cancels any chain replay so the user immediately sees the
+    // snapshot for the new index instead of stale animation frames.
+    historyAnimSeq++;
+    if (get().historyAnim) set({ historyAnim: null });
+    set({ aiHistoryViewIndex: index });
+  },
+  setPlayerHistoryViewIndex: (index) => {
+    historyAnimSeq++;
+    if (get().historyAnim) set({ historyAnim: null });
+    set({ playerHistoryViewIndex: index });
+  },
+
+  cancelHistoryChain: () => {
+    historyAnimSeq++;
+    if (get().historyAnim) set({ historyAnim: null });
+  },
+
+  // Replay the chain that occurred on `index`-th turn of `side` by reconstructing
+  // pre-state (history[index-1] or initial state) → applying the recorded move →
+  // running resolveChain → animating each step into the historyAnim overlay.
+  // Snapshot is reached once the overlay clears (its post-resolution field
+  // matches history[index].field, so the visual transitions seamlessly).
+  playHistoryChain: async (side, index) => {
+    historyAnimSeq++;
+    const seq = historyAnimSeq;
+    const st0 = get();
+    const history = side === 'ai' ? st0.aiHistory : st0.playerHistory;
+    const moves = side === 'ai' ? st0.matchAiMoves : st0.matchPlayerMoves;
+    const target = history[index];
+    const move = moves[index];
+    if (!target || target.chainCount === 0 || !move) {
+      set({ historyAnim: null });
+      return false;
+    }
+    const seed = st0.matchSeed;
+    if (seed === null) {
+      set({ historyAnim: null });
+      return false;
+    }
+    const pre =
+      index === 0 ? createInitialState(seed) : history[index - 1]!;
+    if (!pre.current) {
+      set({ historyAnim: null });
+      return false;
+    }
+
+    const placed: ActivePair = {
+      ...pre.current,
+      axisCol: move.axisCol,
+      rotation: move.rotation,
+    };
+    const locked = lockActive(pre.field, placed);
+    const { steps } = resolveChain(locked);
+
+    const cancelled = () => historyAnimSeq !== seq;
+
+    set({
+      historyAnim: {
+        side,
+        field: locked,
+        current: null,
+        poppingCells: [],
+        chainTexts: [],
+      },
+    });
+    if (steps.length > 0) await sleep(LOCK_PAUSE_MS);
+    if (cancelled()) return false;
+
+    for (const step of steps) {
+      const avgRow =
+        step.popped.reduce((a, p) => a + p.row, 0) / step.popped.length;
+      const avgCol =
+        step.popped.reduce((a, p) => a + p.col, 0) / step.popped.length;
+      const textId = chainTextIdSeq++;
+      set((st) =>
+        st.historyAnim
+          ? {
+              historyAnim: {
+                ...st.historyAnim,
+                field: step.beforeField,
+                poppingCells: step.popped.map((p) => ({
+                  row: p.row,
+                  col: p.col,
+                })),
+                chainTexts: [
+                  ...st.historyAnim.chainTexts,
+                  {
+                    id: textId,
+                    chainIndex: step.chainIndex,
+                    row: avgRow,
+                    col: avgCol,
+                  },
+                ],
+              },
+            }
+          : {},
+      );
+      // Auto-fade the chain text. Same lifetime as live play so the look matches.
+      setTimeout(() => {
+        set((st) =>
+          st.historyAnim
+            ? {
+                historyAnim: {
+                  ...st.historyAnim,
+                  chainTexts: st.historyAnim.chainTexts.filter(
+                    (x) => x.id !== textId,
+                  ),
+                },
+              }
+            : {},
+        );
+      }, CHAIN_TEXT_LIFETIME_MS);
+      await sleep(HIGHLIGHT_MS);
+      if (cancelled()) return false;
+
+      set((st) =>
+        st.historyAnim
+          ? {
+              historyAnim: {
+                ...st.historyAnim,
+                field: step.afterPop,
+                poppingCells: [],
+              },
+            }
+          : {},
+      );
+      await sleep(POP_MS);
+      if (cancelled()) return false;
+
+      set((st) =>
+        st.historyAnim
+          ? { historyAnim: { ...st.historyAnim, field: step.afterGravity } }
+          : {},
+      );
+      await sleep(GRAVITY_MS);
+      if (cancelled()) return false;
+    }
+
+    if (cancelled()) return false;
+    set({ historyAnim: null });
+    return true;
+  },
 
   finalizeMatchIfDone: () => {
     const st = get();

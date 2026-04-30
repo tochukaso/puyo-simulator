@@ -1,0 +1,6 @@
+Tauri (https://tauri.app/)
+Copyright 2019-present Tauri Programme within The Commons Conservancy
+Licensed under the Apache License, Version 2.0 OR MIT License.
+
+You may obtain a copy of the Apache License at:
+http://www.apache.org/licenses/LICENSE-2.0

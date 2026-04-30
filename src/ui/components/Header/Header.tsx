@@ -5,6 +5,16 @@ import { HamburgerMenu } from '../HamburgerMenu/HamburgerMenu';
 import { useTrainerMode } from '../../hooks/useTrainerMode';
 import { useGameStore, type GameMode, type MatchTurnLimit } from '../../store';
 import { useT } from '../../../i18n';
+import { confirmDialog } from '../../utils/dialog';
+import { NativeAmaAI } from '../../../ai/native-ama/native-ama-ai';
+import type { AiKind } from '../../../ai/types';
+
+// In a Tauri build the same beam search runs as a native static-linked C++
+// library (ama-native, < 200ms p99 on Intel Mac), bypassing the worker. In
+// the PWA there's no native binary, so we keep ama-wasm. setAiKind() falls
+// back transparently if a Tauri-only kind is requested in the browser, but
+// resolving here avoids the warning log on every trainer change.
+const AMA_KIND: AiKind = NativeAmaAI.isAvailable() ? 'ama-native' : 'ama-wasm';
 
 export function Header() {
   const trainer = useTrainerMode();
@@ -19,17 +29,14 @@ export function Header() {
   const exitEditMode = useGameStore((s) => s.exitEditMode);
   const [shareOpen, setShareOpen] = useState(false);
 
-  // ama-wasm に統一。trainer mode に応じて preset (form 集合 + weight) を切替。
-  // セレクタ自体は HamburgerMenu に移したが、trainer state はグローバル
-  // (useTrainerMode hook) なので、ここで購読していても問題ない。
+  // ama に統一(Tauri なら ama-native、PWA なら ama-wasm)。trainer mode に
+  // 応じて preset (form 集合 + weight) を切替。セレクタ自体は HamburgerMenu
+  // に移したが、trainer state はグローバル (useTrainerMode hook) なので、
+  // ここで購読していても問題ない。
   useEffect(() => {
-    if (trainer === 'gtr') {
-      setAiKind('ama-wasm', 'gtr');
-    } else if (trainer === 'kaidan') {
-      setAiKind('ama-wasm', 'kaidan');
-    } else {
-      setAiKind('ama-wasm', 'build');
-    }
+    const preset =
+      trainer === 'gtr' ? 'gtr' : trainer === 'kaidan' ? 'kaidan' : 'build';
+    setAiKind(AMA_KIND, preset);
   }, [trainer]);
 
   return (
@@ -80,13 +87,13 @@ export function Header() {
             (マッチを抜けて編集に入る方針。盤面が変わるので再開不可)。 */}
         <button
           type="button"
-          onClick={() => {
+          onClick={async () => {
             if (editing) {
               exitEditMode(true);
               return;
             }
             if (mode === 'match') {
-              if (!confirm(t('edit.matchExitConfirm'))) return;
+              if (!(await confirmDialog(t('edit.matchExitConfirm')))) return;
               setGameMode('free');
             }
             enterEditMode();

@@ -1,5 +1,5 @@
 import type { GameState, ActivePair, Pair, Move } from './types';
-import { SPAWN_COL, SPAWN_AXIS_ROW } from './constants';
+import { SPAWN_COL, SPAWN_AXIS_ROW, VISIBLE_ROW_START } from './constants';
 import { createEmptyField } from './field';
 import { getEsportQueue } from './rng';
 import { resolveChain } from './chain';
@@ -48,7 +48,15 @@ export function spawnNext(state: GameState): GameState {
     rotation: 0,
   };
 
-  if (!canPlace(state.field, active)) {
+  // 「バツマーク」 game-over: standard Puyo Puyo Tsu fires gameover the moment
+  // a puyo settles in the death cell — the topmost visible cell of SPAWN_COL
+  // (12段目, 3 列目). canPlace alone wouldn't catch this in our 14-row model
+  // because the spawn position sits one row above the death cell, so the new
+  // pair could still spawn even with the death cell occupied.
+  const deathCellOccupied =
+    state.field.cells[VISIBLE_ROW_START]![SPAWN_COL]! !== null;
+
+  if (deathCellOccupied || !canPlace(state.field, active)) {
     return {
       ...state,
       current: null,

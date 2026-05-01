@@ -160,41 +160,53 @@ export function MatchPanel() {
               <span className="text-slate-500 tabular-nums whitespace-nowrap">
                 {aiSliderValue + 1}/{aiTurns}
               </span>
-              <button
-                type="button"
-                disabled={animating || aiSliderValue <= 0}
-                onClick={() => setAiHistoryViewIndex(Math.max(0, aiSliderValue - 1))}
-                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
-                title={t('match.stepBackTitle')}
-              >
-                {t('match.stepBack')}
-              </button>
-              <button
-                type="button"
-                disabled={animating || aiSliderValue >= aiSliderMax}
-                onClick={() =>
-                  setAiHistoryViewIndex(Math.min(aiSliderMax, aiSliderValue + 1))
-                }
-                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
-                title={t('match.stepForwardTitle')}
-              >
-                {t('match.stepForward')}
-              </button>
-              {aiHasChain && (
-                <button
-                  type="button"
-                  disabled={animating}
-                  onClick={async () => {
-                    const target = aiSliderValue + 1;
-                    const completed = await playHistoryChain('ai', target);
-                    if (completed) setAiHistoryViewIndex(target);
-                  }}
-                  className="px-2 py-0.5 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
-                  title={t('match.playChainTitle')}
-                >
-                  {t('match.playChain')}
-                </button>
-              )}
+              {/* Chain button stacked above the step buttons so the contextual
+                  "replay this turn's chain" action sits visually closer to the
+                  slider value, while the always-present step buttons stay on
+                  the bottom row. */}
+              <div className="flex flex-col items-end gap-1">
+                {aiHasChain && (
+                  <button
+                    type="button"
+                    disabled={animating}
+                    onClick={async () => {
+                      const target = aiSliderValue + 1;
+                      const completed = await playHistoryChain('ai', target);
+                      if (completed) setAiHistoryViewIndex(target);
+                    }}
+                    className="px-2 py-0.5 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
+                    title={t('match.playChainTitle')}
+                  >
+                    {t('match.playChain')}
+                  </button>
+                )}
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    disabled={animating || aiSliderValue <= 0}
+                    onClick={() =>
+                      setAiHistoryViewIndex(Math.max(0, aiSliderValue - 1))
+                    }
+                    className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
+                    title={t('match.stepBackTitle')}
+                    aria-label={t('match.stepBackTitle')}
+                  >
+                    ◀
+                  </button>
+                  <button
+                    type="button"
+                    disabled={animating || aiSliderValue >= aiSliderMax}
+                    onClick={() =>
+                      setAiHistoryViewIndex(Math.min(aiSliderMax, aiSliderValue + 1))
+                    }
+                    className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
+                    title={t('match.stepForwardTitle')}
+                    aria-label={t('match.stepForwardTitle')}
+                  >
+                    ▶
+                  </button>
+                </div>
+              </div>
             </div>
           )}
           {viewing === 'player' && playerTurns > 0 && (
@@ -213,45 +225,51 @@ export function MatchPanel() {
               <span className="text-slate-500 tabular-nums whitespace-nowrap">
                 {playerSliderValue + 1}/{playerTurns}
               </span>
-              <button
-                type="button"
-                disabled={animating || playerSliderValue <= 0}
-                onClick={() =>
-                  setPlayerHistoryViewIndex(Math.max(0, playerSliderValue - 1))
-                }
-                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
-                title={t('match.stepBackTitle')}
-              >
-                {t('match.stepBack')}
-              </button>
-              <button
-                type="button"
-                disabled={animating || playerSliderValue >= playerSliderMax}
-                onClick={() =>
-                  setPlayerHistoryViewIndex(
-                    Math.min(playerSliderMax, playerSliderValue + 1),
-                  )
-                }
-                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
-                title={t('match.stepForwardTitle')}
-              >
-                {t('match.stepForward')}
-              </button>
-              {playerHasChain && (
-                <button
-                  type="button"
-                  disabled={animating}
-                  onClick={async () => {
-                    const target = playerSliderValue + 1;
-                    const completed = await playHistoryChain('player', target);
-                    if (completed) setPlayerHistoryViewIndex(target);
-                  }}
-                  className="px-2 py-0.5 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
-                  title={t('match.playChainTitle')}
-                >
-                  {t('match.playChain')}
-                </button>
-              )}
+              <div className="flex flex-col items-end gap-1">
+                {playerHasChain && (
+                  <button
+                    type="button"
+                    disabled={animating}
+                    onClick={async () => {
+                      const target = playerSliderValue + 1;
+                      const completed = await playHistoryChain('player', target);
+                      if (completed) setPlayerHistoryViewIndex(target);
+                    }}
+                    className="px-2 py-0.5 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
+                    title={t('match.playChainTitle')}
+                  >
+                    {t('match.playChain')}
+                  </button>
+                )}
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    disabled={animating || playerSliderValue <= 0}
+                    onClick={() =>
+                      setPlayerHistoryViewIndex(Math.max(0, playerSliderValue - 1))
+                    }
+                    className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
+                    title={t('match.stepBackTitle')}
+                    aria-label={t('match.stepBackTitle')}
+                  >
+                    ◀
+                  </button>
+                  <button
+                    type="button"
+                    disabled={animating || playerSliderValue >= playerSliderMax}
+                    onClick={() =>
+                      setPlayerHistoryViewIndex(
+                        Math.min(playerSliderMax, playerSliderValue + 1),
+                      )
+                    }
+                    className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
+                    title={t('match.stepForwardTitle')}
+                    aria-label={t('match.stepForwardTitle')}
+                  >
+                    ▶
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>

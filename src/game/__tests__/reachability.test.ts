@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { reachableTargets, isMoveReachable } from '../reachability';
 import { createEmptyField, withCell } from '../field';
+import { ROWS } from '../constants';
 import type { ActivePair, GameState } from '../types';
 
 function makeState(field = createEmptyField(), current: ActivePair): GameState {
@@ -49,11 +50,9 @@ describe('reachableTargets', () => {
     // Pair starts at the third column from the left (spawn column col=2).
     // Block col=4 row=0 and row=1 with R so that col=5 is physically unreachable.
     let field = createEmptyField();
-    // Block the top 2 rows of col 4.
-    field = withCell(field, 0, 4, 'R');
-    field = withCell(field, 1, 4, 'R');
-    // Also block the lower rows of col 4, otherwise softDrop could go around from below.
-    for (let r = 2; r <= 12; r++) {
+    // Fill all of col 4 so the pair can't reach col 5 by rotating, walking,
+    // or softdropping around.
+    for (let r = 0; r < ROWS; r++) {
       field = withCell(field, r, 4, 'R');
     }
     const current = spawnPair(1, 2);

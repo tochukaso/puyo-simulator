@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { encodeState } from '../encoding';
 import { createEmptyField, withCell } from '../../../game/field';
+import { AI_ROW_OFFSET } from '../../../game/constants';
 import spec from '../../../shared/specs/encoding_spec.json';
 import type { Color, GameState, Rotation } from '../../../game/types';
 
@@ -21,7 +22,13 @@ function buildState(s: SpecState): GameState {
   let field = createEmptyField();
   if (s.field !== null) {
     for (const m of s.field) {
-      if (m !== null) field = withCell(field, m.row, m.col, m.color);
+      // The shared spec was authored against the 13-row AI view (Python's
+      // training pipeline still encodes a 13-row field directly). Now that
+      // the game uses a 14-row field with an AI_ROW_OFFSET offset, shift
+      // the spec's row indices into game coords so the encoding output
+      // lines up with the spec's expected AI-tensor samples.
+      if (m !== null)
+        field = withCell(field, m.row + AI_ROW_OFFSET, m.col, m.color);
     }
   }
   return {

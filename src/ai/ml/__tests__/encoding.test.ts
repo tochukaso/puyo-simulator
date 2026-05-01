@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { encodeState, BOARD_CHANNELS, COLOR_ORDER } from '../encoding';
 import { createEmptyField, withCell } from '../../../game/field';
+import { AI_ROW_OFFSET } from '../../../game/constants';
 import type { GameState, Pair } from '../../../game/types';
 
 function makeState(overrides: Partial<GameState> = {}): GameState {
@@ -47,7 +48,9 @@ describe('encodeState', () => {
   });
 
   it('placing R at (5,3) raises the R channel and clears the empty channel', () => {
-    const field = withCell(createEmptyField(), 5, 3, 'R');
+    // Place R at AI-row 5 = game-row 5 + AI_ROW_OFFSET. The encoder drops the
+    // top AI_ROW_OFFSET game rows so the result lands at AI-tensor row 5.
+    const field = withCell(createEmptyField(), 5 + AI_ROW_OFFSET, 3, 'R');
     const e = encodeState(makeState({ field }));
     const off = 5 * 66 + 3 * 11;
     expect(e.board[off + 0]).toBe(1);

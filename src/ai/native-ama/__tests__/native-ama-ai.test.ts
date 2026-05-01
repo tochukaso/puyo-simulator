@@ -44,7 +44,8 @@ describe('NativeAmaAI', () => {
 
 function makeEmptyState() {
   return {
-    field: { cells: Array.from({ length: 13 }, () => new Array(6).fill(null)) },
+    // 14-row field; the AI bridge will skip the top row when encoding.
+    field: { cells: Array.from({ length: 14 }, () => new Array(6).fill(null)) },
     current: { pair: { axis: 'R', child: 'B' } },
     nextQueue: [
       { axis: 'Y', child: 'P' },

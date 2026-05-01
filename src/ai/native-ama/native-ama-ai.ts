@@ -1,5 +1,6 @@
 import type { PuyoAI } from '../types';
 import type { GameState, Move, Rotation } from '../../game/types';
+import { AI_VIEW_ROWS, AI_ROW_OFFSET } from '../../game/constants';
 import {
   invokeAmaSuggest,
   isTauri,
@@ -83,9 +84,10 @@ export class NativeAmaAI implements PuyoAI {
     const n1 = state.nextQueue[0]!;
     const n2 = state.nextQueue[1]!;
 
+    // Native ama binary expects a 13-row field. Drop the new top row.
     let field = '';
-    for (let r = 0; r < 13; r++) {
-      const row = state.field.cells[r]!;
+    for (let r = 0; r < AI_VIEW_ROWS; r++) {
+      const row = state.field.cells[r + AI_ROW_OFFSET]!;
       for (let c = 0; c < 6; c++) {
         const cell = row[c];
         field +=

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ACTION_COUNT, moveToActionIndex, actionIndexToMove, legalActionMask } from '../action';
 import { createEmptyField, withCell } from '../field';
+import { ROWS } from '../constants';
 
 describe('action index', () => {
   it('ACTION_COUNT is 22', () => {
@@ -61,7 +62,7 @@ describe('legalActionMask', () => {
 
   it('blocking col=5 sets all col=5 actions to 0', () => {
     let field = createEmptyField();
-    for (let r = 0; r < 13; r++) field = withCell(field, r, 5, 'R');
+    for (let r = 0; r < ROWS; r++) field = withCell(field, r, 5, 'R');
     const mask = legalActionMask(field, {
       pair: { axis: 'R', child: 'B' },
       axisRow: 1,

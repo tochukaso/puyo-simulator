@@ -3,7 +3,7 @@ import type { GameState, Move, Color, Rotation } from '../../game/types';
 import { encodeState, BOARD_CHANNELS, QUEUE_DIM } from './encoding';
 import { actionIndexToMove, ACTION_COUNT } from '../../game/action';
 import { commitMove } from '../../game/state';
-import { ROWS, COLS } from '../../game/constants';
+import { COLS, AI_VIEW_ROWS } from '../../game/constants';
 
 interface TfNS {
   loadGraphModel(url: string): Promise<unknown>;
@@ -114,7 +114,7 @@ export class MlSearchAI implements PuyoAI {
   private async forward(state: GameState): Promise<{ policy: Float32Array; value: number }> {
     const { board, queue } = encodeState(state);
     const tf = this.tf!;
-    const b = tf.tensor(board, [1, ROWS, COLS, BOARD_CHANNELS]);
+    const b = tf.tensor(board, [1, AI_VIEW_ROWS, COLS, BOARD_CHANNELS]);
     const q = tf.tensor(queue, [1, QUEUE_DIM]);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const out = this.model!.predict([b, q]) as any[];

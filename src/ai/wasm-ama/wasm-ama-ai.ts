@@ -1,5 +1,6 @@
 import type { PuyoAI } from '../types';
 import type { GameState, Move, Rotation } from '../../game/types';
+import { AI_VIEW_ROWS, AI_ROW_OFFSET } from '../../game/constants';
 import {
   loadAmaModule,
   setAmaPreset,
@@ -79,8 +80,11 @@ export class WasmAmaAI implements PuyoAI {
     const m = this.module!;
     const heap = m.HEAPU8;
 
-    for (let r = 0; r < 13; r++) {
-      const row = state.field.cells[r]!;
+    // The wasm ama binary expects a 13-row field. The game now stores 14 rows
+    // (with one extra row above the old top) — drop that top row by reading
+    // from r + AI_ROW_OFFSET.
+    for (let r = 0; r < AI_VIEW_ROWS; r++) {
+      const row = state.field.cells[r + AI_ROW_OFFSET]!;
       for (let c = 0; c < 6; c++) {
         const cell = row[c];
         let ch = CHAR_DOT;

@@ -120,12 +120,14 @@ export function Board() {
     }
   }
 
-  // When hiding the ceiling (row 0), shift the entire drawing up by one cell
-  // and shrink the canvas/wrapper height by one cell. Anything originating in
-  // row 0 (background strip, DANGER frame, an axis puyo on the ceiling row) is
-  // naturally clipped out.
-  const visibleRows = ceilingVisible ? ROWS : ROWS - 1;
-  const yOffset = ceilingVisible ? 0 : -cell;
+  // When hiding the ceiling, drop ALL rows above VISIBLE_ROW_START — translate
+  // the drawing up by that many cells and shrink the canvas height to match.
+  // Content originating above the visible area (DANGER frame, ceiling-strip
+  // background, an axis puyo lifted into the above-ceiling rows during 回し)
+  // is naturally clipped out.
+  const hiddenRows = ceilingVisible ? 0 : VISIBLE_ROW_START;
+  const visibleRows = ROWS - hiddenRows;
+  const yOffset = -hiddenRows * cell;
   const boardWidth = COLS * cell;
   const boardHeight = visibleRows * cell;
 
@@ -189,7 +191,7 @@ export function Board() {
     const c = Math.floor((x / rect.width) * COLS);
     const visibleH = visibleRows;
     const rVisible = Math.floor((y / rect.height) * visibleH);
-    const r = ceilingVisible ? rVisible : rVisible + 1;
+    const r = rVisible + hiddenRows;
     if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return null;
     return { row: r, col: c };
   };
@@ -363,8 +365,9 @@ function draw(
       3: [0, -1],
     };
     const [dr, dc] = offsets[rotation]!;
-    // Row 0 (height 13, ceiling row) is drawn semi-transparent to indicate
-    // that "this is effectively invisible territory".
+    // Rows above VISIBLE_ROW_START (13段目 / 14段目) are drawn semi-transparent
+    // to indicate "this is effectively invisible territory" — useful for the
+    // 回し technique where the active pair lifts above the visible play area.
     const axisAlpha = axisRow < VISIBLE_ROW_START ? 0.5 : 1;
     const childRow = axisRow + dr;
     const childAlpha = childRow < VISIBLE_ROW_START ? 0.5 : 1;

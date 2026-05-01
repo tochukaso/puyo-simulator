@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { columnHeights, heightVariance, dangerPenalty, chainPotential, connectionSeed, evaluateField, DEFAULT_WEIGHTS } from '../heuristic/evaluator';
 import { createEmptyField, withCell } from '../../game/field';
+import { ROWS } from '../../game/constants';
 
 describe('columnHeights', () => {
   it('all columns are 0 on an empty board', () => {
@@ -9,8 +10,8 @@ describe('columnHeights', () => {
   });
   it('returns the correct highest point for each column', () => {
     let f = createEmptyField();
-    f = withCell(f, 12, 0, 'R');
-    f = withCell(f, 10, 2, 'B');
+    f = withCell(f, ROWS - 1, 0, 'R');
+    f = withCell(f, ROWS - 3, 2, 'B');
     const h = columnHeights(f);
     expect(h[0]).toBe(1);
     expect(h[2]).toBe(3);

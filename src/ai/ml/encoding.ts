@@ -1,4 +1,9 @@
-import { ROWS, COLS } from '../../game/constants';
+import {
+  ROWS,
+  COLS,
+  AI_VIEW_ROWS,
+  AI_ROW_OFFSET,
+} from '../../game/constants';
 import type { Color, GameState, Pair } from '../../game/types';
 import { ACTION_COUNT, actionIndexToMove } from '../../game/action';
 
@@ -79,14 +84,22 @@ export function canonicalizeColors(state: GameState): {
 
 export function encodeState(state: GameState): EncodedState {
   const { canonical } = canonicalizeColors(state);
-  const board = new Float32Array(ROWS * COLS * BOARD_CHANNELS);
+  // The trained policy/value net was built against AI_VIEW_ROWS (= 13). The
+  // game now stores ROWS (= 14), with AI_ROW_OFFSET extra rows above the AI's
+  // view. We drop those top rows when encoding so the tensor shape stays
+  // [AI_VIEW_ROWS, COLS, BOARD_CHANNELS] and the existing model still loads.
+  const board = new Float32Array(AI_VIEW_ROWS * COLS * BOARD_CHANNELS);
   const cellIdx = (r: number, c: number, ch: number) =>
     r * COLS * BOARD_CHANNELS + c * BOARD_CHANNELS + ch;
+  // Translate an AI-view row index (0..AI_VIEW_ROWS-1) into the game-field
+  // row index. The AI's row 0 corresponds to game row AI_ROW_OFFSET (= the
+  // old "13段目" / ceiling).
+  const fieldRow = (r: number) => r + AI_ROW_OFFSET;
 
   // ch 0..3 + ch 4 (empty)
-  for (let r = 0; r < ROWS; r++) {
+  for (let r = 0; r < AI_VIEW_ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
-      const v = canonical.field.cells[r]![c];
+      const v = canonical.field.cells[fieldRow(r)]![c];
       if (v == null) {
         board[cellIdx(r, c, 4)] = 1;
       } else {
@@ -99,7 +112,7 @@ export function encodeState(state: GameState): EncodedState {
   if (canonical.current) {
     const ax = COLOR_INDEX[canonical.current.pair.axis] / 3;
     const ch = COLOR_INDEX[canonical.current.pair.child] / 3;
-    for (let r = 0; r < ROWS; r++) {
+    for (let r = 0; r < AI_VIEW_ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         board[cellIdx(r, c, 5)] = ax;
         board[cellIdx(r, c, 6)] = ch;
@@ -107,33 +120,39 @@ export function encodeState(state: GameState): EncodedState {
     }
   }
 
-  // ch 7: heightmap
+  // ch 7: heightmap (relative to AI_VIEW_ROWS so values stay in [0,1] like
+  // training). Puyos sitting in the dropped top rows don't count toward
+  // height in the AI's view, but they're rare and their effect on heuristics
+  // is small.
   const heights = new Array<number>(COLS).fill(0);
   for (let c = 0; c < COLS; c++) {
-    for (let r = 0; r < ROWS; r++) {
-      if (canonical.field.cells[r]![c] != null) {
-        heights[c] = ROWS - r;
+    for (let r = 0; r < AI_VIEW_ROWS; r++) {
+      if (canonical.field.cells[fieldRow(r)]![c] != null) {
+        heights[c] = AI_VIEW_ROWS - r;
         break;
       }
     }
-    for (let r = 0; r < ROWS; r++) board[cellIdx(r, c, 7)] = heights[c]! / ROWS;
+    for (let r = 0; r < AI_VIEW_ROWS; r++)
+      board[cellIdx(r, c, 7)] = heights[c]! / AI_VIEW_ROWS;
   }
 
   // ch 8: 4-connected mask
   const mask = fourConnectedMask(canonical.field.cells);
-  for (let r = 0; r < ROWS; r++) {
+  for (let r = 0; r < AI_VIEW_ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
-      if (mask[r]![c]) board[cellIdx(r, c, 8)] = 1;
+      if (mask[fieldRow(r)]![c]) board[cellIdx(r, c, 8)] = 1;
     }
   }
 
-  // ch 9 / 10: ceiling and danger occupancy per column
+  // ch 9 / 10: ceiling and danger occupancy per column. In the AI's 13-row
+  // view these refer to (AI) rows 0 and 1 — the topmost two visible/ceiling
+  // rows. Map them back to the game field's corresponding rows.
   for (let c = 0; c < COLS; c++) {
-    if (canonical.field.cells[0]![c] != null) {
-      for (let r = 0; r < ROWS; r++) board[cellIdx(r, c, 9)] = 1;
+    if (canonical.field.cells[fieldRow(0)]![c] != null) {
+      for (let r = 0; r < AI_VIEW_ROWS; r++) board[cellIdx(r, c, 9)] = 1;
     }
-    if (canonical.field.cells[1]![c] != null) {
-      for (let r = 0; r < ROWS; r++) board[cellIdx(r, c, 10)] = 1;
+    if (canonical.field.cells[fieldRow(1)]![c] != null) {
+      for (let r = 0; r < AI_VIEW_ROWS; r++) board[cellIdx(r, c, 10)] = 1;
     }
   }
 

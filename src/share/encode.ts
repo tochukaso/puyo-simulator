@@ -1,13 +1,18 @@
 import type { Cell, Color, Field, Pair } from '../game/types';
-import { ROWS, COLS } from '../game/constants';
+import { ROWS, COLS, AI_VIEW_ROWS, AI_ROW_OFFSET } from '../game/constants';
 
 // 盤面共有用のエンコード / デコード。
 // 84 文字固定の URL-safe な文字列を吐く。
-//   - フィールド 78 文字: 13 行 × 6 列を上から下、左から右に並べる
+//   - フィールド 78 文字: 13 行 × 6 列 (= AI_VIEW_ROWS) を上から下、左から右に並べる
 //   - 現在ペア 2 文字: axis, child
 //   - NEXT 2 文字: axis, child
 //   - NEXT2 2 文字: axis, child
 // 各セル文字: 'R'|'P'|'B'|'Y' = 4 色, 'G' = おじゃま, '_' = 空。
+//
+// game の field は 14 行 (新規追加された 14段目を含む) だが、URL は旧 13 行表現を
+// 維持して既存の共有リンクと長さ互換にする。エンコード時に最上行 (新しい 14段目)
+// を捨て、デコード時には空行を 1 行追加して 14 行に膨らませる。14段目に puyo が
+// ある状態は実プレイではほぼ発生しないため許容する。
 //
 // 短くて目視でも読める利点を取って base64 等は使わない (78+6=84 chars)。
 // `?share=...` のクエリで運ぶ前提で、URL 安全な文字だけを使う。
@@ -25,7 +30,7 @@ type CellChar = (typeof VALID_CELL_CHARS)[number];
 type PairChar = (typeof VALID_PAIR_CHARS)[number];
 
 export const SHARE_PARAM = 'share';
-export const SHARE_LENGTH = ROWS * COLS + 2 + 2 + 2; // 78 + 6 = 84
+export const SHARE_LENGTH = AI_VIEW_ROWS * COLS + 2 + 2 + 2; // 78 + 6 = 84
 
 function cellToChar(c: Cell): CellChar {
   if (c === null) return '_';
@@ -59,9 +64,11 @@ function charToColor(ch: string): Color | undefined {
 
 export function encodeShare(pos: SharedPosition): string {
   let out = '';
-  for (let r = 0; r < ROWS; r++) {
+  // Skip the top AI_ROW_OFFSET rows so the URL stays length-compatible with
+  // pre-14-row clients.
+  for (let r = 0; r < AI_VIEW_ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
-      out += cellToChar(pos.field.cells[r]![c]!);
+      out += cellToChar(pos.field.cells[r + AI_ROW_OFFSET]![c]!);
     }
   }
   out += colorToChar(pos.current.axis);
@@ -77,7 +84,12 @@ export function decodeShare(s: string): SharedPosition | null {
   if (s.length !== SHARE_LENGTH) return null;
 
   const cells: Cell[][] = [];
-  for (let r = 0; r < ROWS; r++) {
+  // Re-introduce the AI_ROW_OFFSET empty rows on top (the 14段目 is always
+  // empty in shared positions).
+  for (let r = 0; r < AI_ROW_OFFSET; r++) {
+    cells.push(new Array<Cell>(COLS).fill(null));
+  }
+  for (let r = 0; r < AI_VIEW_ROWS; r++) {
     const row: Cell[] = [];
     for (let c = 0; c < COLS; c++) {
       const cell = charToCell(s[r * COLS + c]!);
@@ -86,7 +98,8 @@ export function decodeShare(s: string): SharedPosition | null {
     }
     cells.push(row);
   }
-  const fieldOff = ROWS * COLS;
+  if (cells.length !== ROWS) return null;
+  const fieldOff = AI_VIEW_ROWS * COLS;
   const ax = charToColor(s[fieldOff + 0]!);
   const ac = charToColor(s[fieldOff + 1]!);
   const n1a = charToColor(s[fieldOff + 2]!);

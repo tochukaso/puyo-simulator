@@ -16,6 +16,7 @@ import type { Color } from '../../../game/types';
 export function NextQueue() {
   const playerGame = useGameStore((s) => s.game);
   const playerQueue = playerGame.nextQueue;
+  const aiGame = useGameStore((s) => s.aiGame);
   const viewing = useGameStore((s) => s.viewing);
   const aiHistory = useGameStore((s) => s.aiHistory);
   const aiHistoryViewIndex = useGameStore((s) => s.aiHistoryViewIndex);
@@ -30,18 +31,24 @@ export function NextQueue() {
   const aiViewIdx = aiHistoryViewIndex ?? Math.max(0, aiHistory.length - 1);
   const playerViewIdx =
     playerHistoryViewIndex ?? Math.max(0, playerHistory.length - 1);
+  // Resolve snapshots once so queue + turn-count branches stay consistent on
+  // the edge case where the side has no recorded turns yet (e.g. immediate
+  // top-out before any move) — there both fall through together.
+  const aiSnapshot = aiHistory[aiViewIdx];
+  const playerSnapshot = playerHistory[playerViewIdx];
   const queue = !inReplay
     ? playerQueue
     : viewing === 'ai'
-      ? (aiHistory[aiViewIdx]?.nextQueue ?? playerQueue)
-      : (playerHistory[playerViewIdx]?.nextQueue ?? playerQueue);
+      ? (aiSnapshot?.nextQueue ?? aiGame?.nextQueue ?? playerQueue)
+      : (playerSnapshot?.nextQueue ?? playerQueue);
   // 表示中スナップショットの時点で「何手消化済みか」。history[k] は post-move-(k+1)
-  // = (k+1) 手消化済みなので k+1。non-replay 中は live の matchTurnsPlayed。
+  // = (k+1) 手消化済みなので k+1。スナップショット欠落時は 0 手消化扱い (= history.length)。
+  // non-replay 中は live の matchTurnsPlayed。
   const turnsPlayedAtView = !inReplay
     ? matchTurnsPlayed
     : viewing === 'ai'
-      ? aiViewIdx + 1
-      : playerViewIdx + 1;
+      ? (aiSnapshot ? aiViewIdx + 1 : aiHistory.length)
+      : (playerSnapshot ? playerViewIdx + 1 : playerHistory.length);
   const beyondLimit = (i: number) =>
     mode === 'match' && turnsPlayedAtView + 2 + i > matchTurnLimit;
   const next = beyondLimit(0) ? undefined : queue[0];

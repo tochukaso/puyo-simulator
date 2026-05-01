@@ -12,21 +12,23 @@ export function Stats() {
   const playerHistory = useGameStore((s) => s.playerHistory);
   const playerHistoryViewIndex = useGameStore((s) => s.playerHistoryViewIndex);
   const viewing = useGameStore((s) => s.viewing);
-  // Board / NextQueue と同じ side-aware 選択。ama 観戦中はそちらの値、player
-  // スクラブ中はそのスナップショット、それ以外は live。これで数値と盤面が
-  // 食い違わない (ama 観戦中に player の score が出る、を防ぐ)。
-  const snapshot =
-    viewing === 'ai'
-      ? aiHistoryViewIndex !== null
-        ? (aiHistory[aiHistoryViewIndex] ?? aiGame ?? liveGame)
-        : (aiGame ?? liveGame)
-      : playerHistoryViewIndex !== null
-        ? (playerHistory[playerHistoryViewIndex] ?? liveGame)
-        : liveGame;
-  const { score, chainCount, totalChains, maxChain, status } = snapshot;
   const mode = useGameStore((s) => s.mode);
   const matchEnded = useGameStore((s) => s.matchEnded);
   const resignMatch = useGameStore((s) => s.resignMatch);
+  // Board / NextQueue と同じ side-aware 選択。リプレイ中は表示中スナップショット
+  // の値を使い、それ以外は live。これで数値と盤面が食い違わない (ama 観戦中に
+  // player の score が出る、を防ぐ)。
+  const inReplay =
+    mode === 'match' && (matchEnded || liveGame.status === 'gameover');
+  const aiViewIdx = aiHistoryViewIndex ?? Math.max(0, aiHistory.length - 1);
+  const playerViewIdx =
+    playerHistoryViewIndex ?? Math.max(0, playerHistory.length - 1);
+  const snapshot = !inReplay
+    ? liveGame
+    : viewing === 'ai'
+      ? (aiHistory[aiViewIdx] ?? aiGame ?? liveGame)
+      : (playerHistory[playerViewIdx] ?? liveGame);
+  const { score, chainCount, totalChains, maxChain, status } = snapshot;
   const t = useT();
 
   // 投了ボタンは match 進行中のみ。top-out 後も matchEnded になるまでは

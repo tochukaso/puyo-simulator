@@ -101,10 +101,18 @@ export function MatchPanel() {
           <b className="text-emerald-300 tabular-nums">
             {playerScore.toLocaleString()}
           </b>
+          <span className="text-slate-500 tabular-nums">
+            {' '}
+            ({matchTurnsPlayed}/{matchTurnLimit})
+          </span>
         </span>
         <span className="text-slate-300">
           {t('match.ama')}:{' '}
           <b className="text-amber-300 tabular-nums">{aiScore.toLocaleString()}</b>
+          <span className="text-slate-500 tabular-nums">
+            {' '}
+            ({aiTurns}/{matchTurnLimit})
+          </span>
         </span>
       </div>
 
@@ -152,6 +160,26 @@ export function MatchPanel() {
               <span className="text-slate-500 tabular-nums whitespace-nowrap">
                 {aiSliderValue + 1}/{aiTurns}
               </span>
+              <button
+                type="button"
+                disabled={animating || aiSliderValue <= 0}
+                onClick={() => setAiHistoryViewIndex(Math.max(0, aiSliderValue - 1))}
+                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
+                title={t('match.stepBackTitle')}
+              >
+                {t('match.stepBack')}
+              </button>
+              <button
+                type="button"
+                disabled={animating || aiSliderValue >= aiSliderMax}
+                onClick={() =>
+                  setAiHistoryViewIndex(Math.min(aiSliderMax, aiSliderValue + 1))
+                }
+                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
+                title={t('match.stepForwardTitle')}
+              >
+                {t('match.stepForward')}
+              </button>
               {aiHasChain && (
                 <button
                   type="button"
@@ -167,13 +195,6 @@ export function MatchPanel() {
                   {t('match.playChain')}
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => setAiHistoryViewIndex(null)}
-                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-xs"
-              >
-                {t('match.live')}
-              </button>
             </div>
           )}
           {viewing === 'player' && playerTurns > 0 && (
@@ -192,6 +213,30 @@ export function MatchPanel() {
               <span className="text-slate-500 tabular-nums whitespace-nowrap">
                 {playerSliderValue + 1}/{playerTurns}
               </span>
+              <button
+                type="button"
+                disabled={animating || playerSliderValue <= 0}
+                onClick={() =>
+                  setPlayerHistoryViewIndex(Math.max(0, playerSliderValue - 1))
+                }
+                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
+                title={t('match.stepBackTitle')}
+              >
+                {t('match.stepBack')}
+              </button>
+              <button
+                type="button"
+                disabled={animating || playerSliderValue >= playerSliderMax}
+                onClick={() =>
+                  setPlayerHistoryViewIndex(
+                    Math.min(playerSliderMax, playerSliderValue + 1),
+                  )
+                }
+                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
+                title={t('match.stepForwardTitle')}
+              >
+                {t('match.stepForward')}
+              </button>
               {playerHasChain && (
                 <button
                   type="button"
@@ -207,13 +252,6 @@ export function MatchPanel() {
                   {t('match.playChain')}
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => setPlayerHistoryViewIndex(null)}
-                className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-xs"
-              >
-                {t('match.live')}
-              </button>
             </div>
           )}
         </div>

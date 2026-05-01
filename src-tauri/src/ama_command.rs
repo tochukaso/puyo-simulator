@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 
 use serde::Deserialize;
 use tauri::{command, AppHandle, Manager};
@@ -15,8 +15,17 @@ use crate::ama_ffi::{ensure_init, suggest, AmaError, Suggestion};
 const AMA_CONFIG_BYTES: &[u8] = include_bytes!("../vendor/ama/config.json");
 
 static CONFIG_PATH: OnceLock<PathBuf> = OnceLock::new();
+static CONFIG_PATH_INIT: Mutex<()> = Mutex::new(());
 
 fn ensure_config_extracted(app: &AppHandle) -> Result<&'static PathBuf, String> {
+    if let Some(p) = CONFIG_PATH.get() {
+        return Ok(p);
+    }
+    // Serialize cold-start extraction so a second concurrent ama_suggest
+    // doesn't observe a half-written config file or race the temp-rename.
+    let _guard = CONFIG_PATH_INIT
+        .lock()
+        .map_err(|_| "CONFIG_PATH_INIT poisoned".to_string())?;
     if let Some(p) = CONFIG_PATH.get() {
         return Ok(p);
     }
@@ -31,8 +40,11 @@ fn ensure_config_extracted(app: &AppHandle) -> Result<&'static PathBuf, String> 
         Err(_) => true,
     };
     if needs_write {
-        fs::write(&path, AMA_CONFIG_BYTES)
-            .map_err(|e| format!("write {}: {e}", path.display()))?;
+        let tmp = path.with_extension("json.tmp");
+        fs::write(&tmp, AMA_CONFIG_BYTES)
+            .map_err(|e| format!("write {}: {e}", tmp.display()))?;
+        fs::rename(&tmp, &path)
+            .map_err(|e| format!("rename {} -> {}: {e}", tmp.display(), path.display()))?;
     }
     let _ = CONFIG_PATH.set(path);
     Ok(CONFIG_PATH.get().unwrap())

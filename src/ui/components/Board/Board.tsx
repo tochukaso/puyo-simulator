@@ -13,7 +13,6 @@ import {
   ROWS,
   COLS,
   SPAWN_COL,
-  SPAWN_AXIS_ROW,
   VISIBLE_ROW_START,
   AI_ROW_OFFSET,
 } from '../../../game/constants';
@@ -313,14 +312,16 @@ function draw(
     (VISIBLE_ROW_START - AI_ROW_OFFSET) * cell,
   );
 
-  // Danger frame highlights the axis-spawn cell — game-over fires when this
-  // cell is filled at spawn time. Drawn at SPAWN_AXIS_ROW so it stays inside
-  // the rendered area (the 14段目 is clipped off the top of the canvas).
+  // Danger frame highlights the 「バツマーク」 death cell — game-over fires
+  // when this cell is occupied at spawn time (see state.ts's spawnNext).
+  // Drawn at VISIBLE_ROW_START (= 12段目) so the visual rule matches the
+  // gameover trigger, and the marker stays inside the rendered area even
+  // when the ceiling row is hidden (which clips up to VISIBLE_ROW_START).
   ctx.strokeStyle = DANGER_COLOR;
   ctx.lineWidth = 2;
   ctx.strokeRect(
     SPAWN_COL * cell + 1,
-    SPAWN_AXIS_ROW * cell + 1,
+    VISIBLE_ROW_START * cell + 1,
     cell - 2,
     cell - 2,
   );

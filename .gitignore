@@ -28,6 +28,9 @@ playwright/.cache/
 *.sln
 *.sw?
 
+# Claude
+.claude
+
 # ML artifacts
 data/selfplay/
 data/ama-selfplay/

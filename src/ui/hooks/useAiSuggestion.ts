@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useGameStore } from '../store';
 import type { GameState, Move } from '../../game/types';
 import type { AiKind as Kind } from '../../ai/types';
+import { NativeAmaAI } from '../../ai/native-ama/native-ama-ai';
 
 // Singleton Worker: the Header selector and the Suggestion hook share the
 // same Worker; when set-ai switches the AI, the next suggest uses the new one.
@@ -48,6 +49,17 @@ const aiReadyHandlers = new Set<AiReadyHandler>();
 let currentAiKind: Kind = 'ml-ama-v1';
 let currentAiReady = false;
 
+// Tauri-only path — the same conceptual AI (ama beam search) runs as a native
+// static-linked C++ library called via Rust FFI on the main thread, instead of
+// inside the Web Worker. Bypasses the worker entirely.
+let nativeAi: NativeAmaAI | null = null;
+
+function getNativeAi(): NativeAmaAI | null {
+  if (!NativeAmaAI.isAvailable()) return null;
+  if (!nativeAi) nativeAi = new NativeAmaAI();
+  return nativeAi;
+}
+
 // One-shot suggest pending resolvers, keyed by request id.
 const suggestOnceResolvers = new Map<number, (moves: Move[]) => void>();
 let nextSuggestOnceId = 1_000_000; // Disjoint from regular suggest ids.
@@ -93,10 +105,15 @@ function getWorker(): Worker {
   return w;
 }
 
-// Fire-and-await suggest for an arbitrary state. Returns whatever the worker's
-// active AI produces (top `topK` candidates ranked best-first). Does not affect
-// the shared player-UI subscription stream. Resolves to [] on worker error.
+// Fire-and-await suggest for an arbitrary state. Returns whatever the active
+// AI produces (top `topK` candidates ranked best-first). Does not affect the
+// shared player-UI subscription stream. Resolves to [] on worker error.
 export function suggestForState(state: GameState, topK: number = 1): Promise<Move[]> {
+  if (currentAiKind === 'ama-native') {
+    const ai = getNativeAi();
+    if (ai) return ai.suggest(state, topK);
+    // Fall through to worker if native unavailable (shouldn't happen post-setAiKind).
+  }
   const id = nextSuggestOnceId++;
   return new Promise<Move[]>((resolve) => {
     suggestOnceResolvers.set(id, resolve);
@@ -108,6 +125,31 @@ export function setAiKind(kind: Kind, preset?: string): void {
   currentAiKind = kind;
   currentAiReady = false;
   for (const h of aiReadyHandlers) h(kind, false);
+
+  if (kind === 'ama-native') {
+    const ai = getNativeAi();
+    if (!ai) {
+      // Not in Tauri — fall back to ama-wasm transparently so trainer-mode
+      // callers don't need to know which environment they're in.
+      console.warn('[ai] ama-native unavailable, falling back to ama-wasm');
+      currentAiKind = 'ama-wasm';
+      getWorker().postMessage({ type: 'set-ai', kind: 'ama-wasm', preset });
+      return;
+    }
+    const requestedPreset = preset ?? 'build';
+    void ai.setPreset(requestedPreset).then(() => {
+      // Guard against a rapid switch (e.g., trainer flipped twice) — only
+      // publish ready=true if this completion still corresponds to the active
+      // request. Otherwise we'd announce ready for an AI/preset combo the user
+      // already left.
+      if (currentAiKind !== 'ama-native') return;
+      if (ai.preset !== requestedPreset) return;
+      currentAiReady = true;
+      for (const h of aiReadyHandlers) h('ama-native', true);
+    });
+    return;
+  }
+
   getWorker().postMessage({ type: 'set-ai', kind, preset });
 }
 
@@ -122,6 +164,23 @@ function requestSuggestFor(state: GameState): void {
     pendingId: id,
   };
   notify();
+
+  if (currentAiKind === 'ama-native') {
+    const ai = getNativeAi();
+    if (!ai) {
+      // Defensive — setAiKind would have already fallen back. Mark not-loading.
+      shared = { moves: [], loading: false, requestedFor: state, pendingId: id };
+      notify();
+      return;
+    }
+    void ai.suggest(state, SHARED_TOPK).then((moves) => {
+      if (id !== shared.pendingId) return;
+      shared = { moves, loading: false, requestedFor: state, pendingId: id };
+      notify();
+    });
+    return;
+  }
+
   getWorker().postMessage({ type: 'suggest', id, state, topK: SHARED_TOPK });
 }
 

@@ -1,6 +1,7 @@
 import { useGameStore } from '../../store';
 import { useAiSuggestion } from '../../hooks/useAiSuggestion';
 import { useT } from '../../../i18n';
+import { confirmDialog } from '../../utils/dialog';
 
 export function Controls() {
   const reset = useGameStore((s) => s.reset);
@@ -56,9 +57,9 @@ export function Controls() {
       >
         <button
           className={`${cellBase} bg-slate-700 hover:bg-slate-600 active:bg-slate-500`}
-          onClick={() => dispatch({ type: 'rotateCCW' })}
+          onClick={() => dispatch({ type: 'rotateCW' })}
         >
-          {t('controls.rotateCcw')}
+          {t('controls.rotateCw')}
         </button>
         <button
           className={`${cellBase} bg-blue-600 hover:bg-blue-500 active:bg-blue-400`}
@@ -100,8 +101,8 @@ export function Controls() {
         </button>
         <button
           className={`${cellBase} bg-red-600 hover:bg-red-500 active:bg-red-400`}
-          onClick={() => {
-            if (confirm(t('controls.resetConfirm'))) reset();
+          onClick={async () => {
+            if (await confirmDialog(t('controls.resetConfirm'))) reset();
           }}
         >
           {t('controls.reset')}

@@ -1,5 +1,6 @@
 import { useGameStore, type EditPalette } from '../../store';
 import { useT } from '../../../i18n';
+import { confirmDialog } from '../../utils/dialog';
 import {
   PUYO_COLORS,
   PUYO_LIGHT,
@@ -58,8 +59,8 @@ export function EditToolbar() {
       <div className="grid grid-cols-3 gap-2 w-full">
         <button
           type="button"
-          onClick={() => {
-            if (confirm(t('edit.clearConfirm'))) clearEditField();
+          onClick={async () => {
+            if (await confirmDialog(t('edit.clearConfirm'))) clearEditField();
           }}
           className={`${baseBtn} bg-slate-700 hover:bg-slate-600 active:bg-slate-500`}
         >

@@ -9,7 +9,14 @@ import {
 } from '../../hooks/useUiPrefs';
 import { usePreviewMove } from '../../hooks/useAiPreview';
 import { useT } from '../../../i18n';
-import { ROWS, COLS, SPAWN_COL, VISIBLE_ROW_START } from '../../../game/constants';
+import {
+  ROWS,
+  COLS,
+  SPAWN_COL,
+  SPAWN_AXIS_ROW,
+  VISIBLE_ROW_START,
+  AI_ROW_OFFSET,
+} from '../../../game/constants';
 import { PUYO_COLORS, PUYO_LIGHT, PUYO_DARK, BG_COLOR, GRID_COLOR, DANGER_COLOR } from './colors';
 import type { Color, Field, ActivePair, Move } from '../../../game/types';
 import { ghostCells } from './ghost';
@@ -120,12 +127,13 @@ export function Board() {
     }
   }
 
-  // When hiding the ceiling, drop ALL rows above VISIBLE_ROW_START — translate
-  // the drawing up by that many cells and shrink the canvas height to match.
-  // Content originating above the visible area (DANGER frame, ceiling-strip
-  // background, an axis puyo lifted into the above-ceiling rows during 回し)
-  // is naturally clipped out.
-  const hiddenRows = ceilingVisible ? 0 : VISIBLE_ROW_START;
+  // The transient "14段目" rows (game rows 0..AI_ROW_OFFSET-1) are reserved
+  // for rotation only and never hold a locked puyo, so we always clip them
+  // off the top of the canvas — the player should see the visible play area
+  // start at "13段目", with the active pair appearing to slide upward into
+  // empty space when 回し-style rotations lift it above the visible top.
+  // The ceiling toggle additionally hides "13段目" itself when set.
+  const hiddenRows = ceilingVisible ? AI_ROW_OFFSET : VISIBLE_ROW_START;
   const visibleRows = ROWS - hiddenRows;
   const yOffset = -hiddenRows * cell;
   const boardWidth = COLS * cell;
@@ -294,12 +302,28 @@ function draw(
     ctx.stroke();
   }
 
+  // Semi-transparent ceiling overlay covers rows AI_ROW_OFFSET..VISIBLE_ROW_START
+  // (= row 1 / "13段目") — the always-clipped 14段目 (rows 0..AI_ROW_OFFSET-1)
+  // is off-canvas, so we don't bother covering it here.
   ctx.fillStyle = 'rgba(15, 23, 42, 0.5)';
-  ctx.fillRect(0, 0, COLS * cell, VISIBLE_ROW_START * cell);
+  ctx.fillRect(
+    0,
+    AI_ROW_OFFSET * cell,
+    COLS * cell,
+    (VISIBLE_ROW_START - AI_ROW_OFFSET) * cell,
+  );
 
+  // Danger frame highlights the axis-spawn cell — game-over fires when this
+  // cell is filled at spawn time. Drawn at SPAWN_AXIS_ROW so it stays inside
+  // the rendered area (the 14段目 is clipped off the top of the canvas).
   ctx.strokeStyle = DANGER_COLOR;
   ctx.lineWidth = 2;
-  ctx.strokeRect(SPAWN_COL * cell + 1, 1, cell - 2, cell - 2);
+  ctx.strokeRect(
+    SPAWN_COL * cell + 1,
+    SPAWN_AXIS_ROW * cell + 1,
+    cell - 2,
+    cell - 2,
+  );
 
   // Pulse coefficient for the popping highlight. Driven by `Date.now()` and
   // called per frame from rAF.

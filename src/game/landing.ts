@@ -1,4 +1,4 @@
-import { ROWS } from './constants';
+import { ROWS, AI_ROW_OFFSET } from './constants';
 import type { ActivePair, Field } from './types';
 import { pairCells } from './pair';
 import { withCell } from './field';
@@ -46,7 +46,11 @@ export function lockActive(field: Field, active: ActivePair): Field {
 }
 
 function lowestEmpty(field: Field, col: number): number {
-  for (let r = ROWS - 1; r >= 0; r--) {
+  // Stop at AI_ROW_OFFSET (row 1 = "13段目"). Rows above that form the
+  // transient "14段目" buffer — used during rotation only — so a locked
+  // puyo can never settle there. Anything that would have landed in the
+  // 14段目 is discarded as sutepuyo (matches Puyo Puyo Tsu behaviour).
+  for (let r = ROWS - 1; r >= AI_ROW_OFFSET; r--) {
     if (field.cells[r]![col]! === null) return r;
   }
   return -1;

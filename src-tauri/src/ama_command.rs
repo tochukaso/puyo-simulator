@@ -75,7 +75,7 @@ pub async fn ama_suggest(
     let config_path = ensure_config_extracted(&app)?;
 
     ensure_init(&input.preset, config_path)
-        .map_err(|e| format!("{e} (preset={}, config_path={})", input.preset, config_path.display()))?;
+        .map_err(|e| format!("{e} (preset={})", input.preset))?;
 
     if input.field.len() != 78 {
         return Err("field must be exactly 78 chars".into());

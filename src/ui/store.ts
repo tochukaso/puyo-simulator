@@ -175,8 +175,8 @@ interface Store {
   /** Apply a single AI auto-play move on the AI's parallel state and snapshot it. Called by the match driver. */
   applyAiMove(move: Move): void;
   setViewing(side: ViewSide): void;
-  setAiHistoryViewIndex(index: number | null): void;
-  setPlayerHistoryViewIndex(index: number | null): void;
+  setAiHistoryViewIndex(index: number): void;
+  setPlayerHistoryViewIndex(index: number): void;
   /** Replay the chain animation for the given history index on the given side.
    *  Cancels any currently-playing replay. Resolves to true when the full
    *  animation played out, false if it was cancelled (slider scrubbed, side

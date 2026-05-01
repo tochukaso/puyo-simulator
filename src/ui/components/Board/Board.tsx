@@ -34,17 +34,26 @@ export function Board() {
   const viewing = useGameStore((s) => s.viewing);
   const editing = useGameStore((s) => s.editing);
   const paintCell = useGameStore((s) => s.paintCell);
-  // While viewing the AI side, swap the game source. If the user scrubbed the
-  // history slider, render that snapshot. Player side does the same against
-  // playerHistory so the user can review their own turns post-match.
-  const snapshot =
-    viewing === 'ai'
-      ? aiHistoryViewIndex !== null
-        ? (aiHistory[aiHistoryViewIndex] ?? aiGame ?? playerGame)
-        : (aiGame ?? playerGame)
-      : playerHistoryViewIndex !== null
-        ? (playerHistory[playerHistoryViewIndex] ?? playerGame)
-        : playerGame;
+  const matchAiMoves = useGameStore((s) => s.matchAiMoves);
+  const matchPlayerMoves = useGameStore((s) => s.matchPlayerMoves);
+  const mode = useGameStore((s) => s.mode);
+  const matchEnded = useGameStore((s) => s.matchEnded);
+  // Replay context: post-match-end, or after the player tops out. Outside of
+  // this, the player is actively playing — we always show their live game and
+  // ignore history view indices entirely.
+  const inReplay =
+    mode === 'match' && (matchEnded || playerGame.status === 'gameover');
+  // History view index defaults to the latest snapshot when the user hasn't
+  // explicitly scrubbed. (No live-tracking mode: there's no UI to escape back
+  // to following the live game state — replay is always frame-accurate.)
+  const aiViewIdx = aiHistoryViewIndex ?? Math.max(0, aiHistory.length - 1);
+  const playerViewIdx =
+    playerHistoryViewIndex ?? Math.max(0, playerHistory.length - 1);
+  const snapshot = !inReplay
+    ? playerGame
+    : viewing === 'ai'
+      ? (aiHistory[aiViewIdx] ?? aiGame ?? playerGame)
+      : (playerHistory[playerViewIdx] ?? playerGame);
   // While a chain replay is running for the side we're viewing, override the
   // snapshot's field/current so the animation phases are visible. Memoize so
   // the spread only allocates a new object when its inputs change — otherwise
@@ -68,11 +77,11 @@ export function Board() {
   const playerPoppingCells = useGameStore((s) => s.poppingCells);
   const playerChainTexts = useGameStore((s) => s.chainTexts);
   const playerLandedCells = useGameStore((s) => s.landedCells);
-  // When scrubbing the player's own history, the live animation overlays would
-  // be misleading (they belong to the live game state, not the snapshot).
-  // During a chain replay we substitute the replay's overlays instead.
-  const playerLive =
-    viewing === 'player' && playerHistoryViewIndex === null && !animActive;
+  // Live overlays (popping / landing animations) belong to the in-progress
+  // player game. They're meaningful only during active play; in replay mode
+  // they'd misleadingly play on top of a frozen snapshot. During a chain
+  // replay we substitute the replay's overlays instead.
+  const playerLive = !inReplay && viewing === 'player' && !animActive;
   const poppingCells = animActive
     ? historyAnim!.poppingCells
     : playerLive
@@ -84,7 +93,6 @@ export function Board() {
       ? playerChainTexts
       : EMPTY_CHAIN_TEXTS;
   const landedCells = playerLive ? playerLandedCells : EMPTY_LANDED;
-  const mode = useGameStore((s) => s.mode);
   // match モードでは候補手リスト・ゴースト・「AI 最善手」ボタンを全部隠して
   // いるので、worker への suggest 投げそのものを止める (WASM 全幅探索は重い
   // ので生かしっぱなしは計算資源の無駄)。
@@ -94,13 +102,23 @@ export function Board() {
   const previewMove = usePreviewMove();
   const t = useT();
   // If a candidate is hovered/selected in CandidateList, prefer it. Otherwise
-  // fall back to the top candidate. Suppress in match mode (the ghost would
-  // give away the answer in a player-vs-ama score race) and when viewing the
-  // AI side (suggestions are computed for the player's state, not the AI's).
-  const bestMove =
-    ghostEnabled && viewing === 'player' && mode !== 'match'
-      ? (previewMove ?? moves[0] ?? null)
-      : null;
+  // fall back to the top candidate. Suppress in match mode during active play
+  // (the ghost would give away the answer in a player-vs-ama score race).
+  // Replay (post-match): show a ghost of the move that was actually played
+  // from this snapshot (= matchXxxMoves[viewIndex + 1], since history[i] is
+  // post-move-(i+1) with the next pair already spawned). Makes replay easier
+  // to follow — you see at a glance where each pair was placed.
+  let bestMove: Move | null = null;
+  if (ghostEnabled) {
+    if (inReplay) {
+      bestMove =
+        viewing === 'ai'
+          ? (matchAiMoves[aiViewIdx + 1] ?? null)
+          : (matchPlayerMoves[playerViewIdx + 1] ?? null);
+    } else if (mode !== 'match' && viewing === 'player') {
+      bestMove = previewMove ?? moves[0] ?? null;
+    }
+  }
 
   // When hiding the ceiling (row 0), shift the entire drawing up by one cell
   // and shrink the canvas/wrapper height by one cell. Anything originating in

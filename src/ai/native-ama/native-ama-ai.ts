@@ -85,13 +85,20 @@ export class NativeAmaAI implements PuyoAI {
     const n2 = state.nextQueue[1]!;
 
     // Native ama binary expects a 13-row field. Drop the new top row.
+    // Preserve 'G' (ojama / garbage puyo) so the native suggestion accounts
+    // for it — wasm-ama-ai.ts encodes G as CHAR_G; this branch needs to
+    // match or native suggestions go wrong whenever ojama is on the field.
     let field = '';
     for (let r = 0; r < AI_VIEW_ROWS; r++) {
       const row = state.field.cells[r + AI_ROW_OFFSET]!;
       for (let c = 0; c < 6; c++) {
         const cell = row[c];
         field +=
-          cell === 'R' || cell === 'B' || cell === 'Y' || cell === 'P'
+          cell === 'R' ||
+          cell === 'B' ||
+          cell === 'Y' ||
+          cell === 'P' ||
+          cell === 'G'
             ? cell
             : '.';
       }

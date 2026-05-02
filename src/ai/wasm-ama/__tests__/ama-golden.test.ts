@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { WasmAmaAI } from '../wasm-ama-ai';
+import { AI_ROW_OFFSET } from '../../../game/constants';
 import type { Color, GameState, Rotation } from '../../../game/types';
 
 interface GoldenRow {
@@ -23,7 +24,14 @@ const GOLDEN_PATH = resolve(
 );
 
 function rowToState(row: GoldenRow): GameState {
+  // Golden fixtures are 13-row strings (the AI's view). The game now uses a
+  // 14-row field, so we pad AI_ROW_OFFSET empty rows on top before handing
+  // it to the WASM ama (which then drops them again on its way back to its
+  // 13-row internal representation — net effect: identical fixture input).
   const cells: Color[][] = [];
+  for (let r = 0; r < AI_ROW_OFFSET; r++) {
+    cells.push(new Array(6).fill(null) as Color[]);
+  }
   for (let r = 0; r < 13; r++) {
     const rowChars = row.field[r]!;
     const rowCells: (Color | null)[] = [];

@@ -121,33 +121,69 @@ export function MatchPanel() {
           もう打てないので公平性は問題にならず、振り返り UI を解禁する。終了後
           も同様に view 切替・スクラバーを出す。 */}
       {(matchEnded || playerStatus === 'gameover') && (
-        <div className="flex flex-wrap gap-2 items-center">
-          <div className="inline-flex rounded overflow-hidden border border-slate-700">
-            <button
-              type="button"
-              onClick={() => setViewing('player')}
-              className={`px-2 py-1 text-xs ${
-                viewing === 'player'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-              }`}
-            >
-              {t('match.viewYou')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewing('ai')}
-              className={`px-2 py-1 text-xs ${
-                viewing === 'ai'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-              }`}
-            >
-              {t('match.viewAi')}
-            </button>
+        <div className="flex flex-col gap-2">
+          {/* Row 1: side toggle on the left, contextual chain replay button
+              pushed to the right end of the same row (per-side, only when
+              that side's next move resolves into a chain). */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="inline-flex rounded overflow-hidden border border-slate-700">
+              <button
+                type="button"
+                onClick={() => setViewing('player')}
+                className={`px-2 py-1 text-xs ${
+                  viewing === 'player'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                {t('match.viewYou')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewing('ai')}
+                className={`px-2 py-1 text-xs ${
+                  viewing === 'ai'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                {t('match.viewAi')}
+              </button>
+            </div>
+            {viewing === 'ai' && aiTurns > 0 && aiHasChain && (
+              <button
+                type="button"
+                disabled={animating}
+                onClick={async () => {
+                  const target = aiSliderValue + 1;
+                  const completed = await playHistoryChain('ai', target);
+                  if (completed) setAiHistoryViewIndex(target);
+                }}
+                className="ml-auto px-2 py-1 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
+                title={t('match.playChainTitle')}
+              >
+                {t('match.playChain')}
+              </button>
+            )}
+            {viewing === 'player' && playerTurns > 0 && playerHasChain && (
+              <button
+                type="button"
+                disabled={animating}
+                onClick={async () => {
+                  const target = playerSliderValue + 1;
+                  const completed = await playHistoryChain('player', target);
+                  if (completed) setPlayerHistoryViewIndex(target);
+                }}
+                className="ml-auto px-2 py-1 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
+                title={t('match.playChainTitle')}
+              >
+                {t('match.playChain')}
+              </button>
+            )}
           </div>
+          {/* Row 2: scrub slider + position counter + step buttons. */}
           {viewing === 'ai' && aiTurns > 0 && (
-            <div className="flex flex-wrap items-center gap-1 grow min-w-0">
+            <div className="flex items-center gap-1 grow min-w-0">
               <input
                 aria-label={t('match.scrub')}
                 type="range"
@@ -163,11 +199,14 @@ export function MatchPanel() {
               <button
                 type="button"
                 disabled={animating || aiSliderValue <= 0}
-                onClick={() => setAiHistoryViewIndex(Math.max(0, aiSliderValue - 1))}
+                onClick={() =>
+                  setAiHistoryViewIndex(Math.max(0, aiSliderValue - 1))
+                }
                 className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
                 title={t('match.stepBackTitle')}
+                aria-label={t('match.stepBackTitle')}
               >
-                {t('match.stepBack')}
+                ◀
               </button>
               <button
                 type="button"
@@ -177,28 +216,14 @@ export function MatchPanel() {
                 }
                 className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
                 title={t('match.stepForwardTitle')}
+                aria-label={t('match.stepForwardTitle')}
               >
-                {t('match.stepForward')}
+                ▶
               </button>
-              {aiHasChain && (
-                <button
-                  type="button"
-                  disabled={animating}
-                  onClick={async () => {
-                    const target = aiSliderValue + 1;
-                    const completed = await playHistoryChain('ai', target);
-                    if (completed) setAiHistoryViewIndex(target);
-                  }}
-                  className="px-2 py-0.5 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
-                  title={t('match.playChainTitle')}
-                >
-                  {t('match.playChain')}
-                </button>
-              )}
             </div>
           )}
           {viewing === 'player' && playerTurns > 0 && (
-            <div className="flex flex-wrap items-center gap-1 grow min-w-0">
+            <div className="flex items-center gap-1 grow min-w-0">
               <input
                 aria-label={t('match.playerScrub')}
                 type="range"
@@ -221,8 +246,9 @@ export function MatchPanel() {
                 }
                 className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
                 title={t('match.stepBackTitle')}
+                aria-label={t('match.stepBackTitle')}
               >
-                {t('match.stepBack')}
+                ◀
               </button>
               <button
                 type="button"
@@ -234,24 +260,10 @@ export function MatchPanel() {
                 }
                 className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
                 title={t('match.stepForwardTitle')}
+                aria-label={t('match.stepForwardTitle')}
               >
-                {t('match.stepForward')}
+                ▶
               </button>
-              {playerHasChain && (
-                <button
-                  type="button"
-                  disabled={animating}
-                  onClick={async () => {
-                    const target = playerSliderValue + 1;
-                    const completed = await playHistoryChain('player', target);
-                    if (completed) setPlayerHistoryViewIndex(target);
-                  }}
-                  className="px-2 py-0.5 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
-                  title={t('match.playChainTitle')}
-                >
-                  {t('match.playChain')}
-                </button>
-              )}
             </div>
           )}
         </div>

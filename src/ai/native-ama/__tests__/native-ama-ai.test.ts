@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NativeAmaAI } from '../native-ama-ai';
+import { ROWS, COLS } from '../../../game/constants';
 
 vi.mock('../tauri-bridge', () => ({
   isTauri: () => true,
@@ -44,7 +45,11 @@ describe('NativeAmaAI', () => {
 
 function makeEmptyState() {
   return {
-    field: { cells: Array.from({ length: 13 }, () => new Array(6).fill(null)) },
+    // ROWS-row field; the AI bridge will skip the top AI_ROW_OFFSET rows
+    // when encoding for the native binary.
+    field: {
+      cells: Array.from({ length: ROWS }, () => new Array(COLS).fill(null)),
+    },
     current: { pair: { axis: 'R', child: 'B' } },
     nextQueue: [
       { axis: 'Y', child: 'P' },

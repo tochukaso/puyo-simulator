@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createInitialState, spawnNext, commitMove } from '../state';
-import { SPAWN_COL, SPAWN_AXIS_ROW } from '../constants';
+import { SPAWN_COL, SPAWN_AXIS_ROW, VISIBLE_ROW_START } from '../constants';
+import { withCell } from '../field';
 
 describe('createInitialState', () => {
   it('the first pair appears at the spawn position', () => {
@@ -26,6 +27,15 @@ describe('spawnNext', () => {
     const next = s.nextQueue[0]!;
     const s2 = spawnNext(s);
     expect(s2.current!.pair).toEqual(next);
+  });
+
+  it('triggers game-over when the death cell is occupied', () => {
+    const s = createInitialState(1);
+    // Place a puyo on the 「バツマーク」 cell (top of visible play, SPAWN_COL).
+    const blocked = { ...s, field: withCell(s.field, VISIBLE_ROW_START, SPAWN_COL, 'R' as const) };
+    const next = spawnNext(blocked);
+    expect(next.status).toBe('gameover');
+    expect(next.current).toBeNull();
   });
 });
 

@@ -41,8 +41,6 @@ export interface Dict {
   'match.resignConfirm': string;
   'match.playChain': string;
   'match.playChainTitle': string;
-  'match.stepBack': string;
-  'match.stepForward': string;
   'match.stepBackTitle': string;
   'match.stepForwardTitle': string;
   'edit.edit': string;
@@ -144,10 +142,8 @@ export const translations: Record<Lang, Dict> = {
     'match.deleteRecord': 'レコードを削除',
     'match.resign': '投了',
     'match.resignConfirm': '本当に投了しますか? このマッチは ama の勝利として終了します。',
-    'match.playChain': '▶ 連鎖',
+    'match.playChain': '▶ 再生',
     'match.playChainTitle': 'このターンの連鎖をアニメーションで再生',
-    'match.stepBack': '◀ 1手',
-    'match.stepForward': '1手 ▶',
     'match.stepBackTitle': '1手前に戻る',
     'match.stepForwardTitle': '1手先に進む',
     'edit.edit': '編集',
@@ -247,10 +243,8 @@ export const translations: Record<Lang, Dict> = {
     'match.deleteRecord': 'Delete record',
     'match.resign': 'Resign',
     'match.resignConfirm': 'Resign this match? It will end as a loss for you.',
-    'match.playChain': '▶ Chain',
+    'match.playChain': '▶ Replay',
     'match.playChainTitle': "Replay this turn's chain animation",
-    'match.stepBack': '◀ Step',
-    'match.stepForward': 'Step ▶',
     'match.stepBackTitle': 'Step back one move',
     'match.stepForwardTitle': 'Step forward one move',
     'edit.edit': 'Edit',
@@ -350,10 +344,8 @@ export const translations: Record<Lang, Dict> = {
     'match.deleteRecord': '删除记录',
     'match.resign': '认输',
     'match.resignConfirm': '确定要认输吗？本场对战将记为 ama 胜利。',
-    'match.playChain': '▶ 连锁',
+    'match.playChain': '▶ 回放',
     'match.playChainTitle': '回放本回合的连锁动画',
-    'match.stepBack': '◀ 1步',
-    'match.stepForward': '1步 ▶',
     'match.stepBackTitle': '回退一步',
     'match.stepForwardTitle': '前进一步',
     'edit.edit': '编辑',
@@ -453,10 +445,8 @@ export const translations: Record<Lang, Dict> = {
     'match.deleteRecord': '기록 삭제',
     'match.resign': '기권',
     'match.resignConfirm': '정말 기권하시겠습니까? 이 매치는 ama 승리로 종료됩니다.',
-    'match.playChain': '▶ 연쇄',
+    'match.playChain': '▶ 재생',
     'match.playChainTitle': '이 턴의 연쇄 애니메이션을 재생',
-    'match.stepBack': '◀ 1수',
-    'match.stepForward': '1수 ▶',
     'match.stepBackTitle': '한 수 전으로',
     'match.stepForwardTitle': '한 수 앞으로',
     'edit.edit': '편집',

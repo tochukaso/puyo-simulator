@@ -9,7 +9,13 @@ import {
 } from '../../hooks/useUiPrefs';
 import { usePreviewMove } from '../../hooks/useAiPreview';
 import { useT } from '../../../i18n';
-import { ROWS, COLS, SPAWN_COL, VISIBLE_ROW_START } from '../../../game/constants';
+import {
+  ROWS,
+  COLS,
+  SPAWN_COL,
+  VISIBLE_ROW_START,
+  AI_ROW_OFFSET,
+} from '../../../game/constants';
 import { PUYO_COLORS, PUYO_LIGHT, PUYO_DARK, BG_COLOR, GRID_COLOR, DANGER_COLOR } from './colors';
 import type { Color, Field, ActivePair, Move } from '../../../game/types';
 import { ghostCells } from './ghost';
@@ -120,12 +126,15 @@ export function Board() {
     }
   }
 
-  // When hiding the ceiling (row 0), shift the entire drawing up by one cell
-  // and shrink the canvas/wrapper height by one cell. Anything originating in
-  // row 0 (background strip, DANGER frame, an axis puyo on the ceiling row) is
-  // naturally clipped out.
-  const visibleRows = ceilingVisible ? ROWS : ROWS - 1;
-  const yOffset = ceilingVisible ? 0 : -cell;
+  // The transient "14段目" rows (game rows 0..AI_ROW_OFFSET-1) are reserved
+  // for rotation only and never hold a locked puyo, so we always clip them
+  // off the top of the canvas — the player should see the visible play area
+  // start at "13段目", with the active pair appearing to slide upward into
+  // empty space when 回し-style rotations lift it above the visible top.
+  // The ceiling toggle additionally hides "13段目" itself when set.
+  const hiddenRows = ceilingVisible ? AI_ROW_OFFSET : VISIBLE_ROW_START;
+  const visibleRows = ROWS - hiddenRows;
+  const yOffset = -hiddenRows * cell;
   const boardWidth = COLS * cell;
   const boardHeight = visibleRows * cell;
 
@@ -189,7 +198,7 @@ export function Board() {
     const c = Math.floor((x / rect.width) * COLS);
     const visibleH = visibleRows;
     const rVisible = Math.floor((y / rect.height) * visibleH);
-    const r = ceilingVisible ? rVisible : rVisible + 1;
+    const r = rVisible + hiddenRows;
     if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return null;
     return { row: r, col: c };
   };
@@ -292,12 +301,30 @@ function draw(
     ctx.stroke();
   }
 
+  // Semi-transparent ceiling overlay covers rows AI_ROW_OFFSET..VISIBLE_ROW_START
+  // (= row 1 / "13段目") — the always-clipped 14段目 (rows 0..AI_ROW_OFFSET-1)
+  // is off-canvas, so we don't bother covering it here.
   ctx.fillStyle = 'rgba(15, 23, 42, 0.5)';
-  ctx.fillRect(0, 0, COLS * cell, VISIBLE_ROW_START * cell);
+  ctx.fillRect(
+    0,
+    AI_ROW_OFFSET * cell,
+    COLS * cell,
+    (VISIBLE_ROW_START - AI_ROW_OFFSET) * cell,
+  );
 
+  // Danger frame highlights the 「バツマーク」 death cell — game-over fires
+  // when this cell is occupied at spawn time (see state.ts's spawnNext).
+  // Drawn at VISIBLE_ROW_START (= 12段目) so the visual rule matches the
+  // gameover trigger, and the marker stays inside the rendered area even
+  // when the ceiling row is hidden (which clips up to VISIBLE_ROW_START).
   ctx.strokeStyle = DANGER_COLOR;
   ctx.lineWidth = 2;
-  ctx.strokeRect(SPAWN_COL * cell + 1, 1, cell - 2, cell - 2);
+  ctx.strokeRect(
+    SPAWN_COL * cell + 1,
+    VISIBLE_ROW_START * cell + 1,
+    cell - 2,
+    cell - 2,
+  );
 
   // Pulse coefficient for the popping highlight. Driven by `Date.now()` and
   // called per frame from rAF.
@@ -363,8 +390,9 @@ function draw(
       3: [0, -1],
     };
     const [dr, dc] = offsets[rotation]!;
-    // Row 0 (height 13, ceiling row) is drawn semi-transparent to indicate
-    // that "this is effectively invisible territory".
+    // Rows above VISIBLE_ROW_START (13段目 / 14段目) are drawn semi-transparent
+    // to indicate "this is effectively invisible territory" — useful for the
+    // 回し technique where the active pair lifts above the visible play area.
     const axisAlpha = axisRow < VISIBLE_ROW_START ? 0.5 : 1;
     const childRow = axisRow + dr;
     const childAlpha = childRow < VISIBLE_ROW_START ? 0.5 : 1;

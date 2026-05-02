@@ -34,21 +34,21 @@ describe('applyGravity', () => {
   it('floating puyos fall down', () => {
     let f = createEmptyField();
     f = withCell(f, 0, 0, 'R');
-    f = withCell(f, 12, 0, 'B');
+    f = withCell(f, ROWS - 1, 0, 'B');
     const g = applyGravity(f);
     expect(getCell(g, 0, 0)).toBeNull();
-    expect(getCell(g, 11, 0)).toBe('R');
-    expect(getCell(g, 12, 0)).toBe('B');
+    expect(getCell(g, ROWS - 2, 0)).toBe('R');
+    expect(getCell(g, ROWS - 1, 0)).toBe('B');
   });
 
   it('packs a column with gaps so puyos stack at the bottom', () => {
     let f = createEmptyField();
     f = withCell(f, 5, 2, 'R');
     f = withCell(f, 7, 2, 'B');
-    f = withCell(f, 12, 2, 'Y');
+    f = withCell(f, ROWS - 1, 2, 'Y');
     const g = applyGravity(f);
-    expect(getCell(g, 10, 2)).toBe('R');
-    expect(getCell(g, 11, 2)).toBe('B');
-    expect(getCell(g, 12, 2)).toBe('Y');
+    expect(getCell(g, ROWS - 3, 2)).toBe('R');
+    expect(getCell(g, ROWS - 2, 2)).toBe('B');
+    expect(getCell(g, ROWS - 1, 2)).toBe('Y');
   });
 });

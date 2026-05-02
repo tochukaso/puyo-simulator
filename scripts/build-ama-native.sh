@@ -14,7 +14,7 @@ fi
 
 case "${1:-}" in
   --all-targets)
-    TARGETS=(x86_64-apple-darwin aarch64-apple-darwin aarch64-linux-android)
+    TARGETS=(x86_64-apple-darwin aarch64-apple-darwin aarch64-linux-android x86_64-linux-android)
     ;;
   --target=*)
     TARGETS=("${1#--target=}")
@@ -38,6 +38,10 @@ for T in "${TARGETS[@]}"; do
     aarch64-linux-android)
       if [ -z "${NDK_HOME:-}" ]; then echo "NDK_HOME not set" >&2; exit 3; fi
       (cd "$AMA_REPO" && NDK_HOME="$NDK_HOME" make native-arm-android)
+      ;;
+    x86_64-linux-android)
+      if [ -z "${NDK_HOME:-}" ]; then echo "NDK_HOME not set" >&2; exit 3; fi
+      (cd "$AMA_REPO" && NDK_HOME="$NDK_HOME" make native-x86-android)
       ;;
     *)
       echo "unknown target $T" >&2; exit 4 ;;

@@ -1,7 +1,54 @@
+use std::fs;
+use std::path::PathBuf;
+use std::sync::{Mutex, OnceLock};
+
 use serde::Deserialize;
 use tauri::{command, AppHandle, Manager};
 
 use crate::ama_ffi::{ensure_init, suggest, AmaError, Suggestion};
+
+// Embed config.json at compile time so we don't depend on bundle.resources
+// path resolution at runtime. On Android, app.path().resource_dir() returns
+// an `asset://localhost/...` virtual URI that ama's C++ fopen cannot read.
+// Writing a real file under app_local_data_dir keeps a single uniform path
+// across desktop and mobile.
+const AMA_CONFIG_BYTES: &[u8] = include_bytes!("../vendor/ama/config.json");
+
+static CONFIG_PATH: OnceLock<PathBuf> = OnceLock::new();
+static CONFIG_PATH_INIT: Mutex<()> = Mutex::new(());
+
+fn ensure_config_extracted(app: &AppHandle) -> Result<&'static PathBuf, String> {
+    if let Some(p) = CONFIG_PATH.get() {
+        return Ok(p);
+    }
+    // Serialize cold-start extraction so a second concurrent ama_suggest
+    // doesn't observe a half-written config file or race the temp-rename.
+    let _guard = CONFIG_PATH_INIT
+        .lock()
+        .map_err(|_| "CONFIG_PATH_INIT poisoned".to_string())?;
+    if let Some(p) = CONFIG_PATH.get() {
+        return Ok(p);
+    }
+    let dir = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|e| format!("app_local_data_dir: {e}"))?;
+    fs::create_dir_all(&dir).map_err(|e| format!("create_dir_all: {e}"))?;
+    let path = dir.join("ama-config.json");
+    let needs_write = match fs::read(&path) {
+        Ok(existing) => existing != AMA_CONFIG_BYTES,
+        Err(_) => true,
+    };
+    if needs_write {
+        let tmp = path.with_extension("json.tmp");
+        fs::write(&tmp, AMA_CONFIG_BYTES)
+            .map_err(|e| format!("write {}: {e}", tmp.display()))?;
+        fs::rename(&tmp, &path)
+            .map_err(|e| format!("rename {} -> {}: {e}", tmp.display(), path.display()))?;
+    }
+    let _ = CONFIG_PATH.set(path);
+    Ok(CONFIG_PATH.get().unwrap())
+}
 
 #[derive(Debug, Deserialize)]
 pub struct SuggestInput {
@@ -25,18 +72,10 @@ pub async fn ama_suggest(
     app: AppHandle,
     input: SuggestInput,
 ) -> Result<Suggestion, String> {
-    // tauri.conf.json declares `vendor/ama/config.json` in bundle.resources, so
-    // the bundler preserves that path under resource_dir() (e.g.
-    // .app/Contents/Resources/vendor/ama/config.json). Don't strip the prefix —
-    // earlier code used join("config.json") and silently failed init in production.
-    let config_path = app
-        .path()
-        .resource_dir()
-        .map_err(|e| format!("resource_dir: {e}"))?
-        .join("vendor/ama/config.json");
+    let config_path = ensure_config_extracted(&app)?;
 
-    ensure_init(&input.preset, &config_path)
-        .map_err(|e| format!("{e} (preset={}, config_path={})", input.preset, config_path.display()))?;
+    ensure_init(&input.preset, config_path)
+        .map_err(|e| format!("{e} (preset={})", input.preset))?;
 
     if input.field.len() != 78 {
         return Err("field must be exactly 78 chars".into());

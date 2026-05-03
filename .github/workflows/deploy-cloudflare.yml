@@ -1,0 +1,47 @@
+name: Deploy to Cloudflare Workers
+
+# main への push 時に自動デプロイ。手動実行も許可。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# 同一ブランチで連続 push されても、安全のためキャンセルせず順次実行する。
+# (デプロイ最中の中断はカスタムドメインの剥がれ等を招きうるため。)
+concurrency:
+  group: cf-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      # Pin third-party actions by full commit SHA. タグ書き換えによるサプライ
+      # チェーン攻撃を避けるため、必ず SHA を使い、隣に検証済みのバージョンを
+      # コメントしておく(.github/workflows/ci.yml と同じ方針)。
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and deploy
+        env:
+          # 機密情報はすべて GitHub Secrets 経由で注入する。
+          # repo は public なので wrangler.jsonc にもこれらを書かない。
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CUSTOM_DOMAIN: ${{ secrets.CUSTOM_DOMAIN }}
+        run: npm run deploy

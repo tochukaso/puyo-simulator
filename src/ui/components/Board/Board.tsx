@@ -134,9 +134,14 @@ export function Board() {
   // The ceiling toggle additionally hides "13段目" itself when set.
   const hiddenRows = ceilingVisible ? AI_ROW_OFFSET : VISIBLE_ROW_START;
   const visibleRows = ROWS - hiddenRows;
-  const yOffset = -hiddenRows * cell;
+  // Reveal the bottom half of the topmost otherwise-hidden row in both
+  // modes — gives the player a peek at incoming pieces / 回し motion
+  // without flipping the full ceiling display on. Pixel-quantized so the
+  // canvas dims stay integer regardless of `cell`.
+  const topRevealPx = Math.floor(cell / 2);
+  const yOffset = -hiddenRows * cell + topRevealPx;
   const boardWidth = COLS * cell;
-  const boardHeight = visibleRows * cell;
+  const boardHeight = visibleRows * cell + topRevealPx;
 
   useLayoutEffect(() => {
     const ro = new ResizeObserver((entries) => {
@@ -193,12 +198,12 @@ export function Board() {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    // Convert canvas-pixel coords back to logical (row, col), accounting for
-    // the optional ceiling-row hidden offset.
+    // Convert canvas-pixel coords back to logical (row, col). Drawing
+    // translates by yOffset so canvas-y maps to game-y = canvas-y - yOffset.
+    // Scale through rect to handle any CSS resizing of the canvas element.
     const c = Math.floor((x / rect.width) * COLS);
-    const visibleH = visibleRows;
-    const rVisible = Math.floor((y / rect.height) * visibleH);
-    const r = rVisible + hiddenRows;
+    const yPx = (y / rect.height) * boardHeight;
+    const r = Math.floor((yPx - yOffset) / cell);
     if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return null;
     return { row: r, col: c };
   };

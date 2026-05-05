@@ -113,7 +113,7 @@ export interface Dict {
 
 export const translations: Record<Lang, Dict> = {
   ja: {
-    'app.title': 'ぷよトレーニング',
+    'app.title': 'GTR トレーニング',
     'header.ghost': 'ゴースト',
     'header.ceiling': '天井',
     'header.trainer': 'テンプレ',
@@ -214,7 +214,7 @@ export const translations: Record<Lang, Dict> = {
     'board.chain': '{n}れんさ!',
   },
   en: {
-    'app.title': 'Puyo Training',
+    'app.title': 'GTR Training',
     'header.ghost': 'Ghost',
     'header.ceiling': 'Ceiling',
     'header.trainer': 'Template',
@@ -315,7 +315,7 @@ export const translations: Record<Lang, Dict> = {
     'board.chain': '{n} chain!',
   },
   zh: {
-    'app.title': '噗哟训练',
+    'app.title': 'GTR 训练',
     'header.ghost': '幽灵预览',
     'header.ceiling': '顶部',
     'header.trainer': '模板',
@@ -416,7 +416,7 @@ export const translations: Record<Lang, Dict> = {
     'board.chain': '{n}连锁!',
   },
   ko: {
-    'app.title': '뿌요 트레이닝',
+    'app.title': 'GTR 트레이닝',
     'header.ghost': '고스트',
     'header.ceiling': '천장',
     'header.trainer': '템플릿',

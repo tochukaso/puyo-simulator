@@ -56,7 +56,8 @@ export function Board() {
   // this, the player is actively playing — we always show their live game and
   // ignore history view indices entirely.
   const inReplay =
-    mode === 'match' && (matchEnded || playerGame.status === 'gameover');
+    (mode === 'match' || mode === 'score') &&
+    (matchEnded || playerGame.status === 'gameover');
   // History view index defaults to the latest snapshot when the user hasn't
   // explicitly scrubbed. (No live-tracking mode: there's no UI to escape back
   // to following the live game state — replay is always frame-accurate.)
@@ -110,7 +111,9 @@ export function Board() {
   // match モードでは候補手リスト・ゴースト・「AI 最善手」ボタンを全部隠して
   // いるので、worker への suggest 投げそのものを止める (WASM 全幅探索は重い
   // ので生かしっぱなしは計算資源の無駄)。
-  const { moves } = useAiSuggestion(5, mode !== 'match');
+  // free モードのみ AI 候補手 / ghost を出す。match (対人戦) と score
+  // (一発勝負) では AI ヒント無しがユーザー要件。
+  const { moves } = useAiSuggestion(5, mode === 'free');
   const ghostEnabled = useGhostEnabled();
   const ceilingVisible = useCeilingVisible();
   const previewMove = usePreviewMove();
@@ -129,7 +132,7 @@ export function Board() {
         viewing === 'ai'
           ? (matchAiMoves[aiViewIdx + 1] ?? null)
           : (matchPlayerMoves[playerViewIdx + 1] ?? null);
-    } else if (mode !== 'match' && viewing === 'player') {
+    } else if (mode === 'free' && viewing === 'player') {
       bestMove = previewMove ?? moves[0] ?? null;
     }
   }

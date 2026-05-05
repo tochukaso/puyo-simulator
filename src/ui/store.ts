@@ -81,9 +81,20 @@ const EMPTY_AI_STATS: AiStats = {
 
 export type CommitSource = 'user' | 'ai';
 
-export type GameMode = 'free' | 'match';
-export type MatchTurnLimit = 30 | 50 | 100;
+// 'free' = 自由練習(ターン無制限・ama 不在・全機能)。
+// 'match' = ama とのスコア勝負(ターン上限あり・ama 並走)。
+// 'score' = 一人用スコアモード(ama 不在・上限あり/無制限選択可能・undo/AI 不可)。
+export type GameMode = 'free' | 'match' | 'score';
+// match モードは 30/50/100 のみ、score モードは + 200 と 'unlimited' も可。
+// 共通の型として持っておき、UI 側で mode 別に許可値を絞る。
+export type MatchTurnLimit = 30 | 50 | 100 | 200 | 'unlimited';
 export type ViewSide = 'player' | 'ai';
+
+// 'unlimited' でも matchTurnsPlayed >= matchTurnLimit が常に false になる
+// よう Infinity で評価したいので、数値 / Infinity に正規化するヘルパー。
+export function turnLimitToNumber(limit: MatchTurnLimit): number {
+  return limit === 'unlimited' ? Infinity : limit;
+}
 
 /** Edit-mode palette selection. 'X' = eraser. */
 export type EditPalette = Color | 'G' | 'X';
@@ -179,6 +190,13 @@ interface Store {
   setGameMode(mode: GameMode): void;
   setMatchTurnLimit(limit: MatchTurnLimit): void;
   startMatch(opts?: { seed?: number; turnLimit?: MatchTurnLimit }): void;
+  /** 一人用スコアモードを開始。ama は登場しない。
+   *  turnLimit: 30 / 50 / 100 / 200 / 'unlimited'。 */
+  startScore(opts?: { seed?: number; turnLimit?: MatchTurnLimit }): void;
+  /** score モードのみ。ユーザーがゲームを途中で終了する (Quit ボタン)。
+   *  ターン数到達と同じく matchEnded=true + matchResult をセットして、
+   *  保存・共有 UI を出せる状態にする。 */
+  quitScore(): void;
   /** Apply a single AI auto-play move on the AI's parallel state and snapshot it. Called by the match driver. */
   applyAiMove(move: Move): void;
   setViewing(side: ViewSide): void;
@@ -264,7 +282,9 @@ const MAX_HISTORY = 100;
 
 function readPersistedMode(): GameMode {
   try {
-    return localStorage.getItem('puyo.gameMode') === 'match' ? 'match' : 'free';
+    const raw = localStorage.getItem('puyo.gameMode');
+    if (raw === 'match' || raw === 'score') return raw;
+    return 'free';
   } catch {
     return 'free';
   }
@@ -276,6 +296,8 @@ function readPersistedTurnLimit(): MatchTurnLimit {
     if (raw === '30') return 30;
     if (raw === '50') return 50;
     if (raw === '100') return 100;
+    if (raw === '200') return 200;
+    if (raw === 'unlimited') return 'unlimited';
     return 50;
   } catch {
     return 50;
@@ -308,6 +330,10 @@ function simulateRecordSide(
   moves: ReadonlyArray<Move>,
   turnLimit: number,
 ): { history: GameState[]; lastState: GameState } {
+  // turnLimit=0 は records.ts 仕様で 'unlimited' のセンチネル。Infinity に
+  // 変換しないと「常に atLimit」になり spawnNext が一度も呼ばれず、初手で
+  // current=null のまま再生が止まってしまう。
+  const limit = turnLimit <= 0 ? Infinity : turnLimit;
   const history: GameState[] = [];
   let state = createInitialState(seed);
   for (let i = 0; i < moves.length; i++) {
@@ -330,7 +356,7 @@ function simulateRecordSide(
       maxChain: Math.max(state.maxChain, steps.length),
       status: 'resolving',
     };
-    const atLimit = i + 1 >= turnLimit;
+    const atLimit = i + 1 >= limit;
     state = atLimit ? resolved : spawnNext(resolved);
     history.push(state);
   }
@@ -527,24 +553,24 @@ export const useGameStore = create<Store>((set, get) => ({
       maxChain,
       status: 'resolving',
     };
-    // Match mode: if this commit consumes the regulated turn count, don't
-    // spawn the next pair. Leaving current=null prevents any further player
-    // input (dispatch / commit both no-op when current is null) and keeps a
-    // useless "ghost pair" out of the visual once the match is resolved.
+    // ターン上限に達した瞬間は次のペアを spawn しない (current=null にしておけば
+    // 以降の dispatch / commit が no-op になり、無意味な "ghost pair" が表示
+    // されないで済む)。match / score 両モードで同じロジック。'unlimited' は
+    // turnLimitToNumber で Infinity になるので常にこの分岐に入らない。
     const stHere = get();
+    const limited = stHere.mode === 'match' || stHere.mode === 'score';
     const playerAtLimit =
-      stHere.mode === 'match' &&
+      limited &&
       !stHere.matchEnded &&
-      stHere.matchTurnsPlayed + 1 >= stHere.matchTurnLimit;
+      stHere.matchTurnsPlayed + 1 >= turnLimitToNumber(stHere.matchTurnLimit);
     const nextGame: GameState = playerAtLimit
       ? finalState
       : spawnNext(finalState);
     set({ game: nextGame, animatingSteps: [], poppingCells: [] });
 
-    // Match-mode bookkeeping. Both 'user' and 'ai' sources count as a player
-    // turn — clicking AI Best is the player's chosen action for this turn, just
-    // delegated.
-    if (get().mode === 'match' && !get().matchEnded) {
+    // match / score モードのターン記録。score モードも playerHistory + 手列を
+    // 揃えておくと scrubber UI と保存・リプレイ・URL 共有がそのまま使える。
+    if ((get().mode === 'match' || get().mode === 'score') && !get().matchEnded) {
       set((st) => ({
         matchTurnsPlayed: st.matchTurnsPlayed + 1,
         matchPlayerMoves: [
@@ -576,6 +602,9 @@ export const useGameStore = create<Store>((set, get) => ({
     const st = get();
     const { animatingSteps, mode } = st;
     if (animatingSteps.length > 0) return;
+
+    // score モードはユーザー要件で undo 不可 (一発勝負のスコアアタック前提)。
+    if (mode === 'score') return;
 
     if (mode === 'match') {
       // Match mode の undo はプレイヤー側だけを巻き戻す。ama の盤面・履歴は
@@ -639,6 +668,8 @@ export const useGameStore = create<Store>((set, get) => ({
   canUndo: () => {
     const st = get();
     if (st.animatingSteps.length > 0) return false;
+    // score モードはユーザー要件で常時 undo 不可。
+    if (st.mode === 'score') return false;
     if (st.mode === 'match') {
       return !st.matchEnded && st.matchTurnsPlayed > 0;
     }
@@ -648,7 +679,8 @@ export const useGameStore = create<Store>((set, get) => ({
   // ---- Match-vs-AI actions ----
 
   setGameMode: (mode) => {
-    const fromMatch = get().mode === 'match';
+    const prevMode = get().mode;
+    const fromMatchOrScore = prevMode === 'match' || prevMode === 'score';
     persistMode(mode);
     set({ mode });
     // Stats from the previous mode (e.g. a finished match) shouldn't bleed
@@ -665,7 +697,7 @@ export const useGameStore = create<Store>((set, get) => ({
       //     の経路を辿ると、free の undo が古い snapshot を読み出して盤面が
       //     ジャンプする潜在バグになる。リセットすればこのチェーンを断てる。
       const fresh: Partial<Pick<Store, 'game' | 'history' | 'freePlayerMoves' | 'animatingSteps' | 'poppingCells' | 'chainTexts' | 'landedCells'>> =
-        fromMatch
+        fromMatchOrScore
           ? {
               game: createInitialState(Date.now() | 0),
               history: [],
@@ -703,7 +735,10 @@ export const useGameStore = create<Store>((set, get) => ({
     // in-flight history replay must be invalidated before we set new state.
     historyAnimSeq++;
     const seed = opts?.seed ?? (Date.now() | 0);
-    const turnLimit = opts?.turnLimit ?? get().matchTurnLimit;
+    // match モードは 'unlimited' を許可しない (ama 側もどこかで止まる必要がある)。
+    // 'unlimited' を引き継いだら 100 にフォールバック。
+    let turnLimit = opts?.turnLimit ?? get().matchTurnLimit;
+    if (turnLimit === 'unlimited' || turnLimit === 200) turnLimit = 100;
     persistMode('match');
     persistTurnLimit(turnLimit);
     const playerGame = createInitialState(seed);
@@ -740,29 +775,93 @@ export const useGameStore = create<Store>((set, get) => ({
     });
   },
 
+  startScore: (opts) => {
+    // 一人用 score モード。startMatch とほぼ同じだが ama は登場しないので
+    // aiGame / aiHistory / matchAiMoves は空のまま。turnLimit は 30/50/100/
+    // 200/'unlimited' を受け付ける。
+    historyAnimSeq++;
+    const seed = opts?.seed ?? (Date.now() | 0);
+    const turnLimit = opts?.turnLimit ?? get().matchTurnLimit;
+    persistMode('score');
+    persistTurnLimit(turnLimit);
+    const playerGame = createInitialState(seed);
+    set({
+      mode: 'score',
+      matchTurnLimit: turnLimit,
+      matchSeed: seed,
+      // score では preset は意味を持たないが、保存スキーマを揃えるため空文字。
+      matchPreset: '',
+      game: playerGame,
+      aiGame: null,
+      aiHistory: [],
+      playerHistory: [],
+      matchTurnsPlayed: 0,
+      matchPlayerMoves: [],
+      matchAiMoves: [],
+      matchEnded: false,
+      matchResult: null,
+      loadedRecordId: null,
+      viewing: 'player',
+      aiHistoryViewIndex: null,
+      playerHistoryViewIndex: null,
+      historyAnim: null,
+      animatingSteps: [],
+      poppingCells: [],
+      chainTexts: [],
+      landedCells: [],
+      history: [],
+      aiStats: { ...EMPTY_AI_STATS },
+      analyzing: false,
+      freePlayerMoves: [],
+    });
+  },
+
+  quitScore: () => {
+    const st = get();
+    if (st.mode !== 'score' || st.matchEnded) return;
+    set({
+      matchEnded: true,
+      matchResult: {
+        playerScore: st.game.score,
+        aiScore: 0,
+        // score モードに勝敗は無いが、MatchResult 型を再利用しているので
+        // 'player' を入れる (UI 側で score モードかをチェックして表示を分岐)。
+        winner: 'player',
+      },
+    });
+  },
+
   loadRecord: (record) => {
     // 在ロード中のリプレイ表示や再生中のチェーンアニメは全部破棄。
     historyAnimSeq++;
-    persistMode('match');
+    // record.mode が無い (legacy) は 'match' 扱い。
+    const recMode: 'match' | 'score' = record.mode ?? 'match';
+    persistMode(recMode);
 
     const sim = simulateRecordSide(
       record.seed,
       record.playerMoves,
       record.turnLimit,
     );
-    const aiSim = simulateRecordSide(
-      record.seed,
-      record.aiMoves,
-      record.turnLimit,
-    );
+    // score モードは ama 側が無いので simulate しない (record.aiMoves は空配列)。
+    const aiSim =
+      recMode === 'match'
+        ? simulateRecordSide(record.seed, record.aiMoves, record.turnLimit)
+        : { history: [] as GameState[], lastState: null as GameState | null };
 
-    // matchTurnLimit は 30/50/100 のリテラル型だが、過去レコードには 200 等が
-    // 残っていることがある (records.ts のコメント参照)。表示と境界判定にしか
-    // 使わないので、unsafe-ish に cast して載せる。
-    const turnLimit = record.turnLimit as MatchTurnLimit;
+    // matchTurnLimit のリテラル型に揃える。turnLimit=0 は score モードの
+    // 「無制限」のセンチネル。それ以外はサポート対象 (30/50/100/200) のみ
+    // 採用し、未知の値 (legacy で 60 など) はデフォルト 50 にフォールバック。
+    const VALID_LIMITS: ReadonlyArray<MatchTurnLimit> = [30, 50, 100, 200];
+    const turnLimit: MatchTurnLimit =
+      record.turnLimit <= 0
+        ? 'unlimited'
+        : VALID_LIMITS.includes(record.turnLimit as MatchTurnLimit)
+          ? (record.turnLimit as MatchTurnLimit)
+          : 50;
 
     set({
-      mode: 'match',
+      mode: recMode,
       matchTurnLimit: turnLimit,
       matchSeed: record.seed,
       matchPreset: record.preset,
@@ -824,7 +923,10 @@ export const useGameStore = create<Store>((set, get) => ({
     };
     // Symmetric with the player side: skip spawnNext on the regulated last
     // turn so we don't dangle an unplayable pair on top of the AI board.
-    const aiAtLimit = st.aiHistory.length + 1 >= st.matchTurnLimit;
+    // 'unlimited' は match モードでは弾いている (startMatch で 100 にフォール
+    // バック) ので Infinity は来ない想定だが、念のため数値化。
+    const aiAtLimit =
+      st.aiHistory.length + 1 >= turnLimitToNumber(st.matchTurnLimit);
     const nextAiGame = aiAtLimit ? resolved : spawnNext(resolved);
     set((cur) => ({
       aiGame: nextAiGame,
@@ -994,12 +1096,33 @@ export const useGameStore = create<Store>((set, get) => ({
 
   finalizeMatchIfDone: () => {
     const st = get();
-    if (st.mode !== 'match' || st.matchEnded) return;
+    if (st.matchEnded) return;
+    const limit = turnLimitToNumber(st.matchTurnLimit);
+
+    if (st.mode === 'score') {
+      // score モードはターン上限到達 or top-out で終了。Quit ボタンは別経路
+      // (quitScore) でセットされるのでここでは扱わない。'unlimited' は limit
+      // が Infinity になるので top-out しか終了条件にならない。
+      const done =
+        st.matchTurnsPlayed >= limit || st.game.status === 'gameover';
+      if (!done) return;
+      set({
+        matchEnded: true,
+        matchResult: {
+          playerScore: st.game.score,
+          aiScore: 0,
+          winner: 'player',
+        },
+      });
+      return;
+    }
+
+    if (st.mode !== 'match') return;
     const playerDone =
-      st.matchTurnsPlayed >= st.matchTurnLimit || st.game.status === 'gameover';
+      st.matchTurnsPlayed >= limit || st.game.status === 'gameover';
     const aiDone =
       !st.aiGame ||
-      st.aiHistory.length >= st.matchTurnLimit ||
+      st.aiHistory.length >= limit ||
       st.aiGame.status === 'gameover';
     if (!playerDone || !aiDone) return;
     const playerScore = st.game.score;
@@ -1023,14 +1146,15 @@ export const useGameStore = create<Store>((set, get) => ({
   analyzeStats: async () => {
     const st0 = get();
     if (st0.analyzing) return;
-    const moves =
-      st0.mode === 'match' ? st0.matchPlayerMoves : st0.freePlayerMoves;
+    // match / score 両モードとも matchPlayerMoves に手が記録されている。
+    // free モードは freePlayerMoves。
+    const usesMatchMoves = st0.mode === 'match' || st0.mode === 'score';
+    const moves = usesMatchMoves ? st0.matchPlayerMoves : st0.freePlayerMoves;
     if (moves.length === 0) {
       set({ aiStats: { ...EMPTY_AI_STATS } });
       return;
     }
-    const seed =
-      st0.mode === 'match' ? (st0.matchSeed ?? null) : st0.game.rngSeed;
+    const seed = usesMatchMoves ? (st0.matchSeed ?? null) : st0.game.rngSeed;
     if (seed === null) return;
 
     set({ analyzing: true, aiStats: { ...EMPTY_AI_STATS } });
@@ -1044,9 +1168,11 @@ export const useGameStore = create<Store>((set, get) => ({
       if (!state.current) break;
       // 起動中に mode/move 列が変わった (例: 解析中にユーザがリセット) なら中断。
       const stCheck = get();
+      const stillUsesMatchMoves =
+        stCheck.mode === 'match' || stCheck.mode === 'score';
       const stillSame =
         stCheck.analyzing &&
-        (stCheck.mode === 'match'
+        (stillUsesMatchMoves
           ? stCheck.matchPlayerMoves === moves
           : stCheck.freePlayerMoves === moves);
       if (!stillSame) {

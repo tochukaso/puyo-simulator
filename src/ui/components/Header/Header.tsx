@@ -23,6 +23,7 @@ export function Header() {
   const setGameMode = useGameStore((s) => s.setGameMode);
   const setMatchTurnLimit = useGameStore((s) => s.setMatchTurnLimit);
   const startMatch = useGameStore((s) => s.startMatch);
+  const startScore = useGameStore((s) => s.startScore);
   const editing = useGameStore((s) => s.editing);
   const enterEditMode = useGameStore((s) => s.enterEditMode);
   const exitEditMode = useGameStore((s) => s.exitEditMode);
@@ -55,7 +56,11 @@ export function Header() {
           onChange={(e) => {
             const next = e.target.value as GameMode;
             if (next === 'match' && mode !== 'match') {
+              // match モードに 'unlimited' / 200 はそのまま渡せないので、
+              // startMatch 側で 100 にフォールバックさせる。
               startMatch({ turnLimit: matchTurnLimit });
+            } else if (next === 'score' && mode !== 'score') {
+              startScore({ turnLimit: matchTurnLimit });
             } else {
               setGameMode(next);
             }
@@ -64,21 +69,31 @@ export function Header() {
         >
           <option value="free">{t('header.modeFree')}</option>
           <option value="match">{t('header.modeMatch')}</option>
+          <option value="score">{t('header.modeScore')}</option>
         </select>
-        {mode === 'match' && (
+        {(mode === 'match' || mode === 'score') && (
           <select
             aria-label={t('header.turnLimit')}
-            value={matchTurnLimit}
+            value={String(matchTurnLimit)}
             onChange={(e) => {
-              const limit = (Number(e.target.value) as MatchTurnLimit);
+              const raw = e.target.value;
+              const limit: MatchTurnLimit =
+                raw === 'unlimited'
+                  ? 'unlimited'
+                  : (Number(raw) as MatchTurnLimit);
               setMatchTurnLimit(limit);
-              startMatch({ turnLimit: limit });
+              if (mode === 'match') startMatch({ turnLimit: limit });
+              else startScore({ turnLimit: limit });
             }}
             className="bg-slate-800 text-slate-100 border border-slate-700 rounded px-2 py-1 text-sm"
           >
             <option value="30">30</option>
             <option value="50">50</option>
             <option value="100">100</option>
+            {mode === 'score' && <option value="200">200</option>}
+            {mode === 'score' && (
+              <option value="unlimited">{t('header.turnUnlimited')}</option>
+            )}
           </select>
         )}
         {/* 編集モードトグル。マッチ中に編集に入ろうとしたら 1 回だけ確認を出す
@@ -90,7 +105,7 @@ export function Header() {
               exitEditMode(true);
               return;
             }
-            if (mode === 'match') {
+            if (mode === 'match' || mode === 'score') {
               if (!(await confirmDialog(t('edit.matchExitConfirm')))) return;
               setGameMode('free');
             }

@@ -19,11 +19,14 @@ export function AnalysisDialog({ onClose }: { onClose: () => void }) {
   const t = useT();
 
   const moveCount =
-    mode === 'match' ? matchPlayerMoves.length : freePlayerMoves.length;
+    mode === 'match' || mode === 'score'
+      ? matchPlayerMoves.length
+      : freePlayerMoves.length;
   const canAnalyze =
     !analyzing &&
     moveCount > 0 &&
-    (mode === 'free' || (mode === 'match' && matchEnded));
+    (mode === 'free' ||
+      ((mode === 'match' || mode === 'score') && matchEnded));
 
   // 開いた時点で結果が無く、解析可能な状態なら自動起動。
   useEffect(() => {
@@ -54,7 +57,7 @@ export function AnalysisDialog({ onClose }: { onClose: () => void }) {
     body = (
       <p className="text-slate-400 text-sm">{t('analysis.noMoves')}</p>
     );
-  } else if (mode === 'match' && !matchEnded) {
+  } else if ((mode === 'match' || mode === 'score') && !matchEnded) {
     body = (
       <p className="text-slate-400 text-sm">{t('analysis.matchInProgress')}</p>
     );

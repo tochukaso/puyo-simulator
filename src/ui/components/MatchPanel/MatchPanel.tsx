@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useGameStore } from '../../store';
+import { useGameStore, turnLimitToNumber } from '../../store';
 import { useT } from '../../../i18n';
 import { saveRecord } from '../../../match/records';
+import { ShareReplayDialog } from '../ShareDialog/ShareReplayDialog';
 
 // Live status panel for match mode: turn counter, dual scores, side toggle,
 // and (when applicable) an AI history scrubber. Hidden in 'free' mode.
@@ -31,10 +32,12 @@ export function MatchPanel() {
   const playHistoryChain = useGameStore((s) => s.playHistoryChain);
   const historyAnim = useGameStore((s) => s.historyAnim);
   const startMatch = useGameStore((s) => s.startMatch);
+  const startScore = useGameStore((s) => s.startScore);
   const setGameMode = useGameStore((s) => s.setGameMode);
   const reset = useGameStore((s) => s.reset);
   const loadedRecordId = useGameStore((s) => s.loadedRecordId);
   const t = useT();
+  const [shareReplayOpen, setShareReplayOpen] = useState(false);
 
   // 保存済みレコードの一覧はケバブメニューの RecordsDialog に移管したので、
   // ここでは「このマッチをまだ保存していない」フラグだけを保持する。
@@ -48,10 +51,15 @@ export function MatchPanel() {
     setSavedThisMatch(false);
   }, [matchSeed]);
 
-  if (mode !== 'match') return null;
+  if (mode !== 'match' && mode !== 'score') return null;
 
+  const isScore = mode === 'score';
   const aiScore = aiGame?.score ?? 0;
-  const remaining = Math.max(0, matchTurnLimit - matchTurnsPlayed);
+  const turnLimitN = turnLimitToNumber(matchTurnLimit);
+  // 'unlimited' (Infinity) のときは「残り」表示は意味がないので空に。
+  const remaining = Number.isFinite(turnLimitN)
+    ? Math.max(0, turnLimitN - matchTurnsPlayed)
+    : null;
   const aiTurns = aiHistory.length;
   const playerTurns = playerHistory.length;
   // Slider only meaningful when there's at least one snapshot on that side.
@@ -87,9 +95,15 @@ export function MatchPanel() {
         <span className="text-slate-300">
           {t('match.turn')}:{' '}
           <b className="text-white tabular-nums">
-            {matchTurnsPlayed}/{matchTurnLimit}
+            {matchTurnsPlayed}/
+            {matchTurnLimit === 'unlimited' ? '∞' : matchTurnLimit}
           </b>
-          <span className="text-slate-500"> ({t('match.remaining', { n: remaining })})</span>
+          {remaining !== null && (
+            <span className="text-slate-500">
+              {' '}
+              ({t('match.remaining', { n: remaining })})
+            </span>
+          )}
         </span>
         <span className="text-slate-300">
           {t('match.you')}:{' '}
@@ -98,17 +112,24 @@ export function MatchPanel() {
           </b>
           <span className="text-slate-500 tabular-nums">
             {' '}
-            ({matchTurnsPlayed}/{matchTurnLimit})
+            ({matchTurnsPlayed}/
+            {matchTurnLimit === 'unlimited' ? '∞' : matchTurnLimit})
           </span>
         </span>
-        <span className="text-slate-300">
-          {t('match.ama')}:{' '}
-          <b className="text-amber-300 tabular-nums">{aiScore.toLocaleString()}</b>
-          <span className="text-slate-500 tabular-nums">
-            {' '}
-            ({aiTurns}/{matchTurnLimit})
+        {/* score モードは 1 人用なので ama 列は出さない。 */}
+        {!isScore && (
+          <span className="text-slate-300">
+            {t('match.ama')}:{' '}
+            <b className="text-amber-300 tabular-nums">
+              {aiScore.toLocaleString()}
+            </b>
+            <span className="text-slate-500 tabular-nums">
+              {' '}
+              ({aiTurns}/
+              {matchTurnLimit === 'unlimited' ? '∞' : matchTurnLimit})
+            </span>
           </span>
-        </span>
+        )}
       </div>
 
       {/* マッチ進行中は ama 盤面の覗き見を許さない (「ama の打ち方を真似る」が
@@ -119,32 +140,35 @@ export function MatchPanel() {
         <div className="flex flex-col gap-2">
           {/* Row 1: side toggle on the left, contextual chain replay button
               pushed to the right end of the same row (per-side, only when
-              that side's next move resolves into a chain). */}
+              that side's next move resolves into a chain).
+              score モードは ama 盤面が無いので side toggle を出さない。 */}
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="inline-flex rounded overflow-hidden border border-slate-700">
-              <button
-                type="button"
-                onClick={() => setViewing('player')}
-                className={`px-2 py-1 text-xs ${
-                  viewing === 'player'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                }`}
-              >
-                {t('match.viewYou')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewing('ai')}
-                className={`px-2 py-1 text-xs ${
-                  viewing === 'ai'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                }`}
-              >
-                {t('match.viewAi')}
-              </button>
-            </div>
+            {!isScore && (
+              <div className="inline-flex rounded overflow-hidden border border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setViewing('player')}
+                  className={`px-2 py-1 text-xs ${
+                    viewing === 'player'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  {t('match.viewYou')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewing('ai')}
+                  className={`px-2 py-1 text-xs ${
+                    viewing === 'ai'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  {t('match.viewAi')}
+                </button>
+              </div>
+            )}
             {viewing === 'ai' && aiTurns > 0 && aiHasChain && (
               <button
                 type="button"
@@ -265,16 +289,31 @@ export function MatchPanel() {
       )}
       {matchEnded && matchResult && (
         <div className="border-t border-slate-700 pt-2 flex flex-wrap items-center gap-3">
-          <span className="text-base">
-            {matchResult.winner === 'player'
-              ? `🏆 ${t('match.youWin')}`
-              : matchResult.winner === 'ai'
-                ? `🤖 ${t('match.amaWin')}`
-                : t('match.draw')}
-          </span>
-          <span className="text-slate-400">
-            {playerScore.toLocaleString()} vs {aiScore.toLocaleString()}
-          </span>
+          {/* score モードは勝敗の概念が無いので「最終スコア: X」、match モード
+              は従来どおり 🏆/🤖/draw のラベルとスコア対比を出す。 */}
+          {isScore ? (
+            <>
+              <span className="text-base">
+                {t('match.scoreFinal')}:{' '}
+                <b className="text-emerald-300 tabular-nums">
+                  {matchResult.playerScore.toLocaleString()}
+                </b>
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-base">
+                {matchResult.winner === 'player'
+                  ? `🏆 ${t('match.youWin')}`
+                  : matchResult.winner === 'ai'
+                    ? `🤖 ${t('match.amaWin')}`
+                    : t('match.draw')}
+              </span>
+              <span className="text-slate-400">
+                {playerScore.toLocaleString()} vs {aiScore.toLocaleString()}
+              </span>
+            </>
+          )}
           {loadedRecordId !== null ? (
             // 既に保存済みのレコードを開いて見ているので「保存」は出さず、
             // 代わりに状況がわかるバッジ + リプレイ表示を抜けるショートカット
@@ -299,36 +338,69 @@ export function MatchPanel() {
               </button>
             </>
           ) : (
-            <button
-              type="button"
-              disabled={savedThisMatch || matchSeed === null}
-              onClick={async () => {
-                if (matchSeed === null) return;
-                await saveRecord({
-                  turnLimit: matchTurnLimit,
-                  preset: matchPreset,
-                  seed: matchSeed,
-                  playerScore,
-                  aiScore,
-                  winner: matchResult.winner,
-                  playerMoves: matchPlayerMoves,
-                  aiMoves: matchAiMoves,
-                });
-                setSavedThisMatch(true);
-              }}
-              className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
-            >
-              {savedThisMatch ? t('match.saved') : t('match.save')}
-            </button>
+            <>
+              <button
+                type="button"
+                disabled={savedThisMatch || matchSeed === null}
+                onClick={async () => {
+                  if (matchSeed === null) return;
+                  // saveRecord は IndexedDB エラー (private mode 等) で reject
+                  // しうるので、unhandled rejection にせず保存済みフラグを
+                  // 立てないことでユーザーが再試行できる状態に留める。
+                  try {
+                    await saveRecord({
+                      // turnLimit は数値 (or 'unlimited' センチネル 0) で永続化する。
+                      // 'unlimited' は MatchRecord 仕様上 0 で表すので変換。
+                      mode: isScore ? 'score' : 'match',
+                      turnLimit:
+                        matchTurnLimit === 'unlimited' ? 0 : matchTurnLimit,
+                      preset: matchPreset,
+                      seed: matchSeed,
+                      playerScore,
+                      aiScore,
+                      winner: matchResult.winner,
+                      playerMoves: matchPlayerMoves,
+                      aiMoves: matchAiMoves,
+                    });
+                    setSavedThisMatch(true);
+                  } catch {
+                    // 失敗時はフラグを立てず、ボタン文字も「保存」のままにして
+                    // ユーザーがもう一度押せるようにする。
+                  }
+                }}
+                className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
+              >
+                {savedThisMatch ? t('match.saved') : t('match.save')}
+              </button>
+              {/* score モードのみ「リプレイ共有」(URL に手順を埋め込む)。
+                  match モードは ama 側の盤面も再現が必要で URL 長が膨らむため
+                  対象外 (将来的にサーバ保存と組み合わせて対応予定)。
+                  手数 0 (即 quit) では共有しても無意味なのでガード。 */}
+              {isScore && matchPlayerMoves.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShareReplayOpen(true)}
+                  className="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs"
+                >
+                  {t('match.shareReplay')}
+                </button>
+              )}
+            </>
           )}
           <button
             type="button"
-            onClick={() => startMatch({ turnLimit: matchTurnLimit })}
+            onClick={() => {
+              if (isScore) startScore({ turnLimit: matchTurnLimit });
+              else startMatch({ turnLimit: matchTurnLimit });
+            }}
             className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 rounded text-xs"
           >
             {t('match.rematch')}
           </button>
         </div>
+      )}
+      {shareReplayOpen && (
+        <ShareReplayDialog onClose={() => setShareReplayOpen(false)} />
       )}
     </div>
   );

@@ -202,6 +202,63 @@ describe('useGameStore undo (match mode)', () => {
     expect(useGameStore.getState().matchPlayerMoves.length).toBe(0);
   });
 
+  it('score mode: undo is always blocked even with moves played', async () => {
+    // score モードに切り替えてから commit しても canUndo=false で undo が
+    // 効かないことを確認 (ユーザー要件)。
+    useGameStore.getState().startScore({ seed: 1, turnLimit: 30 });
+    const { commit } = useGameStore.getState();
+    const st = useGameStore.getState().game;
+    await commit({
+      axisCol: st.current!.axisCol,
+      rotation: st.current!.rotation,
+    });
+    expect(useGameStore.getState().matchTurnsPlayed).toBe(1);
+    expect(useGameStore.getState().canUndo()).toBe(false);
+    const before = useGameStore.getState().matchTurnsPlayed;
+    useGameStore.getState().undo();
+    expect(useGameStore.getState().matchTurnsPlayed).toBe(before);
+  });
+
+  it('score mode: quitScore ends the session and locks the score', async () => {
+    useGameStore.getState().startScore({ seed: 1, turnLimit: 30 });
+    const { commit } = useGameStore.getState();
+    const st = useGameStore.getState().game;
+    await commit({
+      axisCol: st.current!.axisCol,
+      rotation: st.current!.rotation,
+    });
+    const scoreBefore = useGameStore.getState().game.score;
+    useGameStore.getState().quitScore();
+    const after = useGameStore.getState();
+    expect(after.matchEnded).toBe(true);
+    expect(after.matchResult).not.toBeNull();
+    expect(after.matchResult!.playerScore).toBe(scoreBefore);
+    expect(after.matchResult!.winner).toBe('player');
+  });
+
+  it('score mode: unlimited turnLimit does not auto-end before topout', async () => {
+    // turnLimit='unlimited' は Infinity 扱いになるので、ターン上限到達による
+    // matchEnded は起きない。トップアウトしない範囲で commit が積み上がる
+    // ことを確認する (列を散らして topout を避ける)。
+    useGameStore.getState().startScore({ seed: 1, turnLimit: 'unlimited' });
+    const { commit } = useGameStore.getState();
+    for (let i = 0; i < 6; i++) {
+      const st = useGameStore.getState().game;
+      if (!st.current) break;
+      await commit({
+        axisCol: i % 6,
+        rotation: 0,
+      });
+    }
+    const after = useGameStore.getState();
+    expect(after.matchTurnsPlayed).toBeGreaterThan(0);
+    // turn-limit 到達ではない (== Infinity に届かない)。topout していなければ
+    // matchEnded は false のまま。
+    if (after.game.status !== 'gameover') {
+      expect(after.matchEnded).toBe(false);
+    }
+  });
+
   it('undo is blocked once matchEnded is true', async () => {
     const { commit } = useGameStore.getState();
     const st = useGameStore.getState().game;

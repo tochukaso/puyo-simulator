@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { useGameStore } from '../store';
 
 describe('useGameStore', () => {
@@ -125,5 +125,97 @@ describe('useGameStore undo', () => {
     useGameStore.getState().reset(2);
     expect(useGameStore.getState().history.length).toBe(0);
     expect(useGameStore.getState().canUndo()).toBe(false);
+  });
+});
+
+describe('useGameStore undo (match mode)', () => {
+  beforeEach(() => {
+    // useMatchDriver は React hook なので vitest 単体では発火せず ama は
+    // 自動進行しない。プレイヤー側だけの巻き戻しを検査する分には十分。
+    useGameStore.getState().startMatch({ seed: 1, turnLimit: 30 });
+  });
+
+  afterEach(() => {
+    // startMatch は 'match' モードを localStorage に永続化し、シングルトンの
+    // store も match モードのまま残すので、後続の suite (reset() しか呼ばない
+    // 系) が match モードを引き継いで挙動が実行順依存になる。明示的に free
+    // に戻して、永続化キーも消す。
+    useGameStore.getState().setGameMode('free');
+    try {
+      localStorage.removeItem('puyo.gameMode');
+    } catch {
+      // jsdom 等で localStorage が無効でも問題ない。
+    }
+  });
+
+  it('canUndo=false right after startMatch (no moves yet)', () => {
+    expect(useGameStore.getState().canUndo()).toBe(false);
+  });
+
+  it('player-only undo rewinds matchTurnsPlayed and score, keeps ama untouched', async () => {
+    const before = useGameStore.getState();
+    const initialScore = before.game.score;
+    const firstTsumo = before.game.current!.pair;
+    const aiBefore = before.aiGame;
+
+    const { commit } = useGameStore.getState();
+    await commit({
+      axisCol: before.game.current!.axisCol,
+      rotation: before.game.current!.rotation,
+    });
+
+    const afterCommit = useGameStore.getState();
+    expect(afterCommit.matchTurnsPlayed).toBe(1);
+    expect(afterCommit.matchPlayerMoves.length).toBe(1);
+    expect(afterCommit.playerHistory.length).toBe(1);
+    expect(afterCommit.canUndo()).toBe(true);
+
+    useGameStore.getState().undo();
+    const afterUndo = useGameStore.getState();
+    expect(afterUndo.matchTurnsPlayed).toBe(0);
+    expect(afterUndo.matchPlayerMoves.length).toBe(0);
+    expect(afterUndo.playerHistory.length).toBe(0);
+    expect(afterUndo.game.current!.pair).toEqual(firstTsumo);
+    expect(afterUndo.game.score).toBe(initialScore);
+    // ama 側は触っていないはず (テストでは手も打っていないので reference 同一)。
+    expect(afterUndo.aiGame).toBe(aiBefore);
+    expect(afterUndo.canUndo()).toBe(false);
+  });
+
+  it('undo(N) rewinds N moves on the player side', async () => {
+    const { commit } = useGameStore.getState();
+    for (let i = 0; i < 3; i++) {
+      const st = useGameStore.getState().game;
+      await commit({
+        axisCol: st.current!.axisCol,
+        rotation: st.current!.rotation,
+      });
+    }
+    expect(useGameStore.getState().matchTurnsPlayed).toBe(3);
+
+    useGameStore.getState().undo(2);
+    expect(useGameStore.getState().matchTurnsPlayed).toBe(1);
+    expect(useGameStore.getState().matchPlayerMoves.length).toBe(1);
+
+    useGameStore.getState().undo(99); // overshoot clamps
+    expect(useGameStore.getState().matchTurnsPlayed).toBe(0);
+    expect(useGameStore.getState().matchPlayerMoves.length).toBe(0);
+  });
+
+  it('undo is blocked once matchEnded is true', async () => {
+    const { commit } = useGameStore.getState();
+    const st = useGameStore.getState().game;
+    await commit({
+      axisCol: st.current!.axisCol,
+      rotation: st.current!.rotation,
+    });
+    // matchEnded を強制的に立てる (本来は finalizeMatchIfDone が立てるが、
+    // テストでは ama が動かないのでそこまで到達しない。直接 set で立てて
+    // 検査する)。
+    useGameStore.setState({ matchEnded: true });
+    expect(useGameStore.getState().canUndo()).toBe(false);
+    const before = useGameStore.getState().game;
+    useGameStore.getState().undo();
+    expect(useGameStore.getState().game).toBe(before);
   });
 });

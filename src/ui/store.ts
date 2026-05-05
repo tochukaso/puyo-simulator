@@ -573,11 +573,52 @@ export const useGameStore = create<Store>((set, get) => ({
     void source;
   },
   undo: (steps = 1) => {
-    const { history, animatingSteps, mode, freePlayerMoves } = get();
-    if (history.length === 0) return;
+    const st = get();
+    const { animatingSteps, mode } = st;
     if (animatingSteps.length > 0) return;
-    // Undo during a match would desync the AI's parallel state. Disable for now.
-    if (mode === 'match') return;
+
+    if (mode === 'match') {
+      // Match mode の undo はプレイヤー側だけを巻き戻す。ama の盤面・履歴は
+      // 触らないので、undo 後はターン数差が出る (ama は inFlight で常に進む)。
+      // 「ama の応手を見て自分の手を選び直す」が可能になる仕様だが、ユーザーが
+      // 練習や misclick リカバリ用途として明示的に選んだ動作。
+      // matchEnded 後・loadRecord ロード中 (matchEnded=true) は不可。
+      if (st.matchEnded) return;
+      if (st.matchSeed === null) return;
+      const { playerHistory, matchPlayerMoves, matchTurnsPlayed } = st;
+      if (matchTurnsPlayed === 0) return;
+      const n = Math.min(Math.max(1, steps), matchTurnsPlayed);
+      const newLen = matchTurnsPlayed - n;
+      const newPlayerHistory = playerHistory.slice(0, newLen);
+      const newMatchPlayerMoves = matchPlayerMoves.slice(0, newLen);
+      // 巻き戻し先の game state。最初の手まで戻す場合は initial state。
+      const targetGame =
+        newLen === 0
+          ? createInitialState(st.matchSeed)
+          : newPlayerHistory[newLen - 1]!;
+      // 進行中の chain replay や view scrubber を破棄。
+      historyAnimSeq++;
+      set({
+        game: targetGame,
+        playerHistory: newPlayerHistory,
+        matchPlayerMoves: newMatchPlayerMoves,
+        matchTurnsPlayed: newLen,
+        playerHistoryViewIndex: null,
+        animatingSteps: [],
+        poppingCells: [],
+        chainTexts: [],
+        landedCells: [],
+        historyAnim: null,
+        // 解析結果は手列が変わったので破棄。
+        aiStats: { ...EMPTY_AI_STATS },
+        analyzing: false,
+      });
+      return;
+    }
+
+    // free mode: 既存ロジック (history + freePlayerMoves を巻き戻す)。
+    const { history, freePlayerMoves } = st;
+    if (history.length === 0) return;
     const n = Math.min(Math.max(1, steps), history.length);
     const targetIndex = history.length - n;
     const target = history[targetIndex]!;
@@ -595,14 +636,19 @@ export const useGameStore = create<Store>((set, get) => ({
       landedCells: [],
     });
   },
-  canUndo: () =>
-    get().history.length > 0 &&
-    get().animatingSteps.length === 0 &&
-    get().mode !== 'match',
+  canUndo: () => {
+    const st = get();
+    if (st.animatingSteps.length > 0) return false;
+    if (st.mode === 'match') {
+      return !st.matchEnded && st.matchTurnsPlayed > 0;
+    }
+    return st.history.length > 0;
+  },
 
   // ---- Match-vs-AI actions ----
 
   setGameMode: (mode) => {
+    const fromMatch = get().mode === 'match';
     persistMode(mode);
     set({ mode });
     // Stats from the previous mode (e.g. a finished match) shouldn't bleed
@@ -610,6 +656,26 @@ export const useGameStore = create<Store>((set, get) => ({
     set({ aiStats: { ...EMPTY_AI_STATS }, analyzing: false });
     if (mode === 'free') {
       historyAnimSeq++;
+      // match → free に戻る時は盤面と履歴をフルリセットして、新しい free
+      // セッションを始める。理由は 2 つ:
+      // (1) match の途中盤面が free に持ち越されると、ユーザーから見て
+      //     「対戦中の盤面が突然フリーモードで見える」直感に反する。
+      // (2) free 専用の `history` スタックは match 中は触っていないので、
+      //     match 開始前に free でプレイした残骸が残ったまま match→undo→free
+      //     の経路を辿ると、free の undo が古い snapshot を読み出して盤面が
+      //     ジャンプする潜在バグになる。リセットすればこのチェーンを断てる。
+      const fresh: Partial<Pick<Store, 'game' | 'history' | 'freePlayerMoves' | 'animatingSteps' | 'poppingCells' | 'chainTexts' | 'landedCells'>> =
+        fromMatch
+          ? {
+              game: createInitialState(Date.now() | 0),
+              history: [],
+              freePlayerMoves: [],
+              animatingSteps: [],
+              poppingCells: [],
+              chainTexts: [],
+              landedCells: [],
+            }
+          : {};
       set({
         aiGame: null,
         aiHistory: [],
@@ -622,6 +688,7 @@ export const useGameStore = create<Store>((set, get) => ({
         playerHistoryViewIndex: null,
         historyAnim: null,
         loadedRecordId: null,
+        ...fresh,
       });
     }
   },

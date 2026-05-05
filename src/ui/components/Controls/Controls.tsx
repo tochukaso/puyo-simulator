@@ -6,15 +6,18 @@ import { confirmDialog } from '../../utils/dialog';
 export function Controls() {
   const reset = useGameStore((s) => s.reset);
   const dispatch = useGameStore((s) => s.dispatch);
-  const historyLength = useGameStore((s) => s.history.length);
   const animating = useGameStore((s) => s.animatingSteps.length > 0);
   const undo = useGameStore((s) => s.undo);
   const mode = useGameStore((s) => s.mode);
+  // store の canUndo() を直接 selector として購読する。free / match モード両方の
+  // ルールが store 側に集約されているので、UI 側で再実装するとロジックが分岐して
+  // 将来ドリフトしうる。selector が返すのは boolean なので不要な再レンダーは
+  // 起きない (zustand は Object.is で比較)。
+  const canUndo = useGameStore((s) => s.canUndo());
   // match モードでは AI 最善手ボタン自体を隠しているので、worker への
   // suggest 投げ自体も止める。
   const { moves, loading, aiReady } = useAiSuggestion(1, mode !== 'match');
   const t = useT();
-  const canUndo = historyLength > 0 && !animating;
   const aiBest = moves[0] ?? null;
   // The AI commit button is disabled while thinking, while not yet loaded,
   // when there are no candidates, and during the chain animation.

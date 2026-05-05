@@ -6,10 +6,27 @@
   "observability": {
     "enabled": true
   },
+  // Worker スクリプト本体。/api/* を D1 で処理し、それ以外は ASSETS にパス。
+  "main": "worker/index.ts",
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "single-page-application"
+    "not_found_handling": "single-page-application",
+    // Worker が main にあるので、静的アセットの要求は ASSETS バインディングに
+    // 流す形にして「Worker が必ず最初に走る」モデルにする。
+    "binding": "ASSETS",
+    "run_worker_first": true
   },
+  // D1 データベース。リポジトリは public のため、本番の database_id は
+  // wrangler.jsonc に書かず、scripts/cf-deploy-prepare.mjs で
+  // wrangler.deploy.jsonc に注入する運用 (CUSTOM_DOMAIN と同じパターン)。
+  // ローカル開発時は `wrangler dev --persist-to .wrangler/state` で local
+  // sqlite が使われるので database_id は無くてよい。
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "puyo-scores"
+    }
+  ],
   "compatibility_flags": [
     "nodejs_compat"
   ]

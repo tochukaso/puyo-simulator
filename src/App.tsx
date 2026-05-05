@@ -13,6 +13,7 @@ import {
   REPLAY_PARAM,
   replayDataToRecord,
 } from './share/encodeReplay';
+import { getScoreFromServer, SCORE_PARAM } from './api/scoresClient';
 import { Board } from './ui/components/Board/Board';
 import { NextQueue } from './ui/components/NextQueue/NextQueue';
 import { Stats } from './ui/components/Stats/Stats';
@@ -30,26 +31,44 @@ export default function App() {
   useMatchDriver();
   const editing = useGameStore((s) => s.editing);
   const mode = useGameStore((s) => s.mode);
-  // 起動時 URL に `?replay=...` (score モードのリプレイ共有) または
-  // `?share=...` (盤面共有) が乗っていたら、それぞれをロードする。
+  // 起動時 URL に `?score=<id>` (サーバ短縮)、`?replay=...` (inline リプレイ)、
+  // `?share=...` (盤面共有) のいずれかが乗っていたらそれぞれをロード。
   // 共有を踏んだ場合は match を続行せず該当モードに切替える。失敗はサイレント。
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const stripParam = (key: string) => {
+      const url = new URL(window.location.href);
+      url.searchParams.delete(key);
+      window.history.replaceState({}, '', url.toString());
+    };
+
+    // 1) サーバ短縮 URL: `?score=<id>` で /api/scores/<id> を取りに行く。
+    const scoreId = params.get(SCORE_PARAM);
+    if (scoreId) {
+      void (async () => {
+        try {
+          const rec = await getScoreFromServer(scoreId);
+          useGameStore.getState().loadRecord(rec);
+        } catch {
+          // サーバ未配備 / オフライン / 404 の場合は黙ってフリーモードのまま。
+        } finally {
+          stripParam(SCORE_PARAM);
+        }
+      })();
+      // 続けて他の param も処理させない (二重ロード防止)。
+      return;
+    }
+
+    // 2) inline replay: `?replay=base64url(...)` で同期的にデコード。
     const replayEncoded = params.get(REPLAY_PARAM);
     if (replayEncoded) {
       const data = decodeReplay(replayEncoded);
       if (data) {
         useGameStore.getState().loadRecord(replayDataToRecord(data));
-        // URL を綺麗にする (再リロードでまた load されないように)。
-        const url = new URL(window.location.href);
-        url.searchParams.delete(REPLAY_PARAM);
-        window.history.replaceState({}, '', url.toString());
+        stripParam(REPLAY_PARAM);
         return;
       }
-      // デコード失敗は黙って継続。
-      const url = new URL(window.location.href);
-      url.searchParams.delete(REPLAY_PARAM);
-      window.history.replaceState({}, '', url.toString());
+      stripParam(REPLAY_PARAM);
     }
     const encoded = readShareFromUrl();
     if (encoded) {

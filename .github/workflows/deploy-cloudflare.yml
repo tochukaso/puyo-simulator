@@ -47,4 +47,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CUSTOM_DOMAIN: ${{ secrets.CUSTOM_DOMAIN }}
+          # D1 データベース ID。未設定なら scripts/cf-deploy-prepare.mjs が
+          # d1 バインドを落として deploy する (API は 500 を返すが deploy は通る)。
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
         run: npm run deploy

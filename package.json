@@ -17,6 +17,9 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
+    "worker:check": "tsc --noEmit -p tsconfig.worker.json",
+    "db:migrate:local": "wrangler d1 migrations apply puyo-scores --local",
+    "db:migrate:remote": "wrangler d1 migrations apply puyo-scores --remote",
     "e2e": "playwright test",
     "selfplay": "tsx scripts/selfplay.ts",
     "ama-selfplay": "tsx scripts/ama-selfplay.ts",
@@ -39,6 +42,7 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.33.2",
+    "@cloudflare/workers-types": "^4.20260505.1",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.59.1",
     "@tauri-apps/api": "^2.10.1",

@@ -10,11 +10,19 @@ export function Controls() {
   const animating = useGameStore((s) => s.animatingSteps.length > 0);
   const undo = useGameStore((s) => s.undo);
   const mode = useGameStore((s) => s.mode);
+  // match モードでは別系列の履歴 (matchTurnsPlayed) に依存し、終了後は
+  // 巻き戻し不可。free モードは history.length に従う既存の挙動。
+  const matchTurnsPlayed = useGameStore((s) => s.matchTurnsPlayed);
+  const matchEnded = useGameStore((s) => s.matchEnded);
   // match モードでは AI 最善手ボタン自体を隠しているので、worker への
   // suggest 投げ自体も止める。
   const { moves, loading, aiReady } = useAiSuggestion(1, mode !== 'match');
   const t = useT();
-  const canUndo = historyLength > 0 && !animating;
+  const canUndo =
+    !animating &&
+    (mode === 'match'
+      ? !matchEnded && matchTurnsPlayed > 0
+      : historyLength > 0);
   const aiBest = moves[0] ?? null;
   // The AI commit button is disabled while thinking, while not yet loaded,
   // when there are no candidates, and during the chain animation.

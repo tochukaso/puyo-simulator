@@ -518,11 +518,52 @@ export const useGameStore = create<Store>((set, get) => ({
     void source;
   },
   undo: (steps = 1) => {
-    const { history, animatingSteps, mode, freePlayerMoves } = get();
-    if (history.length === 0) return;
+    const st = get();
+    const { animatingSteps, mode } = st;
     if (animatingSteps.length > 0) return;
-    // Undo during a match would desync the AI's parallel state. Disable for now.
-    if (mode === 'match') return;
+
+    if (mode === 'match') {
+      // Match mode の undo はプレイヤー側だけを巻き戻す。ama の盤面・履歴は
+      // 触らないので、undo 後はターン数差が出る (ama は inFlight で常に進む)。
+      // 「ama の応手を見て自分の手を選び直す」が可能になる仕様だが、ユーザーが
+      // 練習や misclick リカバリ用途として明示的に選んだ動作。
+      // matchEnded 後・loadRecord ロード中 (matchEnded=true) は不可。
+      if (st.matchEnded) return;
+      if (st.matchSeed === null) return;
+      const { playerHistory, matchPlayerMoves, matchTurnsPlayed } = st;
+      if (matchTurnsPlayed === 0) return;
+      const n = Math.min(Math.max(1, steps), matchTurnsPlayed);
+      const newLen = matchTurnsPlayed - n;
+      const newPlayerHistory = playerHistory.slice(0, newLen);
+      const newMatchPlayerMoves = matchPlayerMoves.slice(0, newLen);
+      // 巻き戻し先の game state。最初の手まで戻す場合は initial state。
+      const targetGame =
+        newLen === 0
+          ? createInitialState(st.matchSeed)
+          : newPlayerHistory[newLen - 1]!;
+      // 進行中の chain replay や view scrubber を破棄。
+      historyAnimSeq++;
+      set({
+        game: targetGame,
+        playerHistory: newPlayerHistory,
+        matchPlayerMoves: newMatchPlayerMoves,
+        matchTurnsPlayed: newLen,
+        playerHistoryViewIndex: null,
+        animatingSteps: [],
+        poppingCells: [],
+        chainTexts: [],
+        landedCells: [],
+        historyAnim: null,
+        // 解析結果は手列が変わったので破棄。
+        aiStats: { ...EMPTY_AI_STATS },
+        analyzing: false,
+      });
+      return;
+    }
+
+    // free mode: 既存ロジック (history + freePlayerMoves を巻き戻す)。
+    const { history, freePlayerMoves } = st;
+    if (history.length === 0) return;
     const n = Math.min(Math.max(1, steps), history.length);
     const targetIndex = history.length - n;
     const target = history[targetIndex]!;
@@ -540,10 +581,14 @@ export const useGameStore = create<Store>((set, get) => ({
       landedCells: [],
     });
   },
-  canUndo: () =>
-    get().history.length > 0 &&
-    get().animatingSteps.length === 0 &&
-    get().mode !== 'match',
+  canUndo: () => {
+    const st = get();
+    if (st.animatingSteps.length > 0) return false;
+    if (st.mode === 'match') {
+      return !st.matchEnded && st.matchTurnsPlayed > 0;
+    }
+    return st.history.length > 0;
+  },
 
   // ---- Match-vs-AI actions ----
 

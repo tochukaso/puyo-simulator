@@ -1,6 +1,10 @@
 /src/main/**/generated
 /src/main/jniLibs/**/*.so
 /src/main/assets/tauri.conf.json
+# bundle.resources で指定したリソースは Tauri が毎ビルドで assets/ に
+# コピーする。git で追跡するとビルドの度に diff が出てしまうので除外。
+/src/main/assets/vendor/
+/src/main/assets/_up_/
 /tauri.build.gradle.kts
 /proguard-tauri.pro
 /tauri.properties

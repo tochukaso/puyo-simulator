@@ -123,3 +123,22 @@ export async function clearAllRecords(): Promise<void> {
     db.close();
   }
 }
+
+// ストレージ逼迫時の自動 evict 対象から外してもらうリクエスト。
+// 起動時に 1 回呼べばよい (ブラウザは内部状態を覚えている)。
+// 失敗 (Safari の一部・古い browser・Tauri WebView 一部) でも害はないので
+// 黙って false を返す。
+export async function requestPersistentStorage(): Promise<boolean> {
+  try {
+    if (
+      typeof navigator !== 'undefined' &&
+      'storage' in navigator &&
+      typeof navigator.storage?.persist === 'function'
+    ) {
+      return await navigator.storage.persist();
+    }
+  } catch {
+    // ignore
+  }
+  return false;
+}

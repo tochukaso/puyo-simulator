@@ -58,7 +58,11 @@ export default function App() {
       <div
         ref={gestureRef}
         className="flex-1 flex flex-col items-center gap-3 p-3 lg:flex-row lg:items-start lg:justify-center select-none"
-        style={{ touchAction: 'none' }}
+        // pan-y にすることで小型機で UI がはみ出した時の縦スクロールを解禁する。
+        // Board 自体は wrapperRef 側で touchAction: 'none' を維持しているので、
+        // 盤面上の左右スワイプ・下スワイプ (softDrop)・タップ回転は従来どおり動く。
+        // ピンチズームと横方向の native pan は依然ブロック。
+        style={{ touchAction: 'pan-y' }}
       >
         <div className="flex flex-col items-center gap-3 w-full max-w-sm">
           <Stats />

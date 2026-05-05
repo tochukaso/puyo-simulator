@@ -71,8 +71,10 @@ jobs:
           # `--max-time 15` で hang を防ぎ、本体は捨てて HTTP ステータスだけ取る。
           status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "$url" || echo 000)
           echo "[smoke] GET ${url} -> ${status}"
-          # 404 (期待) / 200 (万一 ID が当たった) / 4xx 系は OK。5xx と 000 (timeout/接続失敗) は NG。
-          if [ "$status" = "000" ] || [ "${status:0:1}" = "5" ]; then
-            echo "[smoke] /api/scores returned ${status} — likely D1 misconfiguration"
+          # 期待値は 404 (id 未存在) のみ。万一 ID が衝突した場合のみ 200。
+          # それ以外の 5xx / 4xx (403 / 429 / 別パス 404 等) / 000 は API が
+          # 期待どおり動いていない兆候として扱い、CI を失敗させる。
+          if [ "$status" != "404" ] && [ "$status" != "200" ]; then
+            echo "[smoke] /api/scores returned unexpected ${status}"
             exit 1
           fi

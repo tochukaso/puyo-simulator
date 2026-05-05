@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useKeyboard } from './ui/hooks/useKeyboard';
 import { useGestures } from './ui/hooks/useGestures';
 import { useMatchDriver } from './ui/hooks/useMatchDriver';
+import { useHaptics } from './ui/hooks/useHaptics';
 import { useGameStore } from './ui/store';
 import {
   readShareFromUrl,
@@ -28,6 +29,7 @@ export default function App() {
   useKeyboard();
   useGestures(gestureRef);
   useMatchDriver();
+  useHaptics();
   const editing = useGameStore((s) => s.editing);
   const mode = useGameStore((s) => s.mode);
   // 起動時 URL に `?replay=...` (score モードのリプレイ共有) または

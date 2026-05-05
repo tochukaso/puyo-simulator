@@ -850,10 +850,15 @@ export const useGameStore = create<Store>((set, get) => ({
         : { history: [] as GameState[], lastState: null as GameState | null };
 
     // matchTurnLimit のリテラル型に揃える。turnLimit=0 は score モードの
-    // 「無制限」のセンチネルなので 'unlimited' に戻す。それ以外は数値そのまま
-    // (30/50/100/200 のはずだが、過去レコードには違う値もありうる)。
+    // 「無制限」のセンチネル。それ以外はサポート対象 (30/50/100/200) のみ
+    // 採用し、未知の値 (legacy で 60 など) はデフォルト 50 にフォールバック。
+    const VALID_LIMITS: ReadonlyArray<MatchTurnLimit> = [30, 50, 100, 200];
     const turnLimit: MatchTurnLimit =
-      record.turnLimit <= 0 ? 'unlimited' : (record.turnLimit as MatchTurnLimit);
+      record.turnLimit <= 0
+        ? 'unlimited'
+        : VALID_LIMITS.includes(record.turnLimit as MatchTurnLimit)
+          ? (record.turnLimit as MatchTurnLimit)
+          : 50;
 
     set({
       mode: recMode,

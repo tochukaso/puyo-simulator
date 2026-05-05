@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { useGameStore } from '../../store';
 import {
@@ -18,6 +18,18 @@ export function ShareReplayDialog({ onClose }: { onClose: () => void }) {
 
   const [qrSvg, setQrSvg] = useState<string>('');
   const [copied, setCopied] = useState(false);
+  // copy 後の "Copied!" 表示を 1.5s 後に戻す timer。連打されると複数の
+  // timeout が積み重なり想定外のタイミングで戻る + アンマウント後に setState
+  // が走って警告が出るので、ref で管理して再実行前に clear + cleanup する。
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current !== null) {
+        clearTimeout(copyTimerRef.current);
+        copyTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // 'unlimited' は MatchRecord と同様 0 をセンチネルに。
   const turnLimitNum = matchTurnLimit === 'unlimited' ? 0 : matchTurnLimit;
@@ -58,7 +70,12 @@ export function ShareReplayDialog({ onClose }: { onClose: () => void }) {
     try {
       await navigator.clipboard.writeText(replayUrl);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      // 連打対応: 既存の timer を破棄してから新しいものをセット。
+      if (copyTimerRef.current !== null) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => {
+        setCopied(false);
+        copyTimerRef.current = null;
+      }, 1500);
     } catch {
       // Safari mobile などのフォールバック: input を select してユーザーに任せる。
       const el = document.getElementById(

@@ -344,21 +344,29 @@ export function MatchPanel() {
                 disabled={savedThisMatch || matchSeed === null}
                 onClick={async () => {
                   if (matchSeed === null) return;
-                  await saveRecord({
-                    // turnLimit は数値 (or 'unlimited' センチネル 0) で永続化する。
-                    // 'unlimited' は MatchRecord 仕様上 0 で表すので変換。
-                    mode: isScore ? 'score' : 'match',
-                    turnLimit:
-                      matchTurnLimit === 'unlimited' ? 0 : matchTurnLimit,
-                    preset: matchPreset,
-                    seed: matchSeed,
-                    playerScore,
-                    aiScore,
-                    winner: matchResult.winner,
-                    playerMoves: matchPlayerMoves,
-                    aiMoves: matchAiMoves,
-                  });
-                  setSavedThisMatch(true);
+                  // saveRecord は IndexedDB エラー (private mode 等) で reject
+                  // しうるので、unhandled rejection にせず保存済みフラグを
+                  // 立てないことでユーザーが再試行できる状態に留める。
+                  try {
+                    await saveRecord({
+                      // turnLimit は数値 (or 'unlimited' センチネル 0) で永続化する。
+                      // 'unlimited' は MatchRecord 仕様上 0 で表すので変換。
+                      mode: isScore ? 'score' : 'match',
+                      turnLimit:
+                        matchTurnLimit === 'unlimited' ? 0 : matchTurnLimit,
+                      preset: matchPreset,
+                      seed: matchSeed,
+                      playerScore,
+                      aiScore,
+                      winner: matchResult.winner,
+                      playerMoves: matchPlayerMoves,
+                      aiMoves: matchAiMoves,
+                    });
+                    setSavedThisMatch(true);
+                  } catch {
+                    // 失敗時はフラグを立てず、ボタン文字も「保存」のままにして
+                    // ユーザーがもう一度押せるようにする。
+                  }
                 }}
                 className="px-2 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
               >
@@ -366,8 +374,9 @@ export function MatchPanel() {
               </button>
               {/* score モードのみ「リプレイ共有」(URL に手順を埋め込む)。
                   match モードは ama 側の盤面も再現が必要で URL 長が膨らむため
-                  対象外 (将来的にサーバ保存と組み合わせて対応予定)。 */}
-              {isScore && (
+                  対象外 (将来的にサーバ保存と組み合わせて対応予定)。
+                  手数 0 (即 quit) では共有しても無意味なのでガード。 */}
+              {isScore && matchPlayerMoves.length > 0 && (
                 <button
                   type="button"
                   onClick={() => setShareReplayOpen(true)}

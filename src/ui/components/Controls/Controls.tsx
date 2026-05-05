@@ -2,6 +2,8 @@ import { useGameStore } from '../../store';
 import { useAiSuggestion } from '../../hooks/useAiSuggestion';
 import { useT } from '../../../i18n';
 import { confirmDialog } from '../../utils/dialog';
+import { useControlMode, useControlTuning } from '../../hooks/useControlPrefs';
+import { usePressRepeat } from '../../hooks/usePressRepeat';
 
 export function Controls() {
   const reset = useGameStore((s) => s.reset);
@@ -22,42 +24,77 @@ export function Controls() {
   // The AI commit button is disabled while thinking, while not yet loaded,
   // when there are no candidates, and during the chain animation.
   const canAiCommit = aiReady && !loading && !animating && aiBest !== null;
+
+  const controlMode = useControlMode();
+  const tuning = useControlTuning();
+
   // free モードのみ AI Best と Undo を出す。
   // match モード: AI Best 隠し / Undo は出す (player-only undo)。
   // score モード: AI Best も Undo も隠し、代わりに左回転を出す。
   const showAiBest = mode === 'free';
   const showUndo = mode === 'free' || mode === 'match';
-  const showCcw = mode === 'score';
+  // CCW を出す条件:
+  //   - score モード: 既存仕様 (CCW + CW を並列)
+  //   - tap-to-drop / drag: ジェスチャーで回転できないので CCW ボタンを表示
+  const showCcw =
+    mode === 'score' || controlMode === 'tap-to-drop' || controlMode === 'drag';
+  // score モードのときだけ CCW + CW を両方出す。tap-to-drop / drag は
+  // CCW を CW の代わりに置き換える (CW は既存ボタンのまま使い分け)。
+  const showCwExtra = mode === 'score';
 
+  const padY = tuning.buttonScaleLarge ? 'py-4' : 'py-3';
+  const fontSize = tuning.buttonScaleLarge ? 'text-lg' : 'text-base';
   const cellBase =
-    'py-3 rounded text-base touch-manipulation select-none disabled:opacity-50 disabled:cursor-not-allowed';
+    `${padY} rounded ${fontSize} touch-manipulation select-none disabled:opacity-50 disabled:cursor-not-allowed`;
 
   // 2 段目のグリッド列数を出すボタン数に合わせる。
-  // free:  [CW, Drop, AI Best, Undo, Reset]                        = 5
-  // match: [CW, Drop, Undo, Reset]                                 = 4
-  // score: [↺ CCW, Drop, ↻ CW, Reset]                              = 4
+  // free:  [CW or CCW, Drop, AI Best, Undo, Reset]              = 5
+  // match: [CW or CCW, Drop, Undo, Reset]                       = 4
+  // score: [CCW, Drop, CW, Reset]                               = 4
   const cols = showAiBest ? 5 : 4;
+
+  const repeatLeft = usePressRepeat(
+    () => dispatch({ type: 'moveLeft' }),
+    { enabled: tuning.holdRepeatEnabled, initialDelayMs: 200, intervalMs: 80 },
+  );
+  const repeatRight = usePressRepeat(
+    () => dispatch({ type: 'moveRight' }),
+    { enabled: tuning.holdRepeatEnabled, initialDelayMs: 200, intervalMs: 80 },
+  );
+  const repeatDrop = usePressRepeat(
+    () => dispatch({ type: 'softDrop' }),
+    { enabled: tuning.holdRepeatEnabled, initialDelayMs: 200, intervalMs: 60 },
+  );
 
   return (
     <div className="flex flex-col gap-2 w-full">
       <div className="grid grid-cols-3 gap-2 w-full">
         <button
           className={`${cellBase} bg-slate-700 hover:bg-slate-600 active:bg-slate-500`}
-          onClick={() => dispatch({ type: 'moveLeft' })}
+          onPointerDown={repeatLeft.onPointerDown}
+          onPointerUp={repeatLeft.onPointerUp}
+          onPointerCancel={repeatLeft.onPointerCancel}
+          onPointerLeave={repeatLeft.onPointerLeave}
           aria-label={t('controls.moveLeft')}
         >
           {t('controls.moveLeft')}
         </button>
         <button
           className={`${cellBase} bg-slate-700 hover:bg-slate-600 active:bg-slate-500`}
-          onClick={() => dispatch({ type: 'softDrop' })}
+          onPointerDown={repeatDrop.onPointerDown}
+          onPointerUp={repeatDrop.onPointerUp}
+          onPointerCancel={repeatDrop.onPointerCancel}
+          onPointerLeave={repeatDrop.onPointerLeave}
           aria-label={t('controls.softDrop')}
         >
           {t('controls.softDrop')}
         </button>
         <button
           className={`${cellBase} bg-slate-700 hover:bg-slate-600 active:bg-slate-500`}
-          onClick={() => dispatch({ type: 'moveRight' })}
+          onPointerDown={repeatRight.onPointerDown}
+          onPointerUp={repeatRight.onPointerUp}
+          onPointerCancel={repeatRight.onPointerCancel}
+          onPointerLeave={repeatRight.onPointerLeave}
           aria-label={t('controls.moveRight')}
         >
           {t('controls.moveRight')}
@@ -66,9 +103,6 @@ export function Controls() {
       <div
         className={`grid gap-2 w-full ${cols === 5 ? 'grid-cols-5' : 'grid-cols-4'}`}
       >
-        {/* score モードは [CCW, Drop, CW, Reset] のレイアウト。
-            それ以外は [CW, Drop, ...] のまま (左回転は free でもボタンとしては
-            出していない — キーボード派は未割当。要望が来たら追加検討)。 */}
         {showCcw ? (
           <button
             className={`${cellBase} bg-slate-700 hover:bg-slate-600 active:bg-slate-500`}
@@ -114,7 +148,7 @@ export function Controls() {
             {t('controls.aiBest')}
           </button>
         )}
-        {showCcw && (
+        {showCwExtra && (
           <button
             className={`${cellBase} bg-slate-700 hover:bg-slate-600 active:bg-slate-500`}
             onClick={() => dispatch({ type: 'rotateCW' })}

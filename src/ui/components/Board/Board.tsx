@@ -119,13 +119,11 @@ export function Board() {
   const ceilingVisible = useCeilingVisible();
   const previewMove = usePreviewMove();
   const t = useT();
-  // If a candidate is hovered/selected in CandidateList, prefer it. Otherwise
-  // fall back to the top candidate. Suppress in match mode during active play
-  // (the ghost would give away the answer in a player-vs-ama score race).
-  // Replay (post-match): show a ghost of the move that was actually played
-  // from this snapshot (= matchXxxMoves[viewIndex + 1], since history[i] is
-  // post-move-(i+1) with the next pair already spawned). Makes replay easier
-  // to follow — you see at a glance where each pair was placed.
+  // Ghost selection priority:
+  //   1) Replay (post-match): show the recorded move from this snapshot.
+  //   2) User gesture preview (any mode): wins over AI suggestion since it's
+  //      the player's own ghost (set by tap-to-drop / drag press-tracking).
+  //   3) Free mode + viewing player: AI top candidate (legacy behavior).
   let bestMove: Move | null = null;
   if (ghostEnabled) {
     if (inReplay) {
@@ -133,8 +131,10 @@ export function Board() {
         viewing === 'ai'
           ? (matchAiMoves[aiViewIdx + 1] ?? null)
           : (matchPlayerMoves[playerViewIdx + 1] ?? null);
+    } else if (previewMove !== null && viewing === 'player') {
+      bestMove = previewMove;
     } else if (mode === 'free' && viewing === 'player') {
-      bestMove = previewMove ?? moves[0] ?? null;
+      bestMove = moves[0] ?? null;
     }
   }
 

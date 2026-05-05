@@ -31,6 +31,11 @@ export interface Dict {
   'share.replayTitle': string;
   'share.replayCopy': string;
   'share.replayNote': string;
+  'share.serverSubmit': string;
+  'share.serverUploading': string;
+  'share.serverRetry': string;
+  'share.serverShortReady': string;
+  'share.serverFailed': string;
   'match.turn': string;
   'match.remaining': string;
   'match.you': string;
@@ -154,6 +159,11 @@ export const translations: Record<Lang, Dict> = {
     'share.replayTitle': 'リプレイを共有',
     'share.replayCopy': 'URLをコピー',
     'share.replayNote': 'この URL を開くと、同じ seed と同じ手順でリプレイが再生されます。',
+    'share.serverSubmit': 'サーバに送信して短縮 URL を取得',
+    'share.serverUploading': '送信中…',
+    'share.serverRetry': '送信失敗 — 再試行',
+    'share.serverShortReady': '短縮 URL を取得しました。上の URL をコピーしてください。',
+    'share.serverFailed': 'サーバ送信に失敗しました。長い URL は引き続き使えます。',
     'match.turn': 'ターン',
     'match.remaining': '残り{n}',
     'match.you': 'あなた',
@@ -275,6 +285,11 @@ export const translations: Record<Lang, Dict> = {
     'share.replayTitle': 'Share replay',
     'share.replayCopy': 'Copy URL',
     'share.replayNote': "Opening this URL replays the same seed and the same move sequence.",
+    'share.serverSubmit': 'Send to server for short URL',
+    'share.serverUploading': 'Uploading…',
+    'share.serverRetry': 'Upload failed — retry',
+    'share.serverShortReady': 'Short URL ready. Copy the URL above.',
+    'share.serverFailed': 'Server upload failed. The long URL still works.',
     'match.turn': 'Turn',
     'match.remaining': '{n} left',
     'match.you': 'You',
@@ -396,6 +411,11 @@ export const translations: Record<Lang, Dict> = {
     'share.replayTitle': '分享回放',
     'share.replayCopy': '复制链接',
     'share.replayNote': '打开此链接会以相同的 seed 和落点序列回放。',
+    'share.serverSubmit': '上传到服务器获取短链接',
+    'share.serverUploading': '上传中…',
+    'share.serverRetry': '上传失败 — 重试',
+    'share.serverShortReady': '已生成短链接，请复制上方的 URL。',
+    'share.serverFailed': '上传到服务器失败，长链接仍可用。',
     'match.turn': '回合',
     'match.remaining': '剩余{n}',
     'match.you': '你',
@@ -517,6 +537,11 @@ export const translations: Record<Lang, Dict> = {
     'share.replayTitle': '리플레이 공유',
     'share.replayCopy': 'URL 복사',
     'share.replayNote': '이 URL 을 열면 같은 seed 와 같은 수순으로 리플레이가 재생됩니다.',
+    'share.serverSubmit': '서버에 전송해 짧은 URL 받기',
+    'share.serverUploading': '전송 중…',
+    'share.serverRetry': '전송 실패 — 다시 시도',
+    'share.serverShortReady': '짧은 URL 이 준비되었습니다. 위의 URL 을 복사하세요.',
+    'share.serverFailed': '서버 전송에 실패했습니다. 긴 URL 은 계속 사용할 수 있습니다.',
     'match.turn': '턴',
     'match.remaining': '{n}수 남음',
     'match.you': '당신',

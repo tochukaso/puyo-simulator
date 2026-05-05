@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.worker.tsbuildinfo",
+    "target": "es2022",
+    "lib": ["ES2023"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["@cloudflare/workers-types"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true
+  },
+  // worker/ から src/game/ の純粋ロジックを再利用するために、type-check は
+  // 両方のディレクトリを対象にする。src/game/* には DOM / browser 依存の
+  // import が無いので Workers ランタイムでも動く (validateMoves で使用)。
+  "include": ["worker", "src/game"]
+}

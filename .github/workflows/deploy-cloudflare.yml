@@ -47,4 +47,34 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CUSTOM_DOMAIN: ${{ secrets.CUSTOM_DOMAIN }}
+          # D1 データベース ID。未設定なら scripts/cf-deploy-prepare.mjs が
+          # d1 バインドを落として deploy する (API は 500 を返すが deploy は通る)。
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
         run: npm run deploy
+
+      # デプロイ直後に GET /api/scores/<random-id> を叩いて 5xx でないことを
+      # 確認する smoke check。期待は 404 (id 未存在)。500 が返ったら D1 バインド
+      # 不整合 (binding はあるが DB に届かない等) なので CI を失敗させる。
+      # GitHub Actions の `if:` から secrets を直接参照すると不安定なため、
+      # シェル側で空チェックして skip する。
+      - name: Smoke check /api/scores
+        env:
+          CUSTOM_DOMAIN: ${{ secrets.CUSTOM_DOMAIN }}
+        run: |
+          set -e
+          if [ -z "$CUSTOM_DOMAIN" ]; then
+            echo "[smoke] CUSTOM_DOMAIN not set; skipping"
+            exit 0
+          fi
+          probe_id="ci-smoke-$(date +%s)"
+          url="https://${CUSTOM_DOMAIN}/api/scores/${probe_id}"
+          # `--max-time 15` で hang を防ぎ、本体は捨てて HTTP ステータスだけ取る。
+          status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "$url" || echo 000)
+          echo "[smoke] GET ${url} -> ${status}"
+          # 期待値は 404 (id 未存在) のみ。万一 ID が衝突した場合のみ 200。
+          # それ以外の 5xx / 4xx (403 / 429 / 別パス 404 等) / 000 は API が
+          # 期待どおり動いていない兆候として扱い、CI を失敗させる。
+          if [ "$status" != "404" ] && [ "$status" != "200" ]; then
+            echo "[smoke] /api/scores returned unexpected ${status}"
+            exit 1
+          fi

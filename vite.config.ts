@@ -6,6 +6,12 @@ import { execSync } from 'node:child_process';
 
 import { cloudflare } from "@cloudflare/vite-plugin";
 
+// vitest 起動中は cloudflare plugin を外す: vitest は node の組み込みモジュール
+// を `resolve.external` にズラッと並べるが、cloudflare plugin はそれを
+// "Worker 環境では external 禁止" としてエラーにする。テストでは Worker の
+// fetch ハンドラを純粋な関数として呼ぶだけなので plugin は不要。
+const IS_TEST = !!process.env.VITEST;
+
 // ビルド時点のコミット SHA を取得し、ランタイムに埋め込む。
 // 優先順:
 //   1. VITE_BUILD_SHA (手動上書き)
@@ -62,7 +68,7 @@ export default defineConfig({
       navigateFallback: '/index.html',
       cleanupOutdatedCaches: true,
     },
-  }), cloudflare()],
+  }), ...(IS_TEST ? [] : [cloudflare()])],
   test: {
     environment: 'jsdom',
     globals: true,

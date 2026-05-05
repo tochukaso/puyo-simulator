@@ -21,7 +21,7 @@
     "selfplay": "tsx scripts/selfplay.ts",
     "ama-selfplay": "tsx scripts/ama-selfplay.ts",
     "eval": "tsx scripts/eval-ai.ts",
-    "deploy": "npm run build && wrangler deploy",
+    "deploy": "npm run build && node scripts/cf-deploy-prepare.mjs && wrangler deploy --config wrangler.deploy.jsonc",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:dev:android": "tauri android dev",

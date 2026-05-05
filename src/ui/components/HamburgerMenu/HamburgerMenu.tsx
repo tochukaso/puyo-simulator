@@ -14,6 +14,7 @@ import { useGameStore } from '../../store';
 import { AnalysisDialog } from '../AnalysisDialog/AnalysisDialog';
 import { ShareDialog } from '../ShareDialog/ShareDialog';
 import { RecordsDialog } from '../RecordsDialog/RecordsDialog';
+import { ControlSettingsDialog } from '../ControlSettingsDialog/ControlSettingsDialog';
 import {
   LANGUAGES,
   LANGUAGE_LABELS,
@@ -45,6 +46,7 @@ export function HamburgerMenu() {
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [recordsOpen, setRecordsOpen] = useState(false);
+  const [controlSettingsOpen, setControlSettingsOpen] = useState(false);
 
   // 解析が許可されるのは "プレイした手があって、かつ match/score なら終了済み"
   // の時。進行中の match/score で押されると意味的にもおかしいので無効化。
@@ -172,6 +174,17 @@ export function HamburgerMenu() {
 
             <button
               type="button"
+              onClick={() => {
+                setOpen(false);
+                setControlSettingsOpen(true);
+              }}
+              className="px-3 py-1.5 rounded text-sm border bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700"
+            >
+              {t('controls.settings.button')}
+            </button>
+
+            <button
+              type="button"
               disabled={!canAnalyze}
               onClick={() => {
                 setOpen(false);
@@ -191,6 +204,9 @@ export function HamburgerMenu() {
       )}
       {shareOpen && <ShareDialog onClose={() => setShareOpen(false)} />}
       {recordsOpen && <RecordsDialog onClose={() => setRecordsOpen(false)} />}
+      {controlSettingsOpen && (
+        <ControlSettingsDialog onClose={() => setControlSettingsOpen(false)} />
+      )}
     </>
   );
 }

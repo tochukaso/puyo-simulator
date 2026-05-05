@@ -15,11 +15,13 @@ export function Stats() {
   const mode = useGameStore((s) => s.mode);
   const matchEnded = useGameStore((s) => s.matchEnded);
   const resignMatch = useGameStore((s) => s.resignMatch);
+  const quitScore = useGameStore((s) => s.quitScore);
   // Board / NextQueue と同じ side-aware 選択。リプレイ中は表示中スナップショット
   // の値を使い、それ以外は live。これで数値と盤面が食い違わない (ama 観戦中に
   // player の score が出る、を防ぐ)。
   const inReplay =
-    mode === 'match' && (matchEnded || liveGame.status === 'gameover');
+    (mode === 'match' || mode === 'score') &&
+    (matchEnded || liveGame.status === 'gameover');
   const aiViewIdx = aiHistoryViewIndex ?? Math.max(0, aiHistory.length - 1);
   const playerViewIdx =
     playerHistoryViewIndex ?? Math.max(0, playerHistory.length - 1);
@@ -34,6 +36,9 @@ export function Stats() {
   // 投了ボタンは match 進行中のみ。top-out 後も matchEnded になるまでは
   // ama の完走を待たずに即終了できるよう一貫して出す。
   const showResign = mode === 'match' && !matchEnded;
+  // score モードは「Quit」(同じ位置・同じスタイル) で、ユーザー要件どおり
+  // 別ラベル / 別アクションにする。
+  const showQuit = mode === 'score' && !matchEnded;
 
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-300 items-center">
@@ -58,6 +63,17 @@ export function Stats() {
           className="ml-auto px-2 py-1 bg-red-600 hover:bg-red-500 active:bg-red-400 rounded text-xs"
         >
           {t('match.resign')}
+        </button>
+      )}
+      {showQuit && (
+        <button
+          type="button"
+          onClick={async () => {
+            if (await confirmDialog(t('match.quitConfirm'))) quitScore();
+          }}
+          className="ml-auto px-2 py-1 bg-red-600 hover:bg-red-500 active:bg-red-400 rounded text-xs"
+        >
+          {t('match.quit')}
         </button>
       )}
       {status === 'gameover' && <span className="text-red-400">{t('stats.gameOver')}</span>}

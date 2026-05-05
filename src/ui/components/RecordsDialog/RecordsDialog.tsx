@@ -105,19 +105,27 @@ export function RecordsDialog({ onClose }: { onClose: () => void }) {
           <ul className="flex flex-col gap-1 max-h-[60vh] overflow-y-auto">
             {records.map((r) => {
               const dateStr = dateFmt.format(new Date(r.createdAt));
-              const winLabel =
-                r.winner === 'player'
+              // mode 欠損 (legacy) は 'match' とみなす。
+              const recMode: 'match' | 'score' = r.mode ?? 'match';
+              const isScore = recMode === 'score';
+              const winLabel = isScore
+                ? t('header.modeScore')
+                : r.winner === 'player'
                   ? t('match.you')
                   : r.winner === 'ai'
                     ? t('match.ama')
                     : t('match.draw');
-              const winColor =
-                r.winner === 'player'
+              const winColor = isScore
+                ? 'text-blue-300'
+                : r.winner === 'player'
                   ? 'text-emerald-300'
                   : r.winner === 'ai'
                     ? 'text-amber-300'
                     : 'text-slate-300';
               const isLoaded = r.id === loadedRecordId;
+              // turnLimit=0 は unlimited のセンチネル (score モード用)。
+              const turnLimitLabel =
+                r.turnLimit <= 0 ? '∞' : String(r.turnLimit);
               return (
                 <li
                   key={r.id}
@@ -127,13 +135,15 @@ export function RecordsDialog({ onClose }: { onClose: () => void }) {
                     {dateStr}
                   </span>
                   <span className="text-slate-500 whitespace-nowrap">
-                    {r.turnLimit}
+                    {turnLimitLabel}
                   </span>
+                  {/* score モードは ama スコアを出さない (常に 0)。 */}
                   <span
                     className={`font-mono tabular-nums whitespace-nowrap ${winColor}`}
                   >
-                    {r.playerScore.toLocaleString(lang)} -{' '}
-                    {r.aiScore.toLocaleString(lang)}
+                    {isScore
+                      ? r.playerScore.toLocaleString(lang)
+                      : `${r.playerScore.toLocaleString(lang)} - ${r.aiScore.toLocaleString(lang)}`}
                   </span>
                   <span className={`whitespace-nowrap ${winColor}`}>
                     {winLabel}

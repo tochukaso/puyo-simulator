@@ -1,4 +1,4 @@
-import { useGameStore } from '../../store';
+import { useGameStore, turnLimitToNumber } from '../../store';
 import { useBoardCellSize } from '../../hooks/useUiPrefs';
 import { PUYO_COLORS, PUYO_LIGHT, PUYO_DARK } from '../Board/colors';
 import type { Color } from '../../../game/types';
@@ -27,7 +27,8 @@ export function NextQueue() {
   const matchTurnLimit = useGameStore((s) => s.matchTurnLimit);
   const matchTurnsPlayed = useGameStore((s) => s.matchTurnsPlayed);
   const inReplay =
-    mode === 'match' && (matchEnded || playerGame.status === 'gameover');
+    (mode === 'match' || mode === 'score') &&
+    (matchEnded || playerGame.status === 'gameover');
   const aiViewIdx = aiHistoryViewIndex ?? Math.max(0, aiHistory.length - 1);
   const playerViewIdx =
     playerHistoryViewIndex ?? Math.max(0, playerHistory.length - 1);
@@ -49,8 +50,12 @@ export function NextQueue() {
     : viewing === 'ai'
       ? (aiSnapshot ? aiViewIdx + 1 : aiHistory.length)
       : (playerSnapshot ? playerViewIdx + 1 : playerHistory.length);
+  // match / score 共通でターン上限を超えるツモは隠す。'unlimited' は Infinity
+  // になるので常に false 側に倒れる。
+  const limitN = turnLimitToNumber(matchTurnLimit);
   const beyondLimit = (i: number) =>
-    mode === 'match' && turnsPlayedAtView + 2 + i > matchTurnLimit;
+    (mode === 'match' || mode === 'score') &&
+    turnsPlayedAtView + 2 + i > limitN;
   const next = beyondLimit(0) ? undefined : queue[0];
   const nextNext = beyondLimit(1) ? undefined : queue[1];
   const cell = useBoardCellSize();

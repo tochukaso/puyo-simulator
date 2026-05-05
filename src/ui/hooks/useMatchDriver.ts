@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useGameStore } from '../store';
+import { useGameStore, turnLimitToNumber } from '../store';
 import { suggestForState } from './useAiSuggestion';
 import { searchEndgameMove } from '../../match/endgameSearch';
 
@@ -34,7 +34,12 @@ export function useMatchDriver(): void {
     if (mode !== 'match') return;
     if (matchEnded) return;
     if (!aiGame || !aiGame.current) return;
-    const remainingForAi = Math.max(0, matchTurnLimit - aiHistoryLength);
+    // match モードでは matchTurnLimit に 'unlimited' は来ない (startMatch
+    // 側で 100 にフォールバック) が、念のため数値化。
+    const remainingForAi = Math.max(
+      0,
+      turnLimitToNumber(matchTurnLimit) - aiHistoryLength,
+    );
     if (remainingForAi <= 0) return;
     if (inFlight.current) return;
 

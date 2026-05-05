@@ -20,7 +20,17 @@ export interface Dict {
   'header.gameMode': string;
   'header.modeFree': string;
   'header.modeMatch': string;
+  'header.modeScore': string;
   'header.turnLimit': string;
+  'header.turnUnlimited': string;
+  'controls.rotateCcw': string;
+  'match.quit': string;
+  'match.quitConfirm': string;
+  'match.scoreFinal': string;
+  'match.shareReplay': string;
+  'share.replayTitle': string;
+  'share.replayCopy': string;
+  'share.replayNote': string;
   'match.turn': string;
   'match.remaining': string;
   'match.you': string;
@@ -133,7 +143,17 @@ export const translations: Record<Lang, Dict> = {
     'header.gameMode': 'モード',
     'header.modeFree': 'フリー',
     'header.modeMatch': '対amaスコア勝負',
+    'header.modeScore': 'スコアアタック',
     'header.turnLimit': '手数',
+    'header.turnUnlimited': '無制限',
+    'controls.rotateCcw': '↺ 左回転',
+    'match.quit': '終了',
+    'match.quitConfirm': '本当にゲームを終了しますか? 現在のスコアで確定します。',
+    'match.scoreFinal': '最終スコア',
+    'match.shareReplay': 'リプレイを共有',
+    'share.replayTitle': 'リプレイを共有',
+    'share.replayCopy': 'URLをコピー',
+    'share.replayNote': 'この URL を開くと、同じ seed と同じ手順でリプレイが再生されます。',
     'match.turn': 'ターン',
     'match.remaining': '残り{n}',
     'match.you': 'あなた',
@@ -244,7 +264,17 @@ export const translations: Record<Lang, Dict> = {
     'header.gameMode': 'Mode',
     'header.modeFree': 'Free',
     'header.modeMatch': 'Score vs ama',
+    'header.modeScore': 'Score attack',
     'header.turnLimit': 'Turns',
+    'header.turnUnlimited': 'Unlimited',
+    'controls.rotateCcw': '↺ CCW',
+    'match.quit': 'Quit',
+    'match.quitConfirm': 'End this run now? The current score will be locked in.',
+    'match.scoreFinal': 'Final score',
+    'match.shareReplay': 'Share replay',
+    'share.replayTitle': 'Share replay',
+    'share.replayCopy': 'Copy URL',
+    'share.replayNote': "Opening this URL replays the same seed and the same move sequence.",
     'match.turn': 'Turn',
     'match.remaining': '{n} left',
     'match.you': 'You',
@@ -355,7 +385,17 @@ export const translations: Record<Lang, Dict> = {
     'header.gameMode': '模式',
     'header.modeFree': '自由',
     'header.modeMatch': '与ama比分',
+    'header.modeScore': '分数挑战',
     'header.turnLimit': '手数',
+    'header.turnUnlimited': '无限',
+    'controls.rotateCcw': '↺ 左旋',
+    'match.quit': '结束',
+    'match.quitConfirm': '确定要结束本局?当前分数将被锁定。',
+    'match.scoreFinal': '最终分数',
+    'match.shareReplay': '分享回放',
+    'share.replayTitle': '分享回放',
+    'share.replayCopy': '复制链接',
+    'share.replayNote': '打开此链接会以相同的 seed 和落点序列回放。',
     'match.turn': '回合',
     'match.remaining': '剩余{n}',
     'match.you': '你',
@@ -466,7 +506,17 @@ export const translations: Record<Lang, Dict> = {
     'header.gameMode': '모드',
     'header.modeFree': '자유',
     'header.modeMatch': 'ama 점수 대결',
+    'header.modeScore': '스코어 어택',
     'header.turnLimit': '수',
+    'header.turnUnlimited': '무제한',
+    'controls.rotateCcw': '↺ 좌회전',
+    'match.quit': '종료',
+    'match.quitConfirm': '정말 종료할까요? 현재 점수로 확정됩니다.',
+    'match.scoreFinal': '최종 점수',
+    'match.shareReplay': '리플레이 공유',
+    'share.replayTitle': '리플레이 공유',
+    'share.replayCopy': 'URL 복사',
+    'share.replayNote': '이 URL 을 열면 같은 seed 와 같은 수순으로 리플레이가 재생됩니다.',
     'match.turn': '턴',
     'match.remaining': '{n}수 남음',
     'match.you': '당신',

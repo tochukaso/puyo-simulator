@@ -14,7 +14,17 @@ export interface MatchRecord {
   createdAt: string;
   /** 同じ build SHA で動いていた事の証跡。`__BUILD_SHA__` をそのまま入れる。 */
   buildSha: string;
-  /** マッチの規定手数。過去の記録には旧設定値 (例: 200) が残ることがある。 */
+  /**
+   * 'match' = ama とのスコア勝負 (aiScore / aiMoves が意味を持つ)。
+   * 'score' = 一人用スコアモード (ama 関連は 0 / 空)。
+   * 古いレコードには無いので optional。読み込み時に欠損なら 'match' とみなす。
+   */
+  mode?: 'match' | 'score';
+  /**
+   * 規定手数。score モードの「無制限」は `0` をセンチネルとして使う
+   * (JSON で Infinity が表現できないため。`turnLimit === 0` は読み込み時に
+   * `Infinity` 扱いに変換する)。それ以外は 30 / 50 / 100 / 200 のいずれか。
+   */
   turnLimit: number;
   /** マッチ中に有効だった ama-wasm preset (例: 'build' / 'gtr' / 'kaidan')。 */
   preset: string;
@@ -25,7 +35,7 @@ export interface MatchRecord {
   winner: 'player' | 'ai' | 'draw';
   /** プレイヤー側が各ターンに置いた手。手順順。 */
   playerMoves: Move[];
-  /** ama 側が各ターンに置いた手。手順順。 */
+  /** ama 側が各ターンに置いた手。手順順。score モードでは空配列。 */
   aiMoves: Move[];
 }
 

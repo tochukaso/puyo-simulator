@@ -9,26 +9,34 @@ export function Controls() {
   const animating = useGameStore((s) => s.animatingSteps.length > 0);
   const undo = useGameStore((s) => s.undo);
   const mode = useGameStore((s) => s.mode);
-  // store の canUndo() を直接 selector として購読する。free / match モード両方の
-  // ルールが store 側に集約されているので、UI 側で再実装するとロジックが分岐して
-  // 将来ドリフトしうる。selector が返すのは boolean なので不要な再レンダーは
-  // 起きない (zustand は Object.is で比較)。
+  // store の canUndo() を直接 selector として購読する。free / match / score
+  // のルールが store 側に集約されているので、UI 側で再実装するとロジックが
+  // 分岐して将来ドリフトしうる。selector が返すのは boolean なので不要な
+  // 再レンダーは起きない (zustand は Object.is で比較)。
   const canUndo = useGameStore((s) => s.canUndo());
-  // match モードでは AI 最善手ボタン自体を隠しているので、worker への
+  // match / score モードでは AI 最善手ボタン自体を隠しているので、worker への
   // suggest 投げ自体も止める。
-  const { moves, loading, aiReady } = useAiSuggestion(1, mode !== 'match');
+  const { moves, loading, aiReady } = useAiSuggestion(1, mode === 'free');
   const t = useT();
   const aiBest = moves[0] ?? null;
   // The AI commit button is disabled while thinking, while not yet loaded,
   // when there are no candidates, and during the chain animation.
   const canAiCommit = aiReady && !loading && !animating && aiBest !== null;
-  // Match mode is a player-vs-ama score race — letting the user delegate to
-  // the AI breaks that. Hide the button entirely (rather than just disabling)
-  // so the bottom row stays balanced.
-  const showAiBest = mode !== 'match';
+  // free モードのみ AI Best と Undo を出す。
+  // match モード: AI Best 隠し / Undo は出す (player-only undo)。
+  // score モード: AI Best も Undo も隠し、代わりに左回転を出す。
+  const showAiBest = mode === 'free';
+  const showUndo = mode === 'free' || mode === 'match';
+  const showCcw = mode === 'score';
 
   const cellBase =
     'py-3 rounded text-base touch-manipulation select-none disabled:opacity-50 disabled:cursor-not-allowed';
+
+  // 2 段目のグリッド列数を出すボタン数に合わせる。
+  // free:  [CW, Drop, AI Best, Undo, Reset]                        = 5
+  // match: [CW, Drop, Undo, Reset]                                 = 4
+  // score: [↺ CCW, Drop, ↻ CW, Reset]                              = 4
+  const cols = showAiBest ? 5 : 4;
 
   return (
     <div className="flex flex-col gap-2 w-full">
@@ -56,14 +64,26 @@ export function Controls() {
         </button>
       </div>
       <div
-        className={`grid gap-2 w-full ${showAiBest ? 'grid-cols-5' : 'grid-cols-4'}`}
+        className={`grid gap-2 w-full ${cols === 5 ? 'grid-cols-5' : 'grid-cols-4'}`}
       >
-        <button
-          className={`${cellBase} bg-slate-700 hover:bg-slate-600 active:bg-slate-500`}
-          onClick={() => dispatch({ type: 'rotateCW' })}
-        >
-          {t('controls.rotateCw')}
-        </button>
+        {/* score モードは [CCW, Drop, CW, Reset] のレイアウト。
+            それ以外は [CW, Drop, ...] のまま (左回転は free でもボタンとしては
+            出していない — キーボード派は未割当。要望が来たら追加検討)。 */}
+        {showCcw ? (
+          <button
+            className={`${cellBase} bg-slate-700 hover:bg-slate-600 active:bg-slate-500`}
+            onClick={() => dispatch({ type: 'rotateCCW' })}
+          >
+            {t('controls.rotateCcw')}
+          </button>
+        ) : (
+          <button
+            className={`${cellBase} bg-slate-700 hover:bg-slate-600 active:bg-slate-500`}
+            onClick={() => dispatch({ type: 'rotateCW' })}
+          >
+            {t('controls.rotateCw')}
+          </button>
+        )}
         <button
           className={`${cellBase} bg-blue-600 hover:bg-blue-500 active:bg-blue-400`}
           onClick={() => {
@@ -94,14 +114,24 @@ export function Controls() {
             {t('controls.aiBest')}
           </button>
         )}
-        <button
-          className={`${cellBase} bg-amber-600 hover:bg-amber-500 active:bg-amber-400`}
-          disabled={!canUndo}
-          onClick={() => undo(1)}
-          aria-label={t('controls.undoAria', { n: 1 })}
-        >
-          {t('controls.undo')}
-        </button>
+        {showCcw && (
+          <button
+            className={`${cellBase} bg-slate-700 hover:bg-slate-600 active:bg-slate-500`}
+            onClick={() => dispatch({ type: 'rotateCW' })}
+          >
+            {t('controls.rotateCw')}
+          </button>
+        )}
+        {showUndo && (
+          <button
+            className={`${cellBase} bg-amber-600 hover:bg-amber-500 active:bg-amber-400`}
+            disabled={!canUndo}
+            onClick={() => undo(1)}
+            aria-label={t('controls.undoAria', { n: 1 })}
+          >
+            {t('controls.undo')}
+          </button>
+        )}
         <button
           className={`${cellBase} bg-red-600 hover:bg-red-500 active:bg-red-400`}
           onClick={async () => {

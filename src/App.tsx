@@ -8,6 +8,11 @@ import {
   decodeShare,
   clearShareFromUrl,
 } from './share/encode';
+import {
+  decodeReplay,
+  REPLAY_PARAM,
+  replayDataToRecord,
+} from './share/encodeReplay';
 import { Board } from './ui/components/Board/Board';
 import { NextQueue } from './ui/components/NextQueue/NextQueue';
 import { Stats } from './ui/components/Stats/Stats';
@@ -25,10 +30,27 @@ export default function App() {
   useMatchDriver();
   const editing = useGameStore((s) => s.editing);
   const mode = useGameStore((s) => s.mode);
-  // 起動時 URL に `?share=...` が乗っていたらそれを優先して盤面ロード。
-  // 共有を踏んだ時は match を続行せず free に切替えるのが直感的なので
-  // loadSharedPosition 側で handle 済み。失敗時はサイレントに無視。
+  // 起動時 URL に `?replay=...` (score モードのリプレイ共有) または
+  // `?share=...` (盤面共有) が乗っていたら、それぞれをロードする。
+  // 共有を踏んだ場合は match を続行せず該当モードに切替える。失敗はサイレント。
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const replayEncoded = params.get(REPLAY_PARAM);
+    if (replayEncoded) {
+      const data = decodeReplay(replayEncoded);
+      if (data) {
+        useGameStore.getState().loadRecord(replayDataToRecord(data));
+        // URL を綺麗にする (再リロードでまた load されないように)。
+        const url = new URL(window.location.href);
+        url.searchParams.delete(REPLAY_PARAM);
+        window.history.replaceState({}, '', url.toString());
+        return;
+      }
+      // デコード失敗は黙って継続。
+      const url = new URL(window.location.href);
+      url.searchParams.delete(REPLAY_PARAM);
+      window.history.replaceState({}, '', url.toString());
+    }
     const encoded = readShareFromUrl();
     if (encoded) {
       const pos = decodeShare(encoded);
@@ -69,10 +91,9 @@ export default function App() {
               {/* 編集モード中はペア編集カードを優先表示。NextQueue はゲーム中の
                   情報源で編集と概念が違うので入れ替える方が混乱しない。 */}
               {editing ? <EditPairs /> : <NextQueue />}
-              {/* match モード中は AI 候補手を出さない (対人戦の趣旨を壊すので)。
-                  free モード = サンドボックス的にぷよ研究するためのモードなので
-                  そちらでは引き続き表示する。 */}
-              {!editing && mode !== 'match' && (
+              {/* free モードのみ AI 候補手を表示する。match (対人戦の趣旨)、
+                  score (一発勝負) どちらも AI ヒント無しが要件。 */}
+              {!editing && mode === 'free' && (
                 <div className="mt-auto">
                   <CandidateList />
                 </div>

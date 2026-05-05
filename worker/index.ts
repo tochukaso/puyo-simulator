@@ -185,6 +185,18 @@ interface DbRow {
   ai_moves: string;
 }
 
+function safeParseMoves(raw: string, id: string, field: string): unknown {
+  // 通常 INSERT 時に validatePayload 済みの JSON 文字列が入るが、手動編集や
+  // スキーマ変更等で壊れた値が混入した場合に 500 を返してしまわないよう、
+  // パース失敗は空配列にフォールバックして警告ログだけ残す。
+  try {
+    return JSON.parse(raw);
+  } catch {
+    console.warn(`malformed ${field} for record ${id}`);
+    return [];
+  }
+}
+
 function rowToRecord(row: DbRow): unknown {
   return {
     id: row.id,
@@ -197,8 +209,8 @@ function rowToRecord(row: DbRow): unknown {
     playerScore: row.player_score,
     aiScore: row.ai_score,
     winner: row.winner,
-    playerMoves: JSON.parse(row.player_moves),
-    aiMoves: JSON.parse(row.ai_moves),
+    playerMoves: safeParseMoves(row.player_moves, row.id, 'player_moves'),
+    aiMoves: safeParseMoves(row.ai_moves, row.id, 'ai_moves'),
   };
 }
 

@@ -55,13 +55,16 @@ npm run dev
 ## マイグレーション追加
 
 `migrations/0002_*.sql` のように連番で SQL ファイルを追加する。
-`npm run db:migrate:local` / `db:migrate:remote` で適用される。
+`npm run db:migrate:local` / `npm run db:migrate:remote` で適用される。
 
 ## トラブルシューティング
 
-- **Deploy 後に `/api/*` が 500**: `D1_DATABASE_ID` Secret が未設定 or ID が
-  間違っている可能性。`scripts/cf-deploy-prepare.mjs` は ID 未設定なら d1
-  バインドを落として deploy するため、500 でなく 404 が返るはず。
+- **Deploy 後に `/api/scores` が 500**: `D1_DATABASE_ID` Secret が未設定で
+  d1 バインドが落とされたか、ID が間違ってバインドが立っているのに DB に
+  到達できない可能性。前者の場合 `/api/scores` ハンドラは登録されているが
+  `env.DB` が undefined で例外を投げて 500 になる(API ハンドラ未登録時の
+  汎用 404 とは別経路)。`scripts/cf-deploy-prepare.mjs` のログで
+  `database_id を inject` か `d1 バインドを除去` のどちらが出たか確認する。
 - **ローカルで API が動かない**: `npm run db:migrate:local` を実行した上で
   `npm run dev` を起動しているか確認。
 

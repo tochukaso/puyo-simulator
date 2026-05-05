@@ -51,3 +51,28 @@ jobs:
           # d1 バインドを落として deploy する (API は 500 を返すが deploy は通る)。
           D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
         run: npm run deploy
+
+      # デプロイ直後に GET /api/scores/<random-id> を叩いて 5xx でないことを
+      # 確認する smoke check。期待は 404 (id 未存在)。500 が返ったら D1 バインド
+      # 不整合 (binding はあるが DB に届かない等) なので CI を失敗させる。
+      # GitHub Actions の `if:` から secrets を直接参照すると不安定なため、
+      # シェル側で空チェックして skip する。
+      - name: Smoke check /api/scores
+        env:
+          CUSTOM_DOMAIN: ${{ secrets.CUSTOM_DOMAIN }}
+        run: |
+          set -e
+          if [ -z "$CUSTOM_DOMAIN" ]; then
+            echo "[smoke] CUSTOM_DOMAIN not set; skipping"
+            exit 0
+          fi
+          probe_id="ci-smoke-$(date +%s)"
+          url="https://${CUSTOM_DOMAIN}/api/scores/${probe_id}"
+          # `--max-time 15` で hang を防ぎ、本体は捨てて HTTP ステータスだけ取る。
+          status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "$url" || echo 000)
+          echo "[smoke] GET ${url} -> ${status}"
+          # 404 (期待) / 200 (万一 ID が当たった) / 4xx 系は OK。5xx と 000 (timeout/接続失敗) は NG。
+          if [ "$status" = "000" ] || [ "${status:0:1}" = "5" ]; then
+            echo "[smoke] /api/scores returned ${status} — likely D1 misconfiguration"
+            exit 1
+          fi

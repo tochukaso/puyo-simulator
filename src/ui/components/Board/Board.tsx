@@ -8,6 +8,7 @@ import {
   setBoardCellSize,
 } from '../../hooks/useUiPrefs';
 import { usePreviewMove } from '../../hooks/useAiPreview';
+import { setBoardRectGetter } from '../../hooks/useBoardRect';
 import { useT } from '../../../i18n';
 import {
   ROWS,
@@ -163,6 +164,15 @@ export function Board() {
     });
     if (wrapperRef.current) ro.observe(wrapperRef.current);
     return () => ro.disconnect();
+  }, []);
+
+  // useGestures (tap-to-drop / drag) reads the board's current bounding rect
+  // via this singleton to convert pointer clientX into a column index.
+  useEffect(() => {
+    setBoardRectGetter(() => wrapperRef.current?.getBoundingClientRect() ?? null);
+    return () => {
+      setBoardRectGetter(() => null);
+    };
   }, []);
 
   useEffect(() => {

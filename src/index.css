@@ -9,6 +9,14 @@ body,
 body {
   margin: 0;
   font-family: system-ui, sans-serif;
+  /* Android の enableEdgeToEdge() / iOS のノッチで WebView がシステム UI 裏まで
+     拡張されるので、safe-area inset 分の padding を取る。viewport-fit=cover と
+     組み合わせて機能する。Web ブラウザでは env() が 0px なので無影響。 */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  box-sizing: border-box;
 }
 
 /* 連鎖発生時のテキスト("Nれんさ!")。本家ぷよぷよを参考に、

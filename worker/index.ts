@@ -4,6 +4,8 @@
 //
 // 依存: wrangler.jsonc に `main` と `d1_databases[ {binding="DB"} ]` バインドが必要。
 
+import { simulateAndValidate } from './validateMoves';
+
 interface Env {
   ASSETS: Fetcher;
   DB: D1Database;
@@ -134,6 +136,22 @@ async function saveScore(request: Request, env: Env): Promise<Response> {
   if (typeof parsed === 'string') return badRequest(parsed);
   const validated = validatePayload(parsed);
   if (typeof validated === 'string') return badRequest(validated);
+
+  // 改造防止: 受け取った seed + playerMoves をサーバ側で再シミュレートして、
+  // 連鎖判定 / 配置可能性 / 最終スコアが一致するか検証する。一致しなければ
+  // 400 で弾いて DB に書かない。これで「クライアントから直接 fetch して
+  // でっちあげのスコアを送る」攻撃を防げる。
+  // 型: rotation は validatePayload で 0..3 にレンジチェック済みなので
+  // 安全に Move (= rotation: Rotation) として cast する。
+  const sim = simulateAndValidate({
+    seed: validated.seed,
+    moves: validated.playerMoves as readonly { axisCol: number; rotation: 0 | 1 | 2 | 3 }[],
+    claimedScore: validated.playerScore,
+    turnLimit: validated.turnLimit,
+  });
+  if (!sim.ok) {
+    return badRequest(`validation failed: ${sim.reason}`);
+  }
 
   const id = generateId();
   const createdAt = new Date().toISOString();

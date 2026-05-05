@@ -76,3 +76,21 @@ npm run dev
 | GET | `/api/scores/:id` | 保存済みレコードを取得。 |
 
 リクエスト/レスポンス形式は `worker/index.ts` と `src/api/scoresClient.ts` を参照。
+
+## 改造防止 (server-side replay validation)
+
+`POST /api/scores` は受け取った payload をそのまま DB に書かず、
+**`seed` と `playerMoves` から再シミュレート**して以下を検証する
+(`worker/validateMoves.ts`):
+
+1. 各手の `axisCol` / `rotation` が物理的に配置可能か (`canPlace`)
+2. ターン上限を超える手数が送られていないか
+3. すでに gameover した状態で更に手が送られていないか
+4. **再シミュレートで得たスコアが `playerScore` と完全一致するか**
+
+ひとつでも検証に失敗すると 400 を返して DB に書かない。連鎖計算は整数演算
+のみで決定論的なので、同じ seed + 同じ手列なら必ず同じスコアになる
+(クライアント / サーバ間で V8 の挙動差は出ない)。
+
+これにより、ブラウザの DevTools / curl から直接 `POST /api/scores` で
+適当なスコアを送り込む類の改造はリーダーボードに混入しない。

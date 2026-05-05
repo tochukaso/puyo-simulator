@@ -1,5 +1,43 @@
 import { describe, it, expect } from 'vitest';
 import worker from '../index';
+import { createInitialState, spawnNext } from '../../src/game/state';
+import { lockActive } from '../../src/game/landing';
+import { resolveChain } from '../../src/game/chain';
+import type { Move } from '../../src/game/types';
+
+// クライアント側と同じ手順でスコアを再現するヘルパー (validation テストに必要)。
+function simulateClientSide(
+  seed: number,
+  moves: ReadonlyArray<Move>,
+  turnLimit: number,
+): number {
+  const limit = turnLimit <= 0 ? Infinity : turnLimit;
+  let state = createInitialState(seed);
+  for (let i = 0; i < moves.length; i++) {
+    if (!state.current) break;
+    const move = moves[i]!;
+    const placed = {
+      ...state.current,
+      axisCol: move.axisCol,
+      rotation: move.rotation,
+    };
+    const locked = lockActive(state.field, placed);
+    const { finalField, steps, totalScore } = resolveChain(locked);
+    const resolved = {
+      ...state,
+      field: finalField,
+      current: null,
+      score: state.score + totalScore,
+      chainCount: steps.length,
+      totalChains: state.totalChains + steps.length,
+      maxChain: Math.max(state.maxChain, steps.length),
+      status: 'resolving' as const,
+    };
+    const atLimit = i + 1 >= limit;
+    state = atLimit ? resolved : spawnNext(resolved);
+  }
+  return state.score;
+}
 
 // Worker のフェッチハンドラを vitest だけで直接叩く小さな統合テスト。
 // 本物の D1 (`miniflare` 経由) を立てる代わりに、必要最低限の prepare/bind
@@ -89,15 +127,20 @@ describe('worker /api/scores', () => {
   it('accepts a valid POST and returns a server-issued id', async () => {
     const inserted: FakeRow[] = [];
     const env = { DB: makeFakeDb({ insertedRows: inserted }), ASSETS: fakeAssets };
+    const seed = 42;
+    const playerMoves: Move[] = [{ axisCol: 0, rotation: 0 }];
+    // サーバ側 validateMoves が再シミュレートしてスコア検証するので、
+    // payload には実際にシミュレートで得られる score をセットする必要がある。
+    const trueScore = simulateClientSide(seed, playerMoves, 50);
     const payload = {
       mode: 'score',
       turnLimit: 50,
       preset: '',
-      seed: 42,
-      playerScore: 1234,
+      seed,
+      playerScore: trueScore,
       aiScore: 0,
       winner: 'player',
-      playerMoves: [{ axisCol: 0, rotation: 0 }],
+      playerMoves,
       aiMoves: [],
     };
     const res = await worker.fetch(
@@ -113,7 +156,40 @@ describe('worker /api/scores', () => {
     expect(body.id).toBeTruthy();
     expect(body.createdAt).toBeTruthy();
     expect(inserted.length).toBe(1);
-    expect(inserted[0]!.player_score).toBe(1234);
+    expect(inserted[0]!.player_score).toBe(trueScore);
+  });
+
+  it('rejects a tampered score (server-side replay catches mismatch)', async () => {
+    const inserted: FakeRow[] = [];
+    const env = { DB: makeFakeDb({ insertedRows: inserted }), ASSETS: fakeAssets };
+    const seed = 42;
+    const playerMoves: Move[] = [{ axisCol: 0, rotation: 0 }];
+    const trueScore = simulateClientSide(seed, playerMoves, 50);
+    const payload = {
+      mode: 'score',
+      turnLimit: 50,
+      preset: '',
+      seed,
+      // 真のスコアに +999999 を足した「改造データ」。サーバの再シミュレートと
+      // 食い違うので 400 で弾かれる。
+      playerScore: trueScore + 999999,
+      aiScore: 0,
+      winner: 'player',
+      playerMoves,
+      aiMoves: [],
+    };
+    const res = await worker.fetch(
+      new Request('http://localhost/api/scores', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+    expect(inserted.length).toBe(0);
+    const body = (await res.json()) as { error: string; reason: string };
+    expect(body.reason).toMatch(/validation failed: score mismatch/);
   });
 
   it('rejects out-of-range moves', async () => {

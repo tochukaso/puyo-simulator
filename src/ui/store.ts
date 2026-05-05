@@ -593,6 +593,7 @@ export const useGameStore = create<Store>((set, get) => ({
   // ---- Match-vs-AI actions ----
 
   setGameMode: (mode) => {
+    const fromMatch = get().mode === 'match';
     persistMode(mode);
     set({ mode });
     // Stats from the previous mode (e.g. a finished match) shouldn't bleed
@@ -600,6 +601,26 @@ export const useGameStore = create<Store>((set, get) => ({
     set({ aiStats: { ...EMPTY_AI_STATS }, analyzing: false });
     if (mode === 'free') {
       historyAnimSeq++;
+      // match → free に戻る時は盤面と履歴をフルリセットして、新しい free
+      // セッションを始める。理由は 2 つ:
+      // (1) match の途中盤面が free に持ち越されると、ユーザーから見て
+      //     「対戦中の盤面が突然フリーモードで見える」直感に反する。
+      // (2) free 専用の `history` スタックは match 中は触っていないので、
+      //     match 開始前に free でプレイした残骸が残ったまま match→undo→free
+      //     の経路を辿ると、free の undo が古い snapshot を読み出して盤面が
+      //     ジャンプする潜在バグになる。リセットすればこのチェーンを断てる。
+      const fresh: Partial<Pick<Store, 'game' | 'history' | 'freePlayerMoves' | 'animatingSteps' | 'poppingCells' | 'chainTexts' | 'landedCells'>> =
+        fromMatch
+          ? {
+              game: createInitialState(Date.now() | 0),
+              history: [],
+              freePlayerMoves: [],
+              animatingSteps: [],
+              poppingCells: [],
+              chainTexts: [],
+              landedCells: [],
+            }
+          : {};
       set({
         aiGame: null,
         aiHistory: [],
@@ -611,6 +632,7 @@ export const useGameStore = create<Store>((set, get) => ({
         aiHistoryViewIndex: null,
         playerHistoryViewIndex: null,
         historyAnim: null,
+        ...fresh,
       });
     }
   },

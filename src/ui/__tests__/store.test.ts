@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { useGameStore } from '../store';
 
 describe('useGameStore', () => {
@@ -133,6 +133,19 @@ describe('useGameStore undo (match mode)', () => {
     // useMatchDriver は React hook なので vitest 単体では発火せず ama は
     // 自動進行しない。プレイヤー側だけの巻き戻しを検査する分には十分。
     useGameStore.getState().startMatch({ seed: 1, turnLimit: 30 });
+  });
+
+  afterEach(() => {
+    // startMatch は 'match' モードを localStorage に永続化し、シングルトンの
+    // store も match モードのまま残すので、後続の suite (reset() しか呼ばない
+    // 系) が match モードを引き継いで挙動が実行順依存になる。明示的に free
+    // に戻して、永続化キーも消す。
+    useGameStore.getState().setGameMode('free');
+    try {
+      localStorage.removeItem('puyo.gameMode');
+    } catch {
+      // jsdom 等で localStorage が無効でも問題ない。
+    }
   });
 
   it('canUndo=false right after startMatch (no moves yet)', () => {

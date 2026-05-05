@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   listRecords,
   deleteRecord,
   type MatchRecord,
 } from '../../../match/records';
 import { useGameStore } from '../../store';
-import { useT } from '../../../i18n';
+import { useLang, useT } from '../../../i18n';
 
 // ハンバーガーメニュー → 「保存した対戦」で開くモーダル。
 // 一覧 + 各レコードの「再生」「削除」操作。再生ボタンは store.loadRecord を
@@ -13,16 +13,40 @@ import { useT } from '../../../i18n';
 // 状態に切り替える。
 export function RecordsDialog({ onClose }: { onClose: () => void }) {
   const t = useT();
+  const lang = useLang();
   const loadRecord = useGameStore((s) => s.loadRecord);
   const loadedRecordId = useGameStore((s) => s.loadedRecordId);
 
   const [records, setRecords] = useState<MatchRecord[] | null>(null);
 
+  // i18n と整合させるため、選択言語のロケールで日付を整形する。年も出すので
+  // 複数年にまたがった記録でも 5/3 が今年か昨年か区別できる。
+  const dateFmt = useMemo(
+    () =>
+      new Intl.DateTimeFormat(lang, {
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+    [lang],
+  );
+
+  // listRecords / deleteRecord は IndexedDB が拒否されるとき (private mode・
+  // ブラウザのストレージ無効化等) に reject する。catch せずに await すると
+  // ダイアログが「読み込み中」のまま固まったり unhandled rejection を吐く
+  // ので、失敗時は空一覧 / 旧一覧維持に degrade する。
   useEffect(() => {
     let cancelled = false;
-    void listRecords().then((rs) => {
-      if (!cancelled) setRecords(rs);
-    });
+    void (async () => {
+      try {
+        const rs = await listRecords();
+        if (!cancelled) setRecords(rs);
+      } catch {
+        if (!cancelled) setRecords([]);
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -34,8 +58,12 @@ export function RecordsDialog({ onClose }: { onClose: () => void }) {
   };
 
   const onDelete = async (r: MatchRecord) => {
-    await deleteRecord(r.id);
-    setRecords(await listRecords());
+    try {
+      await deleteRecord(r.id);
+      setRecords(await listRecords());
+    } catch {
+      // 失敗時は前回の一覧をそのまま残してユーザーに再試行させる。
+    }
   };
 
   return (
@@ -76,8 +104,7 @@ export function RecordsDialog({ onClose }: { onClose: () => void }) {
         ) : (
           <ul className="flex flex-col gap-1 max-h-[60vh] overflow-y-auto">
             {records.map((r) => {
-              const date = new Date(r.createdAt);
-              const dateStr = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+              const dateStr = dateFmt.format(new Date(r.createdAt));
               const winLabel =
                 r.winner === 'player'
                   ? t('match.you')

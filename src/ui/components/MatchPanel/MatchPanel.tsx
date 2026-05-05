@@ -32,6 +32,7 @@ export function MatchPanel() {
   const historyAnim = useGameStore((s) => s.historyAnim);
   const startMatch = useGameStore((s) => s.startMatch);
   const setGameMode = useGameStore((s) => s.setGameMode);
+  const reset = useGameStore((s) => s.reset);
   const loadedRecordId = useGameStore((s) => s.loadedRecordId);
   const t = useT();
 
@@ -284,7 +285,14 @@ export function MatchPanel() {
               </span>
               <button
                 type="button"
-                onClick={() => setGameMode('free')}
+                onClick={() => {
+                  // setGameMode('free') は match 系の状態 (aiHistory 等) は
+                  // クリアするが game は loadRecord で書いた末尾スナップショット
+                  // のまま (turnLimit 到達時は current=null = 操作不能盤面)。
+                  // reset() で操作可能な初期盤面に戻す。
+                  setGameMode('free');
+                  reset();
+                }}
                 className="px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs"
               >
                 {t('match.exitReplay')}

@@ -121,6 +121,21 @@ export interface Dict {
   'controls.undoAria': string;
   'controls.reset': string;
   'controls.resetConfirm': string;
+  'controls.settings.button': string;
+  'controls.settings.title': string;
+  'controls.settings.modeSection': string;
+  'controls.settings.modeClassic': string;
+  'controls.settings.modeTapToDrop': string;
+  'controls.settings.modeDrag': string;
+  'controls.settings.modeClassicDesc': string;
+  'controls.settings.modeTapToDropDesc': string;
+  'controls.settings.modeDragDesc': string;
+  'controls.settings.tuningSection': string;
+  'controls.settings.flickPx': string;
+  'controls.settings.haptic': string;
+  'controls.settings.buttonLarge': string;
+  'controls.settings.holdRepeat': string;
+  'controls.settings.close': string;
   'candidates.title': string;
   'candidates.loading': string;
   'candidates.thinking': string;
@@ -244,6 +259,21 @@ export const translations: Record<Lang, Dict> = {
     'controls.undoAria': '{n} 手戻る',
     'controls.reset': 'リセット',
     'controls.resetConfirm': 'リセットしますか?',
+    'controls.settings.button': '⚙ 操作設定',
+    'controls.settings.title': '操作設定',
+    'controls.settings.modeSection': '操作プリセット',
+    'controls.settings.modeClassic': 'Classic (現行)',
+    'controls.settings.modeTapToDrop': 'Tap-to-Drop',
+    'controls.settings.modeDrag': 'Drag',
+    'controls.settings.modeClassicDesc': 'フリック=移動 / 下フリック=高速落下 / タップ=回転',
+    'controls.settings.modeTapToDropDesc': '盤面の列をタップして離すと、その列にぷよが落ちる',
+    'controls.settings.modeDragDesc': '現在ぷよを掴んで横にドラッグ → 離した列で確定',
+    'controls.settings.tuningSection': '詳細設定',
+    'controls.settings.flickPx': 'フリック反応量',
+    'controls.settings.haptic': '触覚バイブ',
+    'controls.settings.buttonLarge': 'ボタンを大きく',
+    'controls.settings.holdRepeat': '長押しで連続移動',
+    'controls.settings.close': '閉じる',
     'candidates.title': 'AI候補',
     'candidates.loading': '{aiKind} 読み込み中…',
     'candidates.thinking': '(思考中)',
@@ -365,6 +395,21 @@ export const translations: Record<Lang, Dict> = {
     'controls.undoAria': 'Undo {n} step(s)',
     'controls.reset': 'Reset',
     'controls.resetConfirm': 'Reset?',
+    'controls.settings.button': '⚙ Controls',
+    'controls.settings.title': 'Control Settings',
+    'controls.settings.modeSection': 'Preset',
+    'controls.settings.modeClassic': 'Classic (current)',
+    'controls.settings.modeTapToDrop': 'Tap-to-Drop',
+    'controls.settings.modeDrag': 'Drag',
+    'controls.settings.modeClassicDesc': 'Flick to move / flick down to drop / tap to rotate',
+    'controls.settings.modeTapToDropDesc': 'Tap a column on the board and release to drop the pair there',
+    'controls.settings.modeDragDesc': 'Grab the active pair and drag it horizontally; release to commit',
+    'controls.settings.tuningSection': 'Tuning',
+    'controls.settings.flickPx': 'Flick distance',
+    'controls.settings.haptic': 'Haptic feedback',
+    'controls.settings.buttonLarge': 'Larger buttons',
+    'controls.settings.holdRepeat': 'Hold to repeat move',
+    'controls.settings.close': 'Close',
     'candidates.title': 'AI candidates',
     'candidates.loading': 'Loading {aiKind}…',
     'candidates.thinking': '(thinking)',
@@ -486,6 +531,21 @@ export const translations: Record<Lang, Dict> = {
     'controls.undoAria': '撤销 {n} 步',
     'controls.reset': '重置',
     'controls.resetConfirm': '确定要重置吗?',
+    'controls.settings.button': '⚙ 操作设置',
+    'controls.settings.title': '操作设置',
+    'controls.settings.modeSection': '操作模式',
+    'controls.settings.modeClassic': 'Classic (当前)',
+    'controls.settings.modeTapToDrop': 'Tap-to-Drop',
+    'controls.settings.modeDrag': 'Drag',
+    'controls.settings.modeClassicDesc': '滑动=移动 / 下滑=快速下落 / 点击=旋转',
+    'controls.settings.modeTapToDropDesc': '点击棋盘的列后松开,方块落到该列',
+    'controls.settings.modeDragDesc': '抓住当前方块横向拖动,松开后确定位置',
+    'controls.settings.tuningSection': '详细设置',
+    'controls.settings.flickPx': '滑动灵敏度',
+    'controls.settings.haptic': '触感反馈',
+    'controls.settings.buttonLarge': '加大按钮',
+    'controls.settings.holdRepeat': '长按连续移动',
+    'controls.settings.close': '关闭',
     'candidates.title': 'AI候选',
     'candidates.loading': '{aiKind} 加载中…',
     'candidates.thinking': '(思考中)',
@@ -607,6 +667,21 @@ export const translations: Record<Lang, Dict> = {
     'controls.undoAria': '{n}수 되돌리기',
     'controls.reset': '초기화',
     'controls.resetConfirm': '초기화하시겠습니까?',
+    'controls.settings.button': '⚙ 조작 설정',
+    'controls.settings.title': '조작 설정',
+    'controls.settings.modeSection': '조작 프리셋',
+    'controls.settings.modeClassic': 'Classic (기본)',
+    'controls.settings.modeTapToDrop': 'Tap-to-Drop',
+    'controls.settings.modeDrag': 'Drag',
+    'controls.settings.modeClassicDesc': '플릭=이동 / 아래 플릭=빠른 낙하 / 탭=회전',
+    'controls.settings.modeTapToDropDesc': '보드의 열을 탭하고 떼면 그 열에 떨어집니다',
+    'controls.settings.modeDragDesc': '현재 뿌요를 잡고 가로로 드래그, 떼는 열에서 확정',
+    'controls.settings.tuningSection': '세부 설정',
+    'controls.settings.flickPx': '플릭 감도',
+    'controls.settings.haptic': '햅틱 피드백',
+    'controls.settings.buttonLarge': '버튼 크게',
+    'controls.settings.holdRepeat': '길게 눌러 연속 이동',
+    'controls.settings.close': '닫기',
     'candidates.title': 'AI 후보',
     'candidates.loading': '{aiKind} 로딩 중…',
     'candidates.thinking': '(생각 중)',

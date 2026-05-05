@@ -18,6 +18,9 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # cancel-in-progress: false なので、ハングした run が後続をブロックしないよう
+    # 上限を切っておく(npm ci + build + wrangler deploy で通常 5 分以内)。
+    timeout-minutes: 20
     environment: production
     permissions:
       contents: read

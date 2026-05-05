@@ -132,8 +132,8 @@ export function RecordsDialog({ onClose }: { onClose: () => void }) {
                   <span
                     className={`font-mono tabular-nums whitespace-nowrap ${winColor}`}
                   >
-                    {r.playerScore.toLocaleString()} -{' '}
-                    {r.aiScore.toLocaleString()}
+                    {r.playerScore.toLocaleString(lang)} -{' '}
+                    {r.aiScore.toLocaleString(lang)}
                   </span>
                   <span className={`whitespace-nowrap ${winColor}`}>
                     {winLabel}

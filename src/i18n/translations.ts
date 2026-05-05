@@ -43,6 +43,16 @@ export interface Dict {
   'match.playChainTitle': string;
   'match.stepBackTitle': string;
   'match.stepForwardTitle': string;
+  'match.viewingRecord': string;
+  'match.exitReplay': string;
+  'records.button': string;
+  'records.title': string;
+  'records.close': string;
+  'records.loading': string;
+  'records.empty': string;
+  'records.replay': string;
+  'records.replayTitle': string;
+  'records.note': string;
   'edit.edit': string;
   'edit.editing': string;
   'edit.apply': string;
@@ -113,7 +123,7 @@ export interface Dict {
 
 export const translations: Record<Lang, Dict> = {
   ja: {
-    'app.title': 'ぷよトレーニング',
+    'app.title': 'GTR トレーニング',
     'header.ghost': 'ゴースト',
     'header.ceiling': '天井',
     'header.trainer': 'テンプレ',
@@ -146,6 +156,16 @@ export const translations: Record<Lang, Dict> = {
     'match.playChainTitle': 'このターンの連鎖をアニメーションで再生',
     'match.stepBackTitle': '1手前に戻る',
     'match.stepForwardTitle': '1手先に進む',
+    'match.viewingRecord': '保存した対戦をリプレイ表示中',
+    'match.exitReplay': 'リプレイ終了',
+    'records.button': '保存した対戦',
+    'records.title': '保存した対戦',
+    'records.close': '閉じる',
+    'records.loading': '読み込み中…',
+    'records.empty': 'まだ保存された対戦はありません。マッチ終了後に「保存」を押すと残せます。',
+    'records.replay': '▶ 再生',
+    'records.replayTitle': 'この対戦をリプレイ表示する',
+    'records.note': '再生を押すと、ヒストリーを使って盤面と連鎖を見返せます。再戦すると現在の対戦表示は破棄されます。',
     'edit.edit': '編集',
     'edit.editing': '編集中',
     'edit.apply': '適用',
@@ -214,7 +234,7 @@ export const translations: Record<Lang, Dict> = {
     'board.chain': '{n}れんさ!',
   },
   en: {
-    'app.title': 'Puyo Training',
+    'app.title': 'GTR Training',
     'header.ghost': 'Ghost',
     'header.ceiling': 'Ceiling',
     'header.trainer': 'Template',
@@ -247,6 +267,16 @@ export const translations: Record<Lang, Dict> = {
     'match.playChainTitle': "Replay this turn's chain animation",
     'match.stepBackTitle': 'Step back one move',
     'match.stepForwardTitle': 'Step forward one move',
+    'match.viewingRecord': 'Viewing a saved match',
+    'match.exitReplay': 'Exit replay',
+    'records.button': 'Saved matches',
+    'records.title': 'Saved matches',
+    'records.close': 'Close',
+    'records.loading': 'Loading…',
+    'records.empty': 'No saved matches yet. Press "Save" after a match ends to keep it here.',
+    'records.replay': '▶ Replay',
+    'records.replayTitle': 'Replay this match',
+    'records.note': 'Press Replay to scrub through turns and re-watch chains. Starting a new match clears this view.',
     'edit.edit': 'Edit',
     'edit.editing': 'Editing',
     'edit.apply': 'Apply',
@@ -315,7 +345,7 @@ export const translations: Record<Lang, Dict> = {
     'board.chain': '{n} chain!',
   },
   zh: {
-    'app.title': '噗哟训练',
+    'app.title': 'GTR 训练',
     'header.ghost': '幽灵预览',
     'header.ceiling': '顶部',
     'header.trainer': '模板',
@@ -348,6 +378,16 @@ export const translations: Record<Lang, Dict> = {
     'match.playChainTitle': '回放本回合的连锁动画',
     'match.stepBackTitle': '回退一步',
     'match.stepForwardTitle': '前进一步',
+    'match.viewingRecord': '正在回放已保存的对战',
+    'match.exitReplay': '退出回放',
+    'records.button': '已保存的对战',
+    'records.title': '已保存的对战',
+    'records.close': '关闭',
+    'records.loading': '加载中…',
+    'records.empty': '还没有保存的对战。对战结束后按"保存"即可记录。',
+    'records.replay': '▶ 回放',
+    'records.replayTitle': '回放此对战',
+    'records.note': '按回放可逐回合查看棋盘并重看连锁。开始新对战会清除当前视图。',
     'edit.edit': '编辑',
     'edit.editing': '编辑中',
     'edit.apply': '应用',
@@ -416,7 +456,7 @@ export const translations: Record<Lang, Dict> = {
     'board.chain': '{n}连锁!',
   },
   ko: {
-    'app.title': '뿌요 트레이닝',
+    'app.title': 'GTR 트레이닝',
     'header.ghost': '고스트',
     'header.ceiling': '천장',
     'header.trainer': '템플릿',
@@ -449,6 +489,16 @@ export const translations: Record<Lang, Dict> = {
     'match.playChainTitle': '이 턴의 연쇄 애니메이션을 재생',
     'match.stepBackTitle': '한 수 전으로',
     'match.stepForwardTitle': '한 수 앞으로',
+    'match.viewingRecord': '저장된 대전을 리플레이 보기 중',
+    'match.exitReplay': '리플레이 종료',
+    'records.button': '저장된 대전',
+    'records.title': '저장된 대전',
+    'records.close': '닫기',
+    'records.loading': '불러오는 중…',
+    'records.empty': '아직 저장된 대전이 없습니다. 대전 종료 후 "저장"을 누르면 여기에 남습니다.',
+    'records.replay': '▶ 재생',
+    'records.replayTitle': '이 대전을 리플레이 보기',
+    'records.note': '재생을 누르면 턴별 보드와 연쇄를 다시 볼 수 있습니다. 새 대전을 시작하면 현재 화면은 지워집니다.',
     'edit.edit': '편집',
     'edit.editing': '편집 중',
     'edit.apply': '적용',

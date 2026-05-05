@@ -18,6 +18,7 @@ import { resolveChain } from '../game/chain';
 import { lockActive } from '../game/landing';
 import { suggestForState } from './hooks/useAiSuggestion';
 import { getAmaPreset } from '../ai/wasm-ama/wasm-loader';
+import type { MatchRecord } from '../match/records';
 
 export interface PoppingCell {
   row: number;
@@ -161,6 +162,12 @@ interface Store {
   historyAnim: HistoryAnim | null;
   matchEnded: boolean;
   matchResult: MatchResult | null;
+  /**
+   * 保存レコードからロードしてリプレイ表示している場合の元レコード ID。
+   * null = ライブの対戦 (まだロードしていない)。
+   * UI で「保存」ボタンを隠す / 「リプレイ表示中」のラベルを出す等に使う。
+   */
+  loadedRecordId: string | null;
 
   reset(seed?: number): void;
   dispatch(input: Input): void;
@@ -188,6 +195,14 @@ interface Store {
   finalizeMatchIfDone(): void;
   /** Player concedes the current match. Result is set with `winner: 'ai'` regardless of score. */
   resignMatch(): void;
+  /**
+   * 保存済みマッチをリプレイ用にロード。
+   * `seed` から初期状態を作り、`playerMoves` / `aiMoves` を順に再シミュレート
+   * して playerHistory / aiHistory を再構築する。終了状態 (matchEnded=true,
+   * matchResult, viewing='player', view index = 末尾) でセットするので、
+   * MatchPanel の既存 scrubber UI と「連鎖再生」ボタンがそのまま使える。
+   */
+  loadRecord(record: MatchRecord): void;
 
   /**
    * Replay every player move from the recorded sequence, run ama on each
@@ -283,6 +298,45 @@ function persistTurnLimit(limit: MatchTurnLimit): void {
   }
 }
 
+// 保存レコードを片側ぶん再シミュレートして、`*History[]` の中身を作る。
+// `commitMove` は内部で spawnNext まで含むが、最終ターン (turnLimit 到達) では
+// applyAiMove / commit と同様に spawnNext を抑止して、ライブ進行の snapshot
+// 形状と完全一致させる。これで playHistoryChain が history[index-1] を pre と
+// して使うパスに落ちてもズレない。途中で gameover になれば打ち切る。
+function simulateRecordSide(
+  seed: number,
+  moves: ReadonlyArray<Move>,
+  turnLimit: number,
+): { history: GameState[]; lastState: GameState } {
+  const history: GameState[] = [];
+  let state = createInitialState(seed);
+  for (let i = 0; i < moves.length; i++) {
+    if (!state.current) break;
+    const move = moves[i]!;
+    const placed: ActivePair = {
+      ...state.current,
+      axisCol: move.axisCol,
+      rotation: move.rotation,
+    };
+    const locked = lockActive(state.field, placed);
+    const { finalField, steps, totalScore } = resolveChain(locked);
+    const resolved: GameState = {
+      ...state,
+      field: finalField,
+      current: null,
+      score: state.score + totalScore,
+      chainCount: steps.length,
+      totalChains: state.totalChains + steps.length,
+      maxChain: Math.max(state.maxChain, steps.length),
+      status: 'resolving',
+    };
+    const atLimit = i + 1 >= turnLimit;
+    state = atLimit ? resolved : spawnNext(resolved);
+    history.push(state);
+  }
+  return { history, lastState: state };
+}
+
 export const useGameStore = create<Store>((set, get) => ({
   game: createInitialState(Date.now() | 0),
   animatingSteps: [],
@@ -310,6 +364,7 @@ export const useGameStore = create<Store>((set, get) => ({
   historyAnim: null,
   matchEnded: false,
   matchResult: null,
+  loadedRecordId: null,
 
   editing: false,
   editSnapshot: null,
@@ -632,6 +687,7 @@ export const useGameStore = create<Store>((set, get) => ({
         aiHistoryViewIndex: null,
         playerHistoryViewIndex: null,
         historyAnim: null,
+        loadedRecordId: null,
         ...fresh,
       });
     }
@@ -666,6 +722,7 @@ export const useGameStore = create<Store>((set, get) => ({
       matchAiMoves: [],
       matchEnded: false,
       matchResult: null,
+      loadedRecordId: null,
       viewing: 'player',
       aiHistoryViewIndex: null,
       playerHistoryViewIndex: null,
@@ -679,6 +736,65 @@ export const useGameStore = create<Store>((set, get) => ({
       analyzing: false,
       // Free-mode の解析ログは match 開始時点で意味を失う(再開時に古い seed
       // 由来の手列を新しい盤面に当ててしまう)。空にしておく。
+      freePlayerMoves: [],
+    });
+  },
+
+  loadRecord: (record) => {
+    // 在ロード中のリプレイ表示や再生中のチェーンアニメは全部破棄。
+    historyAnimSeq++;
+    persistMode('match');
+
+    const sim = simulateRecordSide(
+      record.seed,
+      record.playerMoves,
+      record.turnLimit,
+    );
+    const aiSim = simulateRecordSide(
+      record.seed,
+      record.aiMoves,
+      record.turnLimit,
+    );
+
+    // matchTurnLimit は 30/50/100 のリテラル型だが、過去レコードには 200 等が
+    // 残っていることがある (records.ts のコメント参照)。表示と境界判定にしか
+    // 使わないので、unsafe-ish に cast して載せる。
+    const turnLimit = record.turnLimit as MatchTurnLimit;
+
+    set({
+      mode: 'match',
+      matchTurnLimit: turnLimit,
+      matchSeed: record.seed,
+      matchPreset: record.preset,
+      // 末尾スナップショットをライブの game / aiGame に置く (Board が live
+      // 側を見るパスに落ちたときも矛盾しないように)。
+      game: sim.lastState,
+      aiGame: aiSim.lastState,
+      playerHistory: sim.history,
+      aiHistory: aiSim.history,
+      matchTurnsPlayed: sim.history.length,
+      matchPlayerMoves: record.playerMoves,
+      matchAiMoves: record.aiMoves,
+      matchEnded: true,
+      matchResult: {
+        playerScore: record.playerScore,
+        aiScore: record.aiScore,
+        winner: record.winner,
+      },
+      loadedRecordId: record.id,
+      viewing: 'player',
+      // 末尾を初期スクラブ位置に。null だと「ライブ追従」と区別がつかないが、
+      // matchEnded=true なので Board 側は明示的に履歴 index を見にいく。
+      aiHistoryViewIndex: Math.max(0, aiSim.history.length - 1),
+      playerHistoryViewIndex: Math.max(0, sim.history.length - 1),
+      historyAnim: null,
+      animatingSteps: [],
+      poppingCells: [],
+      chainTexts: [],
+      landedCells: [],
+      history: [],
+      aiStats: { ...EMPTY_AI_STATS },
+      analyzing: false,
       freePlayerMoves: [],
     });
   },

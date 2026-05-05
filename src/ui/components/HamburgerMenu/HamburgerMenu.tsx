@@ -13,6 +13,7 @@ import {
 import { useGameStore } from '../../store';
 import { AnalysisDialog } from '../AnalysisDialog/AnalysisDialog';
 import { ShareDialog } from '../ShareDialog/ShareDialog';
+import { RecordsDialog } from '../RecordsDialog/RecordsDialog';
 import {
   LANGUAGES,
   LANGUAGE_LABELS,
@@ -43,6 +44,7 @@ export function HamburgerMenu() {
   const [open, setOpen] = useState(false);
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [recordsOpen, setRecordsOpen] = useState(false);
 
   // 解析が許可されるのは "プレイした手があって、かつ match なら終了済み" の時。
   // 進行中の match で押されると意味的にもおかしいので無効化。
@@ -155,6 +157,17 @@ export function HamburgerMenu() {
 
             <button
               type="button"
+              onClick={() => {
+                setOpen(false);
+                setRecordsOpen(true);
+              }}
+              className="px-3 py-1.5 rounded text-sm border bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700"
+            >
+              {t('records.button')}
+            </button>
+
+            <button
+              type="button"
               disabled={!canAnalyze}
               onClick={() => {
                 setOpen(false);
@@ -173,6 +186,7 @@ export function HamburgerMenu() {
         <AnalysisDialog onClose={() => setAnalysisOpen(false)} />
       )}
       {shareOpen && <ShareDialog onClose={() => setShareOpen(false)} />}
+      {recordsOpen && <RecordsDialog onClose={() => setRecordsOpen(false)} />}
     </>
   );
 }

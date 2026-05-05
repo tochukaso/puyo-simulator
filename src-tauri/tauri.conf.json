@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Puyo Trainer",
+  "productName": "GTR training",
   "version": "0.1.0",
-  "identifier": "com.example.puyotrainer",
+  "identifier": "gtr.training",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Puyo Trainer",
+        "title": "GTR training",
         "width": 800,
         "height": 600,
         "resizable": true,

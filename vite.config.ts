@@ -37,9 +37,9 @@ export default defineConfig({
   plugins: [react(), VitePWA({
     registerType: 'autoUpdate',
     manifest: {
-      name: 'Puyo Training',
-      short_name: 'PuyoTrain',
-      description: 'AI-assisted Puyo Puyo training',
+      name: 'GTR training',
+      short_name: 'GTR',
+      description: 'GTR opening trainer with AI assistance',
       theme_color: '#0f172a',
       background_color: '#0f172a',
       display: 'standalone',

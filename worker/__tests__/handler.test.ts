@@ -58,11 +58,21 @@ interface FakeRow {
   winner: string;
   player_moves: string;
   ai_moves: string;
+  daily_date: string | null;
+  player_name: string | null;
+}
+
+interface LeaderboardFakeRow {
+  id: string;
+  created_at: string;
+  player_name: string | null;
+  player_score: number;
 }
 
 function makeFakeDb(opts: {
   insertedRows: FakeRow[];
   preloaded?: FakeRow;
+  leaderboard?: LeaderboardFakeRow[];
 }): D1Database {
   const stmt = (sql: string) => {
     const bound: unknown[] = [];
@@ -73,6 +83,7 @@ function makeFakeDb(opts: {
       },
       async run() {
         // INSERT で受け取ったパラメータから FakeRow を組み立てて in-memory に push。
+        // 0001_init / 0002_daily で 12 → 14 列に増えたので、末尾 2 つは nullable。
         if (sql.startsWith('INSERT')) {
           opts.insertedRows.push({
             id: bound[0] as string,
@@ -87,6 +98,8 @@ function makeFakeDb(opts: {
             winner: bound[9] as string,
             player_moves: bound[10] as string,
             ai_moves: bound[11] as string,
+            daily_date: (bound[12] as string | null) ?? null,
+            player_name: (bound[13] as string | null) ?? null,
           });
         }
         return { success: true } as unknown;
@@ -96,6 +109,14 @@ function makeFakeDb(opts: {
           return opts.preloaded as unknown as T;
         }
         return null;
+      },
+      async all<T>(): Promise<{ results: T[]; success: boolean }> {
+        // GET /api/daily/leaderboard 用の SELECT。 preset した leaderboard を
+        // そのまま返す (テストでは並び替えやフィルタ責務はチェックしない)。
+        return {
+          results: ((opts.leaderboard ?? []) as unknown) as T[],
+          success: true,
+        };
       },
     };
   };
@@ -233,6 +254,8 @@ describe('worker /api/scores', () => {
           winner: 'player',
           player_moves: '[{"axisCol":0,"rotation":0}]',
           ai_moves: '[]',
+          daily_date: null,
+          player_name: null,
         },
       }),
       ASSETS: fakeAssets,
@@ -270,5 +293,141 @@ describe('worker /api/scores', () => {
       env,
     );
     expect(res.status).toBe(404);
+  });
+});
+
+describe('worker daily mode', () => {
+  it('rejects daily POST without dailyDate', async () => {
+    const inserted: FakeRow[] = [];
+    const env = { DB: makeFakeDb({ insertedRows: inserted }), ASSETS: fakeAssets };
+    const payload = {
+      mode: 'daily',
+      turnLimit: 50,
+      seed: 12345,
+      playerScore: 0,
+      aiScore: 0,
+      winner: 'player',
+      playerMoves: [],
+      aiMoves: [],
+    };
+    const res = await worker.fetch(
+      new Request('http://localhost/api/scores', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+    expect(inserted.length).toBe(0);
+    const body = (await res.json()) as { reason: string };
+    expect(body.reason).toMatch(/dailyDate/);
+  });
+
+  it('rejects daily POST when seed does not match the date', async () => {
+    const inserted: FakeRow[] = [];
+    const env = { DB: makeFakeDb({ insertedRows: inserted }), ASSETS: fakeAssets };
+    const payload = {
+      mode: 'daily',
+      turnLimit: 50,
+      seed: 99999, // 適当な seed (日付ハッシュとは合わない)
+      playerScore: 0,
+      aiScore: 0,
+      winner: 'player',
+      playerMoves: [],
+      aiMoves: [],
+      dailyDate: '2026-05-06',
+    };
+    const res = await worker.fetch(
+      new Request('http://localhost/api/scores', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+    expect(inserted.length).toBe(0);
+    const body = (await res.json()) as { reason: string };
+    expect(body.reason).toMatch(/daily seed mismatch/);
+  });
+
+  it('rejects daily POST with non-50 turnLimit', async () => {
+    const inserted: FakeRow[] = [];
+    const env = { DB: makeFakeDb({ insertedRows: inserted }), ASSETS: fakeAssets };
+    // 正しい seed を取らないと先にそっちで弾かれるので、 dailySeedFor を直接使う。
+    const { dailySeedFor } = await import('../../src/game/dailySeed');
+    const seed = dailySeedFor('2026-05-06');
+    const payload = {
+      mode: 'daily',
+      turnLimit: 30, // not 50
+      seed,
+      playerScore: 0,
+      aiScore: 0,
+      winner: 'player',
+      playerMoves: [],
+      aiMoves: [],
+      dailyDate: '2026-05-06',
+    };
+    const res = await worker.fetch(
+      new Request('http://localhost/api/scores', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+    expect(inserted.length).toBe(0);
+  });
+
+  it('GET /api/daily/leaderboard returns ranked entries', async () => {
+    const env = {
+      DB: makeFakeDb({
+        insertedRows: [],
+        leaderboard: [
+          {
+            id: 'a1',
+            created_at: '2026-05-06T01:00:00Z',
+            player_name: 'alice',
+            player_score: 5000,
+          },
+          {
+            id: 'b2',
+            created_at: '2026-05-06T02:00:00Z',
+            player_name: null,
+            player_score: 3000,
+          },
+        ],
+      }),
+      ASSETS: fakeAssets,
+    };
+    const res = await worker.fetch(
+      new Request(
+        'http://localhost/api/daily/leaderboard?date=2026-05-06&limit=5',
+      ),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      date: string;
+      entries: { id: string; rank: number; playerName: string | null; playerScore: number }[];
+    };
+    expect(body.date).toBe('2026-05-06');
+    expect(body.entries).toHaveLength(2);
+    expect(body.entries[0]).toMatchObject({ id: 'a1', rank: 1, playerScore: 5000 });
+    expect(body.entries[1]).toMatchObject({ id: 'b2', rank: 2, playerScore: 3000 });
+  });
+
+  it('GET /api/daily/leaderboard rejects invalid date', async () => {
+    const env = {
+      DB: makeFakeDb({ insertedRows: [] }),
+      ASSETS: fakeAssets,
+    };
+    const res = await worker.fetch(
+      new Request('http://localhost/api/daily/leaderboard?date=not-a-date'),
+      env,
+    );
+    expect(res.status).toBe(400);
   });
 });

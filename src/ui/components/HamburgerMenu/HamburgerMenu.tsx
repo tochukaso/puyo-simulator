@@ -46,16 +46,15 @@ export function HamburgerMenu() {
   const [shareOpen, setShareOpen] = useState(false);
   const [recordsOpen, setRecordsOpen] = useState(false);
 
-  // 解析が許可されるのは "プレイした手があって、かつ match/score なら終了済み"
-  // の時。進行中の match/score で押されると意味的にもおかしいので無効化。
-  const moveCount =
-    mode === 'match' || mode === 'score'
-      ? matchPlayerMoves.length
-      : freePlayerMoves.length;
+  // 解析が許可されるのは "プレイした手があって、かつ match/score/daily なら終了済み"
+  // の時。進行中で押されると意味的にもおかしいので無効化。
+  const isMatchLike =
+    mode === 'match' || mode === 'score' || mode === 'daily';
+  const moveCount = isMatchLike
+    ? matchPlayerMoves.length
+    : freePlayerMoves.length;
   const canAnalyze =
-    moveCount > 0 &&
-    (mode === 'free' ||
-      ((mode === 'match' || mode === 'score') && matchEnded));
+    moveCount > 0 && (mode === 'free' || (isMatchLike && matchEnded));
 
   return (
     <>

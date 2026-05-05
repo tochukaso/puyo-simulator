@@ -106,16 +106,22 @@ export function RecordsDialog({ onClose }: { onClose: () => void }) {
             {records.map((r) => {
               const dateStr = dateFmt.format(new Date(r.createdAt));
               // mode 欠損 (legacy) は 'match' とみなす。
-              const recMode: 'match' | 'score' = r.mode ?? 'match';
-              const isScore = recMode === 'score';
-              const winLabel = isScore
-                ? t('header.modeScore')
+              const recMode: 'match' | 'score' | 'daily' = r.mode ?? 'match';
+              const isScoreLike = recMode === 'score' || recMode === 'daily';
+              const modeLabel =
+                recMode === 'daily'
+                  ? t('header.modeDaily')
+                  : recMode === 'score'
+                    ? t('header.modeScore')
+                    : null;
+              const winLabel = isScoreLike
+                ? (modeLabel ?? t('header.modeScore'))
                 : r.winner === 'player'
                   ? t('match.you')
                   : r.winner === 'ai'
                     ? t('match.ama')
                     : t('match.draw');
-              const winColor = isScore
+              const winColor = isScoreLike
                 ? 'text-blue-300'
                 : r.winner === 'player'
                   ? 'text-emerald-300'
@@ -137,11 +143,11 @@ export function RecordsDialog({ onClose }: { onClose: () => void }) {
                   <span className="text-slate-500 whitespace-nowrap">
                     {turnLimitLabel}
                   </span>
-                  {/* score モードは ama スコアを出さない (常に 0)。 */}
+                  {/* score / daily モードは ama スコアを出さない (常に 0)。 */}
                   <span
                     className={`font-mono tabular-nums whitespace-nowrap ${winColor}`}
                   >
-                    {isScore
+                    {isScoreLike
                       ? r.playerScore.toLocaleString(lang)
                       : `${r.playerScore.toLocaleString(lang)} - ${r.aiScore.toLocaleString(lang)}`}
                   </span>

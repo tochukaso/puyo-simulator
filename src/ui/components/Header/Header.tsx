@@ -24,6 +24,7 @@ export function Header() {
   const setMatchTurnLimit = useGameStore((s) => s.setMatchTurnLimit);
   const startMatch = useGameStore((s) => s.startMatch);
   const startScore = useGameStore((s) => s.startScore);
+  const startDaily = useGameStore((s) => s.startDaily);
   const editing = useGameStore((s) => s.editing);
   const enterEditMode = useGameStore((s) => s.enterEditMode);
   const exitEditMode = useGameStore((s) => s.exitEditMode);
@@ -61,6 +62,9 @@ export function Header() {
               startMatch({ turnLimit: matchTurnLimit });
             } else if (next === 'score' && mode !== 'score') {
               startScore({ turnLimit: matchTurnLimit });
+            } else if (next === 'daily' && mode !== 'daily') {
+              // デイリーは seed / turnLimit ともに固定なので opts 不要。
+              startDaily();
             } else {
               setGameMode(next);
             }
@@ -70,7 +74,10 @@ export function Header() {
           <option value="free">{t('header.modeFree')}</option>
           <option value="match">{t('header.modeMatch')}</option>
           <option value="score">{t('header.modeScore')}</option>
+          <option value="daily">{t('header.modeDaily')}</option>
         </select>
+        {/* daily モードは turnLimit が 50 固定なので、ユーザに選択肢を見せない。
+            match / score だけ手数セレクタを出す。 */}
         {(mode === 'match' || mode === 'score') && (
           <select
             aria-label={t('header.turnLimit')}
@@ -105,7 +112,7 @@ export function Header() {
               exitEditMode(true);
               return;
             }
-            if (mode === 'match' || mode === 'score') {
+            if (mode === 'match' || mode === 'score' || mode === 'daily') {
               if (!(await confirmDialog(t('edit.matchExitConfirm')))) return;
               setGameMode('free');
             }

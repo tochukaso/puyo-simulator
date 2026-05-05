@@ -21,6 +21,7 @@ import { Controls } from './ui/components/Controls/Controls';
 import { CandidateList } from './ui/components/CandidateList/CandidateList';
 import { Header } from './ui/components/Header/Header';
 import { MatchPanel } from './ui/components/MatchPanel/MatchPanel';
+import { DailyPanel } from './ui/components/DailyPanel/DailyPanel';
 import { EditToolbar } from './ui/components/EditToolbar/EditToolbar';
 import { EditPairs } from './ui/components/EditPairs/EditPairs';
 
@@ -108,6 +109,7 @@ export default function App() {
         <div className="flex flex-col items-center gap-3 w-full max-w-sm">
           <Stats />
           <MatchPanel />
+          <DailyPanel />
           <div className="flex gap-3 items-stretch justify-center w-full">
             <Board />
             <div className="flex flex-col gap-2 w-32 shrink-0" data-no-gesture>

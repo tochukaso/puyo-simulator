@@ -19,6 +19,7 @@ import { lockActive } from '../game/landing';
 import { suggestForState } from './hooks/useAiSuggestion';
 import { getAmaPreset } from '../ai/wasm-ama/wasm-loader';
 import type { MatchRecord } from '../match/records';
+import { dailySeedFor, todayDateJst } from '../game/dailySeed';
 
 export interface PoppingCell {
   row: number;
@@ -84,7 +85,9 @@ export type CommitSource = 'user' | 'ai';
 // 'free' = 自由練習(ターン無制限・ama 不在・全機能)。
 // 'match' = ama とのスコア勝負(ターン上限あり・ama 並走)。
 // 'score' = 一人用スコアモード(ama 不在・上限あり/無制限選択可能・undo/AI 不可)。
-export type GameMode = 'free' | 'match' | 'score';
+// 'daily' = デイリーシードチャレンジ(seed = JST 日付ハッシュ、50 手固定、
+//           ama 不在、サーバに leaderboard 保存)。 score モードの特殊版扱い。
+export type GameMode = 'free' | 'match' | 'score' | 'daily';
 // match モードは 30/50/100 のみ、score モードは + 200 と 'unlimited' も可。
 // 共通の型として持っておき、UI 側で mode 別に許可値を絞る。
 export type MatchTurnLimit = 30 | 50 | 100 | 200 | 'unlimited';
@@ -179,6 +182,12 @@ interface Store {
    * UI で「保存」ボタンを隠す / 「リプレイ表示中」のラベルを出す等に使う。
    */
   loadedRecordId: string | null;
+  /**
+   * 'daily' モード時のみ意味あり: 進行中のチャレンジがどの日 (JST) のものか。
+   * 終了後にサーバ POST する dailyDate および leaderboard 表示の絞り込みに使う。
+   * 他モード / 未開始時は null。
+   */
+  currentDailyDate: string | null;
 
   reset(seed?: number): void;
   dispatch(input: Input): void;
@@ -193,7 +202,10 @@ interface Store {
   /** 一人用スコアモードを開始。ama は登場しない。
    *  turnLimit: 30 / 50 / 100 / 200 / 'unlimited'。 */
   startScore(opts?: { seed?: number; turnLimit?: MatchTurnLimit }): void;
-  /** score モードのみ。ユーザーがゲームを途中で終了する (Quit ボタン)。
+  /** デイリーチャレンジを開始。 seed は JST 日付ハッシュ、 turnLimit は 50 固定。
+   *  dailyDate を省略すると今日の JST 日付を使う (テスト用に固定可能)。 */
+  startDaily(opts?: { dailyDate?: string }): void;
+  /** score / daily モードのみ。ユーザーがゲームを途中で終了する (Quit ボタン)。
    *  ターン数到達と同じく matchEnded=true + matchResult をセットして、
    *  保存・共有 UI を出せる状態にする。 */
   quitScore(): void;
@@ -283,7 +295,7 @@ const MAX_HISTORY = 100;
 function readPersistedMode(): GameMode {
   try {
     const raw = localStorage.getItem('puyo.gameMode');
-    if (raw === 'match' || raw === 'score') return raw;
+    if (raw === 'match' || raw === 'score' || raw === 'daily') return raw;
     return 'free';
   } catch {
     return 'free';
@@ -391,6 +403,7 @@ export const useGameStore = create<Store>((set, get) => ({
   matchEnded: false,
   matchResult: null,
   loadedRecordId: null,
+  currentDailyDate: null,
 
   editing: false,
   editSnapshot: null,
@@ -555,10 +568,13 @@ export const useGameStore = create<Store>((set, get) => ({
     };
     // ターン上限に達した瞬間は次のペアを spawn しない (current=null にしておけば
     // 以降の dispatch / commit が no-op になり、無意味な "ghost pair" が表示
-    // されないで済む)。match / score 両モードで同じロジック。'unlimited' は
+    // されないで済む)。match / score / daily いずれも同じロジック。'unlimited' は
     // turnLimitToNumber で Infinity になるので常にこの分岐に入らない。
     const stHere = get();
-    const limited = stHere.mode === 'match' || stHere.mode === 'score';
+    const limited =
+      stHere.mode === 'match' ||
+      stHere.mode === 'score' ||
+      stHere.mode === 'daily';
     const playerAtLimit =
       limited &&
       !stHere.matchEnded &&
@@ -568,9 +584,15 @@ export const useGameStore = create<Store>((set, get) => ({
       : spawnNext(finalState);
     set({ game: nextGame, animatingSteps: [], poppingCells: [] });
 
-    // match / score モードのターン記録。score モードも playerHistory + 手列を
-    // 揃えておくと scrubber UI と保存・リプレイ・URL 共有がそのまま使える。
-    if ((get().mode === 'match' || get().mode === 'score') && !get().matchEnded) {
+    // match / score / daily モードのターン記録。score / daily も playerHistory +
+    // 手列を揃えておくと scrubber UI と保存・リプレイ・URL 共有がそのまま使える。
+    const recordingMode = get().mode;
+    if (
+      (recordingMode === 'match' ||
+        recordingMode === 'score' ||
+        recordingMode === 'daily') &&
+      !get().matchEnded
+    ) {
       set((st) => ({
         matchTurnsPlayed: st.matchTurnsPlayed + 1,
         matchPlayerMoves: [
@@ -603,8 +625,8 @@ export const useGameStore = create<Store>((set, get) => ({
     const { animatingSteps, mode } = st;
     if (animatingSteps.length > 0) return;
 
-    // score モードはユーザー要件で undo 不可 (一発勝負のスコアアタック前提)。
-    if (mode === 'score') return;
+    // score / daily モードはユーザー要件で undo 不可 (一発勝負のスコアアタック前提)。
+    if (mode === 'score' || mode === 'daily') return;
 
     if (mode === 'match') {
       // Match mode の undo はプレイヤー側だけを巻き戻す。ama の盤面・履歴は
@@ -668,8 +690,8 @@ export const useGameStore = create<Store>((set, get) => ({
   canUndo: () => {
     const st = get();
     if (st.animatingSteps.length > 0) return false;
-    // score モードはユーザー要件で常時 undo 不可。
-    if (st.mode === 'score') return false;
+    // score / daily モードはユーザー要件で常時 undo 不可。
+    if (st.mode === 'score' || st.mode === 'daily') return false;
     if (st.mode === 'match') {
       return !st.matchEnded && st.matchTurnsPlayed > 0;
     }
@@ -680,7 +702,10 @@ export const useGameStore = create<Store>((set, get) => ({
 
   setGameMode: (mode) => {
     const prevMode = get().mode;
-    const fromMatchOrScore = prevMode === 'match' || prevMode === 'score';
+    const fromMatchOrScore =
+      prevMode === 'match' ||
+      prevMode === 'score' ||
+      prevMode === 'daily';
     persistMode(mode);
     set({ mode });
     // Stats from the previous mode (e.g. a finished match) shouldn't bleed
@@ -720,6 +745,7 @@ export const useGameStore = create<Store>((set, get) => ({
         playerHistoryViewIndex: null,
         historyAnim: null,
         loadedRecordId: null,
+        currentDailyDate: null,
         ...fresh,
       });
     }
@@ -758,6 +784,7 @@ export const useGameStore = create<Store>((set, get) => ({
       matchEnded: false,
       matchResult: null,
       loadedRecordId: null,
+      currentDailyDate: null,
       viewing: 'player',
       aiHistoryViewIndex: null,
       playerHistoryViewIndex: null,
@@ -801,6 +828,7 @@ export const useGameStore = create<Store>((set, get) => ({
       matchEnded: false,
       matchResult: null,
       loadedRecordId: null,
+      currentDailyDate: null,
       viewing: 'player',
       aiHistoryViewIndex: null,
       playerHistoryViewIndex: null,
@@ -818,16 +846,59 @@ export const useGameStore = create<Store>((set, get) => ({
 
   quitScore: () => {
     const st = get();
-    if (st.mode !== 'score' || st.matchEnded) return;
+    if ((st.mode !== 'score' && st.mode !== 'daily') || st.matchEnded) return;
     set({
       matchEnded: true,
       matchResult: {
         playerScore: st.game.score,
         aiScore: 0,
-        // score モードに勝敗は無いが、MatchResult 型を再利用しているので
-        // 'player' を入れる (UI 側で score モードかをチェックして表示を分岐)。
+        // score / daily モードに勝敗は無いが、MatchResult 型を再利用しているので
+        // 'player' を入れる (UI 側で score / daily モードかをチェックして表示を分岐)。
         winner: 'player',
       },
+    });
+  },
+
+  startDaily: (opts) => {
+    // デイリーモード: seed は dailySeedFor(today JST) で固定、turnLimit は
+    // 50 手固定。同日中なら何度プレイしても同じぷよ列になる。 startScore と
+    // ほぼ同じだが、 dailyDate を覚えておかないと終了後に「どの日のスコア」
+    // としてサーバ送信するか分からないので、 store にも持たせる。
+    historyAnimSeq++;
+    const dailyDate = opts?.dailyDate ?? todayDateJst();
+    const seed = dailySeedFor(dailyDate);
+    const turnLimit: MatchTurnLimit = 50;
+    persistMode('daily');
+    persistTurnLimit(turnLimit);
+    const playerGame = createInitialState(seed);
+    set({
+      mode: 'daily',
+      matchTurnLimit: turnLimit,
+      matchSeed: seed,
+      matchPreset: '',
+      currentDailyDate: dailyDate,
+      game: playerGame,
+      aiGame: null,
+      aiHistory: [],
+      playerHistory: [],
+      matchTurnsPlayed: 0,
+      matchPlayerMoves: [],
+      matchAiMoves: [],
+      matchEnded: false,
+      matchResult: null,
+      loadedRecordId: null,
+      viewing: 'player',
+      aiHistoryViewIndex: null,
+      playerHistoryViewIndex: null,
+      historyAnim: null,
+      animatingSteps: [],
+      poppingCells: [],
+      chainTexts: [],
+      landedCells: [],
+      history: [],
+      aiStats: { ...EMPTY_AI_STATS },
+      analyzing: false,
+      freePlayerMoves: [],
     });
   },
 
@@ -835,7 +906,7 @@ export const useGameStore = create<Store>((set, get) => ({
     // 在ロード中のリプレイ表示や再生中のチェーンアニメは全部破棄。
     historyAnimSeq++;
     // record.mode が無い (legacy) は 'match' 扱い。
-    const recMode: 'match' | 'score' = record.mode ?? 'match';
+    const recMode: 'match' | 'score' | 'daily' = record.mode ?? 'match';
     persistMode(recMode);
 
     const sim = simulateRecordSide(
@@ -843,7 +914,8 @@ export const useGameStore = create<Store>((set, get) => ({
       record.playerMoves,
       record.turnLimit,
     );
-    // score モードは ama 側が無いので simulate しない (record.aiMoves は空配列)。
+    // score / daily モードは ama 側が無いので simulate しない
+    // (record.aiMoves は空配列)。
     const aiSim =
       recMode === 'match'
         ? simulateRecordSide(record.seed, record.aiMoves, record.turnLimit)
@@ -881,6 +953,7 @@ export const useGameStore = create<Store>((set, get) => ({
         winner: record.winner,
       },
       loadedRecordId: record.id,
+      currentDailyDate: recMode === 'daily' ? (record.dailyDate ?? null) : null,
       viewing: 'player',
       // 末尾を初期スクラブ位置に。null だと「ライブ追従」と区別がつかないが、
       // matchEnded=true なので Board 側は明示的に履歴 index を見にいく。
@@ -1099,10 +1172,11 @@ export const useGameStore = create<Store>((set, get) => ({
     if (st.matchEnded) return;
     const limit = turnLimitToNumber(st.matchTurnLimit);
 
-    if (st.mode === 'score') {
-      // score モードはターン上限到達 or top-out で終了。Quit ボタンは別経路
-      // (quitScore) でセットされるのでここでは扱わない。'unlimited' は limit
-      // が Infinity になるので top-out しか終了条件にならない。
+    if (st.mode === 'score' || st.mode === 'daily') {
+      // score / daily モードはターン上限到達 or top-out で終了。Quit ボタンは
+      // 別経路 (quitScore) でセットされるのでここでは扱わない。'unlimited' は
+      // limit が Infinity になるので top-out しか終了条件にならない (daily は
+      // 50 手固定なので必ずターン到達で終わる)。
       const done =
         st.matchTurnsPlayed >= limit || st.game.status === 'gameover';
       if (!done) return;
@@ -1146,9 +1220,12 @@ export const useGameStore = create<Store>((set, get) => ({
   analyzeStats: async () => {
     const st0 = get();
     if (st0.analyzing) return;
-    // match / score 両モードとも matchPlayerMoves に手が記録されている。
+    // match / score / daily いずれも matchPlayerMoves に手が記録されている。
     // free モードは freePlayerMoves。
-    const usesMatchMoves = st0.mode === 'match' || st0.mode === 'score';
+    const usesMatchMoves =
+      st0.mode === 'match' ||
+      st0.mode === 'score' ||
+      st0.mode === 'daily';
     const moves = usesMatchMoves ? st0.matchPlayerMoves : st0.freePlayerMoves;
     if (moves.length === 0) {
       set({ aiStats: { ...EMPTY_AI_STATS } });
@@ -1169,7 +1246,9 @@ export const useGameStore = create<Store>((set, get) => ({
       // 起動中に mode/move 列が変わった (例: 解析中にユーザがリセット) なら中断。
       const stCheck = get();
       const stillUsesMatchMoves =
-        stCheck.mode === 'match' || stCheck.mode === 'score';
+        stCheck.mode === 'match' ||
+        stCheck.mode === 'score' ||
+        stCheck.mode === 'daily';
       const stillSame =
         stCheck.analyzing &&
         (stillUsesMatchMoves

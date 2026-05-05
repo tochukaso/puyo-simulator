@@ -18,31 +18,35 @@ jobs:
   build-and-release:
     runs-on: ubuntu-latest
     steps:
+      # 第三者 action は SHA pin する。署名鍵を扱うパイプラインなので、
+      # タグ pin だと作者がタグを付け替えた瞬間に keystore が抜かれうる
+      # サプライチェーン攻撃を理論上受ける。SHA pin なら中身が変われば
+      # 検証エラーで止まる。バージョン更新時はコメントの v* も合わせて更新。
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9  # v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407  # v3
 
       - name: Setup Android NDK
-        uses: nttld/setup-ndk@v1
+        uses: nttld/setup-ndk@2817442ee7c3346c1eb7d2ec60263c93206ba14f  # v1
         id: setup-ndk
         with:
           ndk-version: 'r28'
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
         with:
           node-version-file: '.node-version'
 
       - name: Setup Rust toolchain (aarch64-linux-android)
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8  # stable
         with:
           targets: 'aarch64-linux-android'
 
@@ -66,10 +70,15 @@ jobs:
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::error::ANDROID_KEYSTORE_BASE64 secret is not set"
-            exit 1
-          fi
+          # 4本まとめて検証してから処理に入る。1本だけチェックして先に進むと、
+          # gradle 段階で「Key password incorrect」のような分かりにくい
+          # エラーで死ぬので、ここで原因を即座に特定できるようにしておく。
+          for v in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!v}" ]; then
+              echo "::error::ANDROID_${v} secret is not set"
+              exit 1
+            fi
+          done
           KEYSTORE_PATH="$GITHUB_WORKSPACE/src-tauri/gen/android/release.jks"
           echo "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_PATH"
           cat > "$GITHUB_WORKSPACE/src-tauri/gen/android/key.properties" <<EOF
@@ -87,7 +96,16 @@ jobs:
       - name: Locate built APK
         id: apk
         run: |
-          APK=$(find src-tauri/gen/android/app/build/outputs/apk -name '*release*.apk' | head -1)
+          # 決定的選択 + unsigned 排除。`find` の出力順は FS 依存で
+          # 非決定的なので sort、また将来 splits.abi を有効化したり
+          # `--apk --aab` を併用すると複数 APK が出るので、
+          # *-unsigned.apk を確実に除外して誤配信を防ぐ。
+          APK=$(find src-tauri/gen/android/app/build/outputs/apk \
+            -type f \
+            -name '*release*.apk' \
+            ! -name '*unsigned*.apk' \
+            | sort \
+            | head -1)
           if [ -z "$APK" ]; then
             echo "::error::APK not found"; ls -R src-tauri/gen/android/app/build/outputs/apk; exit 1
           fi
@@ -100,7 +118,7 @@ jobs:
           ls -l "$DEST"
 
       - name: Create GitHub Release with APK
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2
         with:
           files: |
             ${{ steps.apk.outputs.apk_path }}

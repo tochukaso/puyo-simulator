@@ -26,8 +26,11 @@ export function usePressRepeat(
   const intervalTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Always call the latest handler so the caller can close over fresh state
-  // without us re-wiring timers.
-  handlerRef.current = handler;
+  // without us re-wiring timers. Updating the ref must happen in an effect,
+  // not during render (react-hooks/refs lint rule).
+  useEffect(() => {
+    handlerRef.current = handler;
+  }, [handler]);
 
   const stop = (): void => {
     if (initialTimerRef.current !== null) {

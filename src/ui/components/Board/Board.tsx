@@ -16,7 +16,15 @@ import {
   VISIBLE_ROW_START,
   AI_ROW_OFFSET,
 } from '../../../game/constants';
-import { PUYO_COLORS, PUYO_LIGHT, PUYO_DARK, BG_COLOR, GRID_COLOR, DANGER_COLOR } from './colors';
+import {
+  PUYO_COLORS,
+  PUYO_LIGHT,
+  PUYO_DARK,
+  BG_COLOR,
+  ABOVE_FIELD_BG_COLOR,
+  GRID_COLOR,
+  DANGER_COLOR,
+} from './colors';
 import type { Color, Field, ActivePair, Move } from '../../../game/types';
 import { ghostCells } from './ghost';
 
@@ -288,8 +296,14 @@ function draw(
   ctx.save();
   ctx.translate(0, yOffset);
 
+  // 背景: プレイ可能領域 (12段目以下) は通常の BG_COLOR、その上の「14段目」
+  // 「13段目」は ABOVE_FIELD_BG_COLOR でやや明るめのスレート色にして「ここは
+  // ペア回し用で本来は見えない領域」と視覚的に区別する。grid lines はこの上に
+  // 重ねるので、両領域とも同じグリッドが見える。
   ctx.fillStyle = BG_COLOR;
   ctx.fillRect(0, 0, COLS * cell, ROWS * cell);
+  ctx.fillStyle = ABOVE_FIELD_BG_COLOR;
+  ctx.fillRect(0, 0, COLS * cell, VISIBLE_ROW_START * cell);
 
   ctx.strokeStyle = GRID_COLOR;
   ctx.lineWidth = 1;
@@ -305,17 +319,6 @@ function draw(
     ctx.lineTo(c * cell, ROWS * cell);
     ctx.stroke();
   }
-
-  // Semi-transparent ceiling overlay covers rows AI_ROW_OFFSET..VISIBLE_ROW_START
-  // (= row 1 / "13段目") — the always-clipped 14段目 (rows 0..AI_ROW_OFFSET-1)
-  // is off-canvas, so we don't bother covering it here.
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.5)';
-  ctx.fillRect(
-    0,
-    AI_ROW_OFFSET * cell,
-    COLS * cell,
-    (VISIBLE_ROW_START - AI_ROW_OFFSET) * cell,
-  );
 
   // Danger frame highlights the 「バツマーク」 death cell — game-over fires
   // when this cell is occupied at spawn time (see state.ts's spawnNext).

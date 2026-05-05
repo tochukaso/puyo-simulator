@@ -34,5 +34,9 @@ export const PUYO_DARK: Record<DrawableCell, string> = {
 };
 
 export const BG_COLOR = '#0f172a';
+// 「14段目」「13段目」の背景色。プレイ可能な領域 (BG_COLOR) と差をつけて
+// 「ここはペアの回し用で本来見えない領域」だと視覚的に伝える。スレート系で
+// やや明るめ・青寄りなのでぷよの色 (R/B/Y/P/G) とは衝突しにくい。
+export const ABOVE_FIELD_BG_COLOR = '#1a2236';
 export const GRID_COLOR = '#1e293b';
 export const DANGER_COLOR = '#7f1d1d';

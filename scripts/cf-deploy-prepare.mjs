@@ -32,6 +32,20 @@ if (!customDomain) {
   process.exit(1);
 }
 
+// scheme/path/port を含む値はホスト名として不正 → wrangler に渡す前に弾く。
+// RFC 1123 に準拠したホスト名(各ラベル 1-63 文字、合計 ≤253、`-` 先頭末尾不可、
+// ドット区切りで 2 ラベル以上)。
+const hostnamePattern =
+  /^(?=.{1,253}$)(?!-)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.(?!-)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i;
+if (!hostnamePattern.test(customDomain)) {
+  console.error(
+    `[cf-deploy-prepare] CUSTOM_DOMAIN の形式が不正です: "${customDomain}"\n` +
+      "  scheme (http://), パス (/...), ポート (:8080) は付けず、ホスト名のみ指定してください。\n" +
+      "  例: puyo.tochukaso.blog",
+  );
+  process.exit(1);
+}
+
 const raw = readFileSync(SOURCE, "utf8");
 // JSONC の // と /* */ コメントを素朴に除去(ブロックコメント内の //, 文字列内の
 // // などのエッジケースは現状の wrangler.jsonc に存在しないため考慮していない)。

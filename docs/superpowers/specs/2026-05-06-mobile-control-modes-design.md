@@ -72,10 +72,10 @@
 
 1. `pointerdown` を盤面要素内で受けた瞬間に、`clientX` から **ターゲット列** を算出:
    `targetCol = clamp(floor((clientX - boardRect.left) / boardCellSize), 0, COLS-1)`
-2. ストアに `previewMove(targetCol)` を呼ぶ。`store.previewAxisCol` がセットされ、Board 側で現在ぷよが `previewAxisCol ?? game.current.axisCol` の列で描画される(既存ゴースト計算もこの列で実行)。
-3. `pointermove` で指が動いたら同様に列を再計算し、変化していれば `previewMove(newCol)` を再発行。
-4. `pointerup` が **盤面内** で発生したら `commit({ axisCol: previewAxisCol, rotation: game.current.rotation })`。`commit` 成功時にストアが自動で `previewAxisCol = null` にリセット。
-5. `pointerup` が **盤面外** または `pointercancel` が発生したら `cancelPreview()` で `previewAxisCol = null` に戻す。
+2. **既存の `src/ui/hooks/useAiPreview.ts` を流用** して `setPreviewMove({ axisCol: targetCol, rotation: game.current.rotation })` を呼ぶ。Board.tsx は既にこの値を読んでゴーストを描画しているので、描画パスを伸ばすだけで済む。
+3. `pointermove` で指が動いたら列を再計算し、変化していれば `setPreviewMove(...)` を再発行(`useAiPreview` 内で同値比較済みなのでチャタリングは起きない)。
+4. `pointerup` が **盤面内** で発生したら `commit({ axisCol: targetCol, rotation: game.current.rotation })` を呼び、その後 `setPreviewMove(null)` を呼んでクリア。
+5. `pointerup` が **盤面外** または `pointercancel` が発生したら `setPreviewMove(null)` だけ呼んでキャンセル。
 6. 上下方向の指移動や Y 距離は無視(キャンセル目的でしか使われない)。
 7. 回転は `Controls` の **CW / CCW ボタン**(下記参照)で行う。フリック・タップ回転は **無効**。
 
@@ -148,18 +148,27 @@
 | `src/ui/hooks/usePressRepeat.ts` | 長押し連続発火フック |
 | `src/ui/feedback/haptics.ts` | `vibrateCommit()` / `vibrateChain(step)` を提供する薄い層 |
 | `src/ui/hooks/useHaptics.ts` | ストア購読で commit / 連鎖を検知してバイブ呼び出し |
+| `src/ui/hooks/useBoardRect.ts` | Board が登録する `() => DOMRect \| null` を保持する singleton。useGestures から clientX → 列換算に使う |
 
 ### 変更
 
 | パス | 変更内容 |
 |---|---|
-| `src/ui/hooks/useGestures.ts` | `controlMode` を購読して `classic` / `tap-to-drop` / `drag` で分岐。`flickColPx` を tuning から取得 |
-| `src/ui/store.ts` | `previewAxisCol: number \| null` と `previewMove(col)` / `cancelPreview()` を追加。`commit` 成功時に自動 `null` リセット |
-| `src/ui/components/Board/Board.tsx` | レンダリングで `previewAxisCol ?? game.current.axisCol` を使用するよう変更。ゴースト計算も同様 |
+| `src/ui/hooks/useGestures.ts` | `controlMode` を購読して `classic` / `tap-to-drop` / `drag` で分岐。`flickColPx` を tuning から取得。tap-to-drop / drag では `useAiPreview` の `setPreviewMove` を呼んで Board のゴーストを動かす |
+| `src/ui/components/Board/Board.tsx` | ゴースト計算の `bestMove` ロジックを「`previewMove !== null` なら最優先(全モード共通でユーザーの move プレビュー扱い)、無ければ既存の free モード AI 候補トップ、replay 時は記録 move」の順に変更。プレビューには `boardRect` が必要なため Board が外向けに `getBoundingClientRect()` を提供する仕組み(下記)を用意 |
 | `src/ui/components/Controls/Controls.tsx` | `controlMode` で CCW ボタンの表示条件を統合。`buttonScaleLarge` で `cellBase` 切替。移動・softDrop ボタンに `usePressRepeat` 適用 |
 | `src/ui/components/HamburgerMenu/HamburgerMenu.tsx` | 「⚙ 操作設定」エントリと `ControlSettingsDialog` の open/close ステート |
 | `src/App.tsx` | `useHaptics()` を呼ぶ |
 | `src/i18n/translations.ts` | `Dict` インターフェイスに `controls.settings.*` キーを追加し、ja / en / zh / ko の 4 言語ぶん文字列を埋める(zh / ko は ja / en どちらかの英訳をベースに既存翻訳の流儀で追従) |
+
+### Board の clientX → 列換算
+
+`useGestures.ts` から「タップした clientX が盤面のどの列に当たるか」を計算する必要がある。Board の幅・位置は ResizeObserver で動的に変わるので、Board が外向けに `getBoundingClientRect()` の参照を提供する singleton 経由で渡す。
+
+- 新規 `src/ui/hooks/useBoardRect.ts`(`useUiPrefs.ts` と同じ singleton + listener パターン)
+  - `setBoardRectGetter(getter: () => DOMRect | null)`: Board が wrapperRef からの `() => wrapperRef.current?.getBoundingClientRect() ?? null` を登録
+  - `getBoardRect(): DOMRect | null`: useGestures から呼ばれて現在の rect を取得
+- Board.tsx は `useEffect` で `setBoardRectGetter` を一度だけ呼び、cleanup で `setBoardRectGetter(() => null)` を呼ぶ
 
 ### データフロー
 
@@ -176,10 +185,15 @@
                    useGestures (mode 分岐)            Controls (UI調整)          useHaptics (vibrate)
                               │
                               ▼
-                   store.previewMove(col) ─────────► Board (preview列で描画)
-                              │
+                   setPreviewMove({axisCol, rotation}) ───► useAiPreview (singleton)
+                              │                                     │
+                              │                                     ▼
+                              │                          Board (ゴースト描画に流用)
                               ▼
                    store.commit({axisCol, rotation}) → 既存パイプライン
+                              │
+                              ▼
+                   setPreviewMove(null) でクリア
 ```
 
 ## エラー処理 / エッジケース
@@ -206,8 +220,8 @@
 
 - デフォルトは `classic`。既存ユーザーは何もしなくても挙動変化なし。
 - `score` モードで CCW ボタンを表示している既存仕様は維持(プリセット条件と OR で統合)。
-- ストアに足す `previewAxisCol` / `previewMove` / `cancelPreview` は新規プロパティのみで、既存 selector 群への破壊的変更なし。
-- `commit` のシグネチャは変更しない(プレビュー解除は `commit` 内部で行う)。
+- ストアには手を入れない。プレビューは既存 `useAiPreview` を流用するだけ。
+- `commit` のシグネチャは変更しない。プレビュー解除はジェスチャーハンドラ側で `setPreviewMove(null)` を呼んで実現。
 
 ## YAGNI で除外したもの
 

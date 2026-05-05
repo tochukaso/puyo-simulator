@@ -1,13 +1,11 @@
 import { getControlTuning } from '../hooks/useControlPrefs';
 
-function safeVibrate(pattern: number | number[]): void {
+function safeVibrate(pattern: number): void {
   if (!getControlTuning().hapticEnabled) return;
-  const v = (
-    navigator as Navigator & { vibrate?: (p: number | number[]) => boolean }
-  ).vibrate;
-  if (typeof v !== 'function') return;
+  const nav = navigator as Navigator & { vibrate?: Navigator['vibrate'] };
+  if (typeof nav.vibrate !== 'function') return;
   try {
-    v.call(navigator, pattern);
+    nav.vibrate(pattern);
   } catch {
     // Browsers can throw NotAllowedError before any user gesture; swallow.
   }

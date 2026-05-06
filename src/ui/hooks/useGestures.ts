@@ -29,11 +29,34 @@ function clientXToCol(clientX: number): number | null {
   return col;
 }
 
+// 横向き (rotation 1 or 3) のペアは child が axis の左右にあるので、axis を
+// 端の列に置くと child が盤外に出てしまう。lockActive が盤外セルを単に無視
+// する仕様なので、放置すると「片方だけ落ちて 1 個消える」見た目のバグになる。
+//   rotation === 1: child は axisCol+1 → axisCol は最大 COLS-2
+//   rotation === 3: child は axisCol-1 → axisCol は最小 1
+// ユーザーが端をタップした意図は「できる限り端に寄せたい」なので、エラー
+// 扱いではなく内側にスナップする。
+function clampAxisColForRotation(col: number, rotation: number): number {
+  if (rotation === 1) return Math.min(col, COLS - 2);
+  if (rotation === 3) return Math.max(col, 1);
+  return col;
+}
+
 // Returns true if (x, y) lies within the board's bounding rect.
 function isInsideBoard(x: number, y: number): boolean {
   const rect = getBoardRect();
   if (!rect) return false;
   return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+}
+
+// pointerup の commit 判定用。tap-to-drop / drag では「列指定」が目的なので、
+// 指が盤面の上下にはみ出ても列(=x)が盤面内なら commit するのが直感的。
+// 厳密 isInsideBoard だと、ユーザーが指を縦にズラした時に accidental cancel
+// になり「同じぷよが残る」ように見えるバグが出やすい。
+function isXInsideBoard(x: number): boolean {
+  const rect = getBoardRect();
+  if (!rect) return false;
+  return x >= rect.left && x <= rect.right;
 }
 
 // プリセット (classic / tap-to-drop / drag) で挙動を切替えるジェスチャー層。
@@ -73,8 +96,9 @@ export function useGestures(targetRef: RefObject<HTMLElement | null>) {
       // preview at column 0 / COLS-1. Refuse to start preview unless the
       // press actually landed on the board.
       if (!isInsideBoard(e.clientX, e.clientY)) return;
-      const col = clientXToCol(e.clientX);
-      if (col === null) return;
+      const rawCol = clientXToCol(e.clientX);
+      if (rawCol === null) return;
+      const col = clampAxisColForRotation(rawCol, game.current.rotation);
 
       // For drag mode, only start tracking if the press began near the active
       // pair's axis column (within ±1). Otherwise treat as a tap rotate
@@ -89,15 +113,56 @@ export function useGestures(targetRef: RefObject<HTMLElement | null>) {
       if (!draggingRef.current) return;
       const game = useGameStore.getState().game;
       if (!game.current) return;
-      const col = clientXToCol(e.clientX);
-      if (col === null) return;
-      setPreviewMove({ axisCol: col, rotation: game.current.rotation });
+      const rawCol = clientXToCol(e.clientX);
+      if (rawCol === null) return;
+      // col は最終 rotation (回転処理後) で clamp し直すので、ここでは
+      // rawCol だけ持って次の段で使う。
+
+      const mode = getControlMode();
+
+      // tap-to-drop: 押下中に縦スライドで回転発火。
+      //   - 上 (dy < 0) → CW、下 (dy > 0) → CCW
+      //   - 縦の動きが横より十分大きい時だけ発火 (誤動作抑制)
+      //   - dy が ROT_PX を複数倍跨ぐ場合は跨いだ回数ぶんループ発火
+      // 横方向は引き続き列追従に使う。drag は softDrop に下方向を使うので適用外。
+      const ROT_PX = 24;
+      if (mode === 'tap-to-drop' && pressStart.current) {
+        const dy = e.clientY - pressStart.current.y;
+        const dx = e.clientX - pressStart.current.x;
+        if (
+          Math.abs(dy) > ROT_PX &&
+          Math.abs(dy) > Math.abs(dx) * 1.5
+        ) {
+          const steps = Math.floor(Math.abs(dy) / ROT_PX);
+          const dir = dy < 0 ? 'rotateCW' : 'rotateCCW';
+          pressStart.current = {
+            ...pressStart.current,
+            y:
+              pressStart.current.y +
+              (dy < 0 ? -1 : 1) * steps * ROT_PX,
+          };
+          for (let i = 0; i < steps; i++) {
+            useGameStore.getState().dispatch({ type: dir });
+          }
+        }
+      }
+
+      // 列追従プレビュー (rotation は dispatch で更新された最新値を読み直す)。
+      // 縦スライドで回転した直後は rotation が変わっているので、横向きに
+      // なった瞬間に col が新しい rotation の有効範囲を超えていないか
+      // 再 clamp する必要がある。
+      const latestRotation =
+        useGameStore.getState().game.current?.rotation ??
+        game.current.rotation;
+      const reClamped = clampAxisColForRotation(rawCol, latestRotation);
+      setPreviewMove({ axisCol: reClamped, rotation: latestRotation });
+
       // For drag mode, also treat downward pull as repeated softDrop dispatches.
       // Coalesced pointer events on mobile can deliver dy spanning multiple
       // thresholds in one move, so dispatch one softDrop per crossed threshold
       // and advance start.y by the consumed multiple (preserving the partial
       // remainder so the next event keeps the pixel budget honest).
-      if (getControlMode() === 'drag' && pressStart.current) {
+      if (mode === 'drag' && pressStart.current) {
         const dy = e.clientY - pressStart.current.y;
         const flickPx = getControlTuning().flickColPx;
         if (dy > flickPx) {
@@ -127,12 +192,18 @@ export function useGestures(targetRef: RefObject<HTMLElement | null>) {
       // landed inside the board). Without this guard a press that begins
       // outside the board and slides in would still trigger a commit on
       // release in tap-to-drop mode.
+      // 判定は x のみ — y 方向は許容。ユーザーは列を狙って動かしているので、
+      // 上下方向のブレで accidental cancel になると「同じぷよが残る」現象が
+      // 起きる。盤の左右に大きくはみ出した場合のみキャンセル扱いにする。
       if (wasDragging && (mode === 'tap-to-drop' || mode === 'drag')) {
-        const insideBoard = isInsideBoard(e.clientX, e.clientY);
+        const xInside = isXInsideBoard(e.clientX);
         const game = useGameStore.getState().game;
-        if (insideBoard && game.current) {
-          const col = clientXToCol(e.clientX);
-          if (col !== null) {
+        if (xInside && game.current) {
+          const rawCol = clientXToCol(e.clientX);
+          if (rawCol !== null) {
+            // 横向き (rotation 1/3) で端に置こうとしたら内側にスナップ。
+            // しないと child が盤外に行って 1 個消える見た目バグになる。
+            const col = clampAxisColForRotation(rawCol, game.current.rotation);
             void useGameStore.getState().commit({
               axisCol: col,
               rotation: game.current.rotation,

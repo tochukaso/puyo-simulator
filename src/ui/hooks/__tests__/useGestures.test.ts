@@ -146,20 +146,40 @@ describe('useGestures', () => {
     });
   });
 
-  it('tap-to-drop: horizontal-dominant slide does NOT rotate (only updates column)', () => {
+  it('tap-to-drop: small vertical motion (< ROT_PX) does NOT rotate', () => {
     setControlMode('tap-to-drop');
     const { el, ref } = mountTarget();
     renderHook(() => useGestures(ref));
     const startRotation = useGameStore.getState().game.current!.rotation;
     act(() => {
       fire(el, 'pointerdown', 100, 200);
-      // dx=64, dy=-30 → 横の方が支配的 (|dy|>ROT_PX だが |dy| < |dx|*1.5)
-      fire(el, 'pointermove', 164, 170);
+      // dy = -20 < ROT_PX (24), 横移動はあるが回転は発火しない
+      fire(el, 'pointermove', 164, 180);
     });
     expect(useGameStore.getState().game.current!.rotation).toBe(startRotation);
     expect(getPreviewMove()!.axisCol).toBe(5);
     act(() => {
-      fire(el, 'pointercancel', 164, 170);
+      fire(el, 'pointercancel', 164, 180);
+    });
+  });
+
+  it('tap-to-drop: diagonal vertical-and-horizontal slide rotates AND updates column', () => {
+    setControlMode('tap-to-drop');
+    const { el, ref } = mountTarget();
+    renderHook(() => useGestures(ref));
+    const startRotation = useGameStore.getState().game.current!.rotation;
+    act(() => {
+      fire(el, 'pointerdown', 100, 200);
+      // dx=32 (列追従、x=132 → col 4), dy=-30 (1 ステップ回転発火)
+      fire(el, 'pointermove', 132, 170);
+    });
+    // 旧仕様 (dx 支配軸チェック) では回転しなかった。新仕様では回る。
+    expect(useGameStore.getState().game.current!.rotation).not.toBe(startRotation);
+    // 列追従もしている (col 4 = x=132/32)。
+    // rotation=1 なら clamp で 4 まで OK なので 4 が見える。
+    expect(getPreviewMove()!.axisCol).toBe(4);
+    act(() => {
+      fire(el, 'pointercancel', 132, 170);
     });
   });
 
@@ -215,6 +235,27 @@ describe('useGestures', () => {
     expect(newRow - startRow).toBe(3);
     act(() => {
       fire(el, 'pointerup', 80, 296);
+    });
+  });
+
+  it('drag: rotation dispatch (= CW button press) updates preview rotation while dragging', () => {
+    setControlMode('drag');
+    const { el, ref } = mountTarget();
+    renderHook(() => useGestures(ref));
+    act(() => {
+      fire(el, 'pointerdown', 80, 200); // start drag near axisCol=2
+    });
+    expect(getPreviewMove()).not.toBeNull();
+    const startPreviewRot = getPreviewMove()!.rotation;
+    // 外部 dispatch (= CW ボタンクリック相当) で active pair を回す。
+    act(() => {
+      useGameStore.getState().dispatch({ type: 'rotateCW' });
+    });
+    const newPreviewRot = getPreviewMove()!.rotation;
+    expect(newPreviewRot).not.toBe(startPreviewRot);
+    expect(newPreviewRot).toBe(useGameStore.getState().game.current!.rotation);
+    act(() => {
+      fire(el, 'pointercancel', 80, 200);
     });
   });
 

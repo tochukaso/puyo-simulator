@@ -41,9 +41,8 @@
 
 | | 項目 | 見積 | メモ |
 |---|---|---|---|
-| ✅ | **タップ・トゥ・ドロップ** | S | 列タップで現在のペアを即落下。ON/OFF トグル付き(`useTapToDropEnabled`) |
-| 💡 | **指ドラッグでペア移動** | M | 親指でぷよを掴んで横にドラッグ → 離した列で確定。ボタン UI と排他で切替 |
-| 💡 | **触覚フィードバック** | S | 連鎖発火・ぷよ消去時に `navigator.vibrate(40)`。打鍵感が出て楽しさ倍増 |
+| ✅ | **操作プリセット (Classic / TapToDrop / Drag)** | M | ハンバーガーメニュー → ⚙ 操作設定。`useControlPrefs` singleton。TapToDrop は列を押下している間ゴースト表示、離して commit。Drag は現在ぷよ周辺を掴んで横ドラッグ |
+| ✅ | **触覚フィードバック** | S | commit / 連鎖発火時に `navigator.vibrate`。`useHaptics` + `feedback/haptics.ts`。設定 ON/OFF |
 | 💡 | **効果音(任意)** | S | pop / chain 数 / Game Over に SE。デフォルト OFF で設定で ON。モバイルブラウザの AudioContext 制約に注意 |
 | 💡 | **Zen モード** | S | UI を最小化(Stats / Header / Controls 隠し)。集中したいときに 1 タップで切替 |
 | 💡 | **左利きレイアウト反転** | S | Board / Controls の左右反転 |

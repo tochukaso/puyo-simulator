@@ -18,9 +18,14 @@ function fire(el: HTMLElement, type: string, x: number, y: number) {
   el.dispatchEvent(ev);
 }
 
+// テストで appendChild した div を afterEach で確実に外すための追跡配列。
+// 残ると次のテストで stale な listener が残って干渉する可能性がある。
+const mountedTargets: HTMLDivElement[] = [];
+
 function mountTarget(): { el: HTMLDivElement; ref: RefObject<HTMLDivElement | null> } {
   const el = document.createElement('div');
   document.body.appendChild(el);
+  mountedTargets.push(el);
   return { el, ref: { current: el } };
 }
 
@@ -35,6 +40,9 @@ describe('useGestures', () => {
   afterEach(() => {
     setBoardRectGetter(() => null);
     setPreviewMove(null);
+    while (mountedTargets.length) {
+      mountedTargets.pop()!.remove();
+    }
   });
 
   it('classic: right flick of 64px dispatches moveRight twice', () => {

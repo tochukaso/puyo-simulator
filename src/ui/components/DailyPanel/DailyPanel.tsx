@@ -75,6 +75,10 @@ export function DailyPanel() {
   const isReplaying = loadedRecordId !== null;
 
   // リーダーボードを取得 (date 切替 / 送信成功時に再取得)。
+  // 依存は「成功時の id」だけ。 submitState 全体を入れると submitting/failed/
+  // idle への戻り遷移でも refetch が走り、毎回 loading フリッカが出るので、
+  // 反映が必要な「サーバが新しい id を発番した瞬間」だけにフォーカス。
+  const submittedId = submitState.kind === 'submitted' ? submitState.id : null;
   useEffect(() => {
     if (!isValidDailyDate(targetDate)) return;
     let cancelled = false;
@@ -93,7 +97,7 @@ export function DailyPanel() {
     return () => {
       cancelled = true;
     };
-  }, [targetDate, submitState, t]);
+  }, [targetDate, submittedId, t]);
 
   if (mode !== 'daily') return null;
 

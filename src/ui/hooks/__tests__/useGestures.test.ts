@@ -81,18 +81,86 @@ describe('useGestures', () => {
     expect(getPreviewMove()).toBeNull();
   });
 
-  it('tap-to-drop: release outside the board clears preview without committing', () => {
+  it('tap-to-drop: release with x outside the board clears preview without committing', () => {
     setControlMode('tap-to-drop');
     const { el, ref } = mountTarget();
     renderHook(() => useGestures(ref));
     const startCurrent = useGameStore.getState().game.current;
     act(() => {
-      fire(el, 'pointerdown', 100, 200);
-      fire(el, 'pointermove', 100, 50); // y=50 sits above the board (rect.top=100)
-      fire(el, 'pointerup', 100, 50);
+      fire(el, 'pointerdown', 100, 200); // press inside (col 3)
+      fire(el, 'pointermove', 250, 200); // x=250 is outside (board ends at x=192)
+      fire(el, 'pointerup', 250, 200);
     });
     expect(getPreviewMove()).toBeNull();
     expect(useGameStore.getState().game.current).toBe(startCurrent);
+  });
+
+  it('tap-to-drop: release with y outside but x inside still commits (列指定優先)', () => {
+    setControlMode('tap-to-drop');
+    const { el, ref } = mountTarget();
+    renderHook(() => useGestures(ref));
+    act(() => {
+      fire(el, 'pointerdown', 100, 200); // press inside (col 3)
+      fire(el, 'pointerup', 100, 50);    // y=50 above board, but x still inside
+    });
+    // 指のブレで y がはみ出ても列(x)が盤内なら commit する。
+    // commit が成功したら preview はクリアされる。
+    expect(getPreviewMove()).toBeNull();
+  });
+
+  it('tap-to-drop: rightmost-column tap with horizontal pair clamps axisCol to 4', () => {
+    setControlMode('tap-to-drop');
+    const { el, ref } = mountTarget();
+    renderHook(() => useGestures(ref));
+    useGameStore.setState((st) => ({
+      game: { ...st.game, current: { ...st.game.current!, rotation: 1 } },
+    }));
+    act(() => {
+      fire(el, 'pointerdown', 180, 200); // x=180 → col 5
+    });
+    expect(getPreviewMove()!.axisCol).toBe(4);
+    act(() => {
+      fire(el, 'pointercancel', 180, 200);
+    });
+  });
+
+  it('tap-to-drop: vertical slide while pressed rotates the active pair', () => {
+    setControlMode('tap-to-drop');
+    const { el, ref } = mountTarget();
+    renderHook(() => useGestures(ref));
+    const startRotation = useGameStore.getState().game.current!.rotation;
+    act(() => {
+      fire(el, 'pointerdown', 100, 200);
+      // 縦に -50px (上方向) → ROT_PX=24 を 2 ステップ跨ぐ → CW を 2 回。
+      fire(el, 'pointermove', 100, 150);
+    });
+    const rotated = useGameStore.getState().game.current!.rotation;
+    expect(rotated).not.toBe(startRotation);
+    // CW 2 回。0 → 1 → 2。
+    expect((rotated - startRotation + 4) % 4).toBe(2);
+    // プレビューは新しい rotation で更新される。
+    const preview = getPreviewMove();
+    expect(preview!.rotation).toBe(rotated);
+    act(() => {
+      fire(el, 'pointercancel', 100, 150);
+    });
+  });
+
+  it('tap-to-drop: horizontal-dominant slide does NOT rotate (only updates column)', () => {
+    setControlMode('tap-to-drop');
+    const { el, ref } = mountTarget();
+    renderHook(() => useGestures(ref));
+    const startRotation = useGameStore.getState().game.current!.rotation;
+    act(() => {
+      fire(el, 'pointerdown', 100, 200);
+      // dx=64, dy=-30 → 横の方が支配的 (|dy|>ROT_PX だが |dy| < |dx|*1.5)
+      fire(el, 'pointermove', 164, 170);
+    });
+    expect(useGameStore.getState().game.current!.rotation).toBe(startRotation);
+    expect(getPreviewMove()!.axisCol).toBe(5);
+    act(() => {
+      fire(el, 'pointercancel', 164, 170);
+    });
   });
 
   it('tap-to-drop: pointerdown outside board then release inside does NOT commit', () => {
@@ -147,6 +215,47 @@ describe('useGestures', () => {
     expect(newRow - startRow).toBe(3);
     act(() => {
       fire(el, 'pointerup', 80, 296);
+    });
+  });
+
+  it('drag: pointing at rightmost column with horizontal pair clamps to COLS-2', () => {
+    setControlMode('drag');
+    const { el, ref } = mountTarget();
+    renderHook(() => useGestures(ref));
+    // 横向きにする (rotation=1: child is to the right of axis).
+    useGameStore.setState((st) => ({
+      game: { ...st.game, current: { ...st.game.current!, rotation: 1 } },
+    }));
+    act(() => {
+      // press near axisCol=2 first to enter drag mode (within ±1).
+      fire(el, 'pointerdown', 80, 200);
+      // drag finger to the rightmost column (x=180 → col 5).
+      fire(el, 'pointermove', 180, 200);
+    });
+    // rotation=1 では axisCol は最大 4 (child が col=5 に行く)。col=5 ではない。
+    expect(getPreviewMove()!.axisCol).toBe(4);
+    expect(getPreviewMove()!.rotation).toBe(1);
+    act(() => {
+      fire(el, 'pointercancel', 180, 200);
+    });
+  });
+
+  it('drag: pointing at leftmost column with rotation=3 clamps axisCol to 1', () => {
+    setControlMode('drag');
+    const { el, ref } = mountTarget();
+    renderHook(() => useGestures(ref));
+    // rotation=3: child is to the left of axis. axisCol must be >= 1.
+    useGameStore.setState((st) => ({
+      game: { ...st.game, current: { ...st.game.current!, rotation: 3 } },
+    }));
+    act(() => {
+      fire(el, 'pointerdown', 80, 200); // start drag near axisCol=2
+      fire(el, 'pointermove', 5, 200);  // drag to leftmost (col 0)
+    });
+    expect(getPreviewMove()!.axisCol).toBe(1);
+    expect(getPreviewMove()!.rotation).toBe(3);
+    act(() => {
+      fire(el, 'pointercancel', 5, 200);
     });
   });
 

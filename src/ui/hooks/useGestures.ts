@@ -36,6 +36,16 @@ function isInsideBoard(x: number, y: number): boolean {
   return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
 }
 
+// pointerup の commit 判定用。tap-to-drop / drag では「列指定」が目的なので、
+// 指が盤面の上下にはみ出ても列(=x)が盤面内なら commit するのが直感的。
+// 厳密 isInsideBoard だと、ユーザーが指を縦にズラした時に accidental cancel
+// になり「同じぷよが残る」ように見えるバグが出やすい。
+function isXInsideBoard(x: number): boolean {
+  const rect = getBoardRect();
+  if (!rect) return false;
+  return x >= rect.left && x <= rect.right;
+}
+
 // プリセット (classic / tap-to-drop / drag) で挙動を切替えるジェスチャー層。
 //   - classic: 既存挙動 (フリック=移動 / 下フリック=softDrop / タップ=回転)
 //   - tap-to-drop: 列を押してる間プレビュー表示、離して commit
@@ -91,13 +101,48 @@ export function useGestures(targetRef: RefObject<HTMLElement | null>) {
       if (!game.current) return;
       const col = clientXToCol(e.clientX);
       if (col === null) return;
-      setPreviewMove({ axisCol: col, rotation: game.current.rotation });
+
+      const mode = getControlMode();
+
+      // tap-to-drop: 押下中に縦スライドで回転発火。
+      //   - 上 (dy < 0) → CW、下 (dy > 0) → CCW
+      //   - 縦の動きが横より十分大きい時だけ発火 (誤動作抑制)
+      //   - dy が ROT_PX を複数倍跨ぐ場合は跨いだ回数ぶんループ発火
+      // 横方向は引き続き列追従に使う。drag は softDrop に下方向を使うので適用外。
+      const ROT_PX = 24;
+      if (mode === 'tap-to-drop' && pressStart.current) {
+        const dy = e.clientY - pressStart.current.y;
+        const dx = e.clientX - pressStart.current.x;
+        if (
+          Math.abs(dy) > ROT_PX &&
+          Math.abs(dy) > Math.abs(dx) * 1.5
+        ) {
+          const steps = Math.floor(Math.abs(dy) / ROT_PX);
+          const dir = dy < 0 ? 'rotateCW' : 'rotateCCW';
+          pressStart.current = {
+            ...pressStart.current,
+            y:
+              pressStart.current.y +
+              (dy < 0 ? -1 : 1) * steps * ROT_PX,
+          };
+          for (let i = 0; i < steps; i++) {
+            useGameStore.getState().dispatch({ type: dir });
+          }
+        }
+      }
+
+      // 列追従プレビュー (rotation は dispatch で更新された最新値を読み直す)。
+      const latestRotation =
+        useGameStore.getState().game.current?.rotation ??
+        game.current.rotation;
+      setPreviewMove({ axisCol: col, rotation: latestRotation });
+
       // For drag mode, also treat downward pull as repeated softDrop dispatches.
       // Coalesced pointer events on mobile can deliver dy spanning multiple
       // thresholds in one move, so dispatch one softDrop per crossed threshold
       // and advance start.y by the consumed multiple (preserving the partial
       // remainder so the next event keeps the pixel budget honest).
-      if (getControlMode() === 'drag' && pressStart.current) {
+      if (mode === 'drag' && pressStart.current) {
         const dy = e.clientY - pressStart.current.y;
         const flickPx = getControlTuning().flickColPx;
         if (dy > flickPx) {
@@ -127,10 +172,13 @@ export function useGestures(targetRef: RefObject<HTMLElement | null>) {
       // landed inside the board). Without this guard a press that begins
       // outside the board and slides in would still trigger a commit on
       // release in tap-to-drop mode.
+      // 判定は x のみ — y 方向は許容。ユーザーは列を狙って動かしているので、
+      // 上下方向のブレで accidental cancel になると「同じぷよが残る」現象が
+      // 起きる。盤の左右に大きくはみ出した場合のみキャンセル扱いにする。
       if (wasDragging && (mode === 'tap-to-drop' || mode === 'drag')) {
-        const insideBoard = isInsideBoard(e.clientX, e.clientY);
+        const xInside = isXInsideBoard(e.clientX);
         const game = useGameStore.getState().game;
-        if (insideBoard && game.current) {
+        if (xInside && game.current) {
           const col = clientXToCol(e.clientX);
           if (col !== null) {
             void useGameStore.getState().commit({

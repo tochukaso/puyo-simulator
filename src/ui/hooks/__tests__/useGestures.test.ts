@@ -108,6 +108,22 @@ describe('useGestures', () => {
     expect(getPreviewMove()).toBeNull();
   });
 
+  it('tap-to-drop: rightmost-column tap with horizontal pair clamps axisCol to 4', () => {
+    setControlMode('tap-to-drop');
+    const { el, ref } = mountTarget();
+    renderHook(() => useGestures(ref));
+    useGameStore.setState((st) => ({
+      game: { ...st.game, current: { ...st.game.current!, rotation: 1 } },
+    }));
+    act(() => {
+      fire(el, 'pointerdown', 180, 200); // x=180 → col 5
+    });
+    expect(getPreviewMove()!.axisCol).toBe(4);
+    act(() => {
+      fire(el, 'pointercancel', 180, 200);
+    });
+  });
+
   it('tap-to-drop: vertical slide while pressed rotates the active pair', () => {
     setControlMode('tap-to-drop');
     const { el, ref } = mountTarget();
@@ -199,6 +215,47 @@ describe('useGestures', () => {
     expect(newRow - startRow).toBe(3);
     act(() => {
       fire(el, 'pointerup', 80, 296);
+    });
+  });
+
+  it('drag: pointing at rightmost column with horizontal pair clamps to COLS-2', () => {
+    setControlMode('drag');
+    const { el, ref } = mountTarget();
+    renderHook(() => useGestures(ref));
+    // 横向きにする (rotation=1: child is to the right of axis).
+    useGameStore.setState((st) => ({
+      game: { ...st.game, current: { ...st.game.current!, rotation: 1 } },
+    }));
+    act(() => {
+      // press near axisCol=2 first to enter drag mode (within ±1).
+      fire(el, 'pointerdown', 80, 200);
+      // drag finger to the rightmost column (x=180 → col 5).
+      fire(el, 'pointermove', 180, 200);
+    });
+    // rotation=1 では axisCol は最大 4 (child が col=5 に行く)。col=5 ではない。
+    expect(getPreviewMove()!.axisCol).toBe(4);
+    expect(getPreviewMove()!.rotation).toBe(1);
+    act(() => {
+      fire(el, 'pointercancel', 180, 200);
+    });
+  });
+
+  it('drag: pointing at leftmost column with rotation=3 clamps axisCol to 1', () => {
+    setControlMode('drag');
+    const { el, ref } = mountTarget();
+    renderHook(() => useGestures(ref));
+    // rotation=3: child is to the left of axis. axisCol must be >= 1.
+    useGameStore.setState((st) => ({
+      game: { ...st.game, current: { ...st.game.current!, rotation: 3 } },
+    }));
+    act(() => {
+      fire(el, 'pointerdown', 80, 200); // start drag near axisCol=2
+      fire(el, 'pointermove', 5, 200);  // drag to leftmost (col 0)
+    });
+    expect(getPreviewMove()!.axisCol).toBe(1);
+    expect(getPreviewMove()!.rotation).toBe(3);
+    act(() => {
+      fire(el, 'pointercancel', 5, 200);
     });
   });
 

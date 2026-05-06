@@ -29,6 +29,19 @@ function clientXToCol(clientX: number): number | null {
   return col;
 }
 
+// 横向き (rotation 1 or 3) のペアは child が axis の左右にあるので、axis を
+// 端の列に置くと child が盤外に出てしまう。lockActive が盤外セルを単に無視
+// する仕様なので、放置すると「片方だけ落ちて 1 個消える」見た目のバグになる。
+//   rotation === 1: child は axisCol+1 → axisCol は最大 COLS-2
+//   rotation === 3: child は axisCol-1 → axisCol は最小 1
+// ユーザーが端をタップした意図は「できる限り端に寄せたい」なので、エラー
+// 扱いではなく内側にスナップする。
+function clampAxisColForRotation(col: number, rotation: number): number {
+  if (rotation === 1) return Math.min(col, COLS - 2);
+  if (rotation === 3) return Math.max(col, 1);
+  return col;
+}
+
 // Returns true if (x, y) lies within the board's bounding rect.
 function isInsideBoard(x: number, y: number): boolean {
   const rect = getBoardRect();
@@ -83,8 +96,9 @@ export function useGestures(targetRef: RefObject<HTMLElement | null>) {
       // preview at column 0 / COLS-1. Refuse to start preview unless the
       // press actually landed on the board.
       if (!isInsideBoard(e.clientX, e.clientY)) return;
-      const col = clientXToCol(e.clientX);
-      if (col === null) return;
+      const rawCol = clientXToCol(e.clientX);
+      if (rawCol === null) return;
+      const col = clampAxisColForRotation(rawCol, game.current.rotation);
 
       // For drag mode, only start tracking if the press began near the active
       // pair's axis column (within ±1). Otherwise treat as a tap rotate
@@ -99,8 +113,10 @@ export function useGestures(targetRef: RefObject<HTMLElement | null>) {
       if (!draggingRef.current) return;
       const game = useGameStore.getState().game;
       if (!game.current) return;
-      const col = clientXToCol(e.clientX);
-      if (col === null) return;
+      const rawCol = clientXToCol(e.clientX);
+      if (rawCol === null) return;
+      // col は最終 rotation (回転処理後) で clamp し直すので、ここでは
+      // rawCol だけ持って次の段で使う。
 
       const mode = getControlMode();
 
@@ -132,10 +148,14 @@ export function useGestures(targetRef: RefObject<HTMLElement | null>) {
       }
 
       // 列追従プレビュー (rotation は dispatch で更新された最新値を読み直す)。
+      // 縦スライドで回転した直後は rotation が変わっているので、横向きに
+      // なった瞬間に col が新しい rotation の有効範囲を超えていないか
+      // 再 clamp する必要がある。
       const latestRotation =
         useGameStore.getState().game.current?.rotation ??
         game.current.rotation;
-      setPreviewMove({ axisCol: col, rotation: latestRotation });
+      const reClamped = clampAxisColForRotation(rawCol, latestRotation);
+      setPreviewMove({ axisCol: reClamped, rotation: latestRotation });
 
       // For drag mode, also treat downward pull as repeated softDrop dispatches.
       // Coalesced pointer events on mobile can deliver dy spanning multiple
@@ -179,8 +199,11 @@ export function useGestures(targetRef: RefObject<HTMLElement | null>) {
         const xInside = isXInsideBoard(e.clientX);
         const game = useGameStore.getState().game;
         if (xInside && game.current) {
-          const col = clientXToCol(e.clientX);
-          if (col !== null) {
+          const rawCol = clientXToCol(e.clientX);
+          if (rawCol !== null) {
+            // 横向き (rotation 1/3) で端に置こうとしたら内側にスナップ。
+            // しないと child が盤外に行って 1 個消える見た目バグになる。
+            const col = clampAxisColForRotation(rawCol, game.current.rotation);
             void useGameStore.getState().commit({
               axisCol: col,
               rotation: game.current.rotation,

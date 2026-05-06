@@ -61,7 +61,12 @@ export function DailyPanel() {
   const [leaderboard, setLeaderboard] = useState<DailyLeaderboardEntry[] | null>(
     null,
   );
-  const [leaderboardErr, setLeaderboardErr] = useState<string | null>(null);
+  // ロード失敗フラグ。 翻訳済みメッセージではなく boolean を持って render 時に
+  // t() で翻訳することで、 useT() が毎レンダー新しい関数を返す性質に
+  // 由来する useEffect 暴走 (t を依存に入れると毎レンダー effect が走り、
+  // setLeaderboard(null) → 進行中 fetch を cancel → 永遠にローディング表示)
+  // を避ける。
+  const [leaderboardFailed, setLeaderboardFailed] = useState(false);
   const [myIds, setMyIds] = useState<readonly string[]>([]);
 
   // viewDate に対応する日付文字列。 "today" / "yesterday" を同じ Date 起点
@@ -83,7 +88,7 @@ export function DailyPanel() {
     if (!isValidDailyDate(targetDate)) return;
     let cancelled = false;
     setLeaderboard(null);
-    setLeaderboardErr(null);
+    setLeaderboardFailed(false);
     getDailyLeaderboard(targetDate, 20)
       .then((res) => {
         if (cancelled) return;
@@ -91,13 +96,16 @@ export function DailyPanel() {
       })
       .catch(() => {
         if (cancelled) return;
-        setLeaderboardErr(t('daily.leaderboardError'));
+        setLeaderboardFailed(true);
       });
     setMyIds(readMyDailyIds(targetDate));
     return () => {
       cancelled = true;
     };
-  }, [targetDate, submittedId, t]);
+    // t は意図的に除外 (useT() は毎レンダー新しい関数を返すので入れると暴走)。
+    // エラーメッセージは render 側で leaderboardFailed フラグから引く。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetDate, submittedId]);
 
   if (mode !== 'daily') return null;
 
@@ -269,8 +277,8 @@ export function DailyPanel() {
       {/* リーダーボード本体。 */}
       <div className="flex flex-col gap-0.5 max-h-60 overflow-y-auto">
         {leaderboard === null ? (
-          leaderboardErr ? (
-            <div className="text-rose-300">{leaderboardErr}</div>
+          leaderboardFailed ? (
+            <div className="text-rose-300">{t('daily.leaderboardError')}</div>
           ) : (
             <div className="text-slate-500">
               {t('daily.leaderboardLoading')}

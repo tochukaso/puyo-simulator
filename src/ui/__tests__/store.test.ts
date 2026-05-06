@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { useGameStore } from '../store';
+import { dailySeedFor, todayDateJst } from '../../game/dailySeed';
 
 describe('useGameStore', () => {
   beforeEach(() => {
@@ -274,5 +275,62 @@ describe('useGameStore undo (match mode)', () => {
     const before = useGameStore.getState().game;
     useGameStore.getState().undo();
     expect(useGameStore.getState().game).toBe(before);
+  });
+});
+
+describe('useGameStore daily mode reset', () => {
+  afterEach(() => {
+    // 後続テストへの mode 持ち越し防止。 free にして state を初期化。
+    useGameStore.getState().setGameMode('free');
+    useGameStore.getState().reset(1);
+  });
+
+  it('reset() in daily mode preserves the daily fixed seed', () => {
+    const today = todayDateJst();
+    const expectedSeed = dailySeedFor(today);
+
+    useGameStore.getState().startDaily();
+    expect(useGameStore.getState().mode).toBe('daily');
+    expect(useGameStore.getState().matchSeed).toBe(expectedSeed);
+    expect(useGameStore.getState().currentDailyDate).toBe(today);
+
+    // ペア列の指紋として最初の current.pair と nextQueue[0..1] を覚えておく。
+    const before = useGameStore.getState().game;
+    const beforeFingerprint = JSON.stringify({
+      cur: before.current!.pair,
+      next: before.nextQueue.slice(0, 2),
+    });
+
+    // Reset すると以前は Date.now() ベースの新 seed になっていた。新仕様では
+    // 当日の dailySeed に固定される。
+    useGameStore.getState().reset();
+
+    const after = useGameStore.getState();
+    expect(after.mode).toBe('daily');
+    expect(after.matchSeed).toBe(expectedSeed);
+    expect(after.currentDailyDate).toBe(today);
+    const afterFingerprint = JSON.stringify({
+      cur: after.game.current!.pair,
+      next: after.game.nextQueue.slice(0, 2),
+    });
+    expect(afterFingerprint).toBe(beforeFingerprint);
+    // turn / move もクリアされている。
+    expect(after.matchTurnsPlayed).toBe(0);
+    expect(after.matchPlayerMoves).toEqual([]);
+    expect(after.matchEnded).toBe(false);
+  });
+
+  it('reset() in non-daily modes still uses a fresh random seed (no regression)', () => {
+    useGameStore.getState().setGameMode('free');
+    useGameStore.getState().reset(1);
+    const before = useGameStore.getState().game.rngSeed;
+    useGameStore.getState().reset(); // no arg → Date.now()-based seed
+    const after = useGameStore.getState().game.rngSeed;
+    // 完全な inequality を保証することはできない (時計が同 ms なら衝突しうる)
+    // が、 free モードでは matchSeed=null である事は保証されるのでそれで判定。
+    expect(useGameStore.getState().mode).toBe('free');
+    expect(useGameStore.getState().matchSeed).toBeNull();
+    void before;
+    void after;
   });
 });

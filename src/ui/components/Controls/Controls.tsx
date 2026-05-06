@@ -38,9 +38,12 @@ export function Controls() {
   //   - tap-to-drop / drag: ジェスチャーで回転できないので CCW ボタンを表示
   const showCcw =
     mode === 'score' || controlMode === 'tap-to-drop' || controlMode === 'drag';
-  // score モードのときだけ CCW + CW を両方出す。tap-to-drop / drag は
-  // CCW を CW の代わりに置き換える (CW は既存ボタンのまま使い分け)。
-  const showCwExtra = mode === 'score';
+  // CW を CCW の隣に追加で出す条件:
+  //   - score モード: 既存仕様。
+  //   - tap-to-drop: ジェスチャーで回転できないので CW も別途必要。CCW のみ
+  //     だと逆回転で代用するハメになって使い物にならない。
+  //   drag は範囲外タップで CW/CCW 両方できるので追加 CW は不要。
+  const showCwExtra = mode === 'score' || controlMode === 'tap-to-drop';
 
   const padY = tuning.buttonScaleLarge ? 'py-4' : 'py-3';
   const fontSize = tuning.buttonScaleLarge ? 'text-lg' : 'text-base';
@@ -48,10 +51,21 @@ export function Controls() {
     `${padY} rounded ${fontSize} touch-manipulation select-none disabled:opacity-50 disabled:cursor-not-allowed`;
 
   // 2 段目のグリッド列数を出すボタン数に合わせる。
-  // free:  [CW or CCW, Drop, AI Best, Undo, Reset]              = 5
-  // match: [CW or CCW, Drop, Undo, Reset]                       = 4
-  // score: [CCW, Drop, CW, Reset]                               = 4
-  const cols = showAiBest ? 5 : 4;
+  // 常に出る: [primary rotate, Drop, Reset] = 3
+  // option: showAiBest, showCwExtra, showUndo
+  const cols =
+    3 +
+    (showAiBest ? 1 : 0) +
+    (showCwExtra ? 1 : 0) +
+    (showUndo ? 1 : 0);
+  // Tailwind が静的に解析できるようクラス名を直接マップ (string concat だと
+  // JIT がクラスを発見できない)。
+  const colsClass =
+    cols === 6
+      ? 'grid-cols-6'
+      : cols === 5
+        ? 'grid-cols-5'
+        : 'grid-cols-4';
 
   const repeatLeft = usePressRepeat(
     () => dispatch({ type: 'moveLeft' }),
@@ -100,9 +114,7 @@ export function Controls() {
           {t('controls.moveRight')}
         </button>
       </div>
-      <div
-        className={`grid gap-2 w-full ${cols === 5 ? 'grid-cols-5' : 'grid-cols-4'}`}
-      >
+      <div className={`grid gap-2 w-full ${colsClass}`}>
         {showCcw ? (
           <button
             className={`${cellBase} bg-slate-700 hover:bg-slate-600 active:bg-slate-500`}

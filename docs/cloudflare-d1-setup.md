@@ -84,7 +84,7 @@ npm run dev
 | --- | --- | --- |
 | POST | `/api/scores` | スコアレコードを保存。 ID を発番して返す。 `mode='daily'` の場合は `dailyDate` 必須 + `seed === dailySeedFor(dailyDate)` + `turnLimit === 50` + `dailyDate === todayDateJst()` (今日の JST 日付) を検証。 |
 | GET | `/api/scores/:id` | 保存済みレコードを取得。 |
-| GET | `/api/daily/leaderboard?date=YYYY-MM-DD&limit=N` | 指定日のデイリーチャレンジ上位 N (デフォルト 20、最大 100)。 各エントリは `id` のみ持ち、リプレイは `/api/scores/:id` で改めて取得する。 |
+| GET | `/api/daily/leaderboard?date=YYYY-MM-DD&limit=N` | 指定日のデイリーチャレンジ上位 N (デフォルト 20、最大 100)。 各エントリは `{id, createdAt, playerName, playerScore, rank}` を返す (リスト表示に必要な分はレスポンスだけで完結)。 リプレイの手順 (playerMoves) まで欲しい場合は `/api/scores/:id` を別途叩く。 |
 
 リクエスト/レスポンス形式は `worker/index.ts` と `src/api/scoresClient.ts` / `src/api/dailyClient.ts` を参照。
 

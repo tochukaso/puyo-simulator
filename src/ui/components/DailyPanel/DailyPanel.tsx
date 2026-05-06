@@ -64,10 +64,14 @@ export function DailyPanel() {
   const [leaderboardErr, setLeaderboardErr] = useState<string | null>(null);
   const [myIds, setMyIds] = useState<readonly string[]>([]);
 
-  // viewDate に対応する日付文字列。"today" は currentDailyDate を優先 (テストで
-  // 固定日付を使えるように)、無ければ todayDateJst()。 "yesterday" は前日。
-  const today = currentDailyDate ?? todayDateJst();
-  const targetDate = viewDate === 'today' ? today : yesterdayDateJst(new Date());
+  // viewDate に対応する日付文字列。 "today" / "yesterday" を同じ Date 起点
+  // (real now) から導出して、「today タブと yesterday タブが必ず連続した
+  // 2 日を指す」ようにする。 currentDailyDate を today にフォールバックすると、
+  // 過去のレコードを loadRecord で開いている間に yesterday タブが現実の
+  // 前日を指して 2 日以上ズレる問題が出るので使わない (PR #53 review)。
+  const now = new Date();
+  const today = todayDateJst(now);
+  const targetDate = viewDate === 'today' ? today : yesterdayDateJst(now);
   const isReplaying = loadedRecordId !== null;
 
   // リーダーボードを取得 (date 切替 / 送信成功時に再取得)。

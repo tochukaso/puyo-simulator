@@ -3,7 +3,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useGestures } from '../useGestures';
 import { useGameStore } from '../../store';
-import { setControlMode } from '../useControlPrefs';
+import {
+  setControlMode,
+  setControlTuning,
+  DEFAULT_CONTROL_TUNING,
+} from '../useControlPrefs';
 import { setBoardRectGetter } from '../useBoardRect';
 import { setPreviewMove, getPreviewMove } from '../useAiPreview';
 
@@ -32,6 +36,10 @@ function mountTarget(): { el: HTMLDivElement; ref: RefObject<HTMLDivElement | nu
 describe('useGestures', () => {
   beforeEach(() => {
     setControlMode('classic');
+    // Tuning is a singleton persisted across tests in this process; if another
+    // suite mutated flickColPx the threshold-dependent assertions here would
+    // flake. Reset to defaults explicitly.
+    setControlTuning(DEFAULT_CONTROL_TUNING);
     setPreviewMove(null);
     // Fake a 192px-wide board (32px * 6 cols) at x=[0,192], y=[100,484].
     setBoardRectGetter(() => new DOMRect(0, 100, 192, 384));

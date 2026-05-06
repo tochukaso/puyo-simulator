@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GTR 트레이닝 — 매뉴얼</title>
+    <meta name="description" content="GTR 트레이닝(뿌요 시뮬레이터)의 사용 설명서. 게임 모드, 템플릿, 편집, 공유, 분석 기능을 안내합니다." />
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <h1>GTR 트레이닝 — 매뉴얼</h1>
+        <nav>
+          <div class="lang-picker">
+            <a href="../ja/">日本語</a>
+            <a href="../en/">English</a>
+            <a href="../zh/">中文</a>
+            <a href="../ko/" class="active">한국어</a>
+          </div>
+          <a class="btn primary" href="../../">← 앱으로 돌아가기</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="layout">
+      <h1>GTR 트레이닝 매뉴얼</h1>
+      <p class="lead">
+        AI(ama)와 함께 GTR · 계단 등 정형 연쇄를 반복 연습할 수 있는 뿌요 시뮬레이터의 사용 가이드입니다.
+      </p>
+
+      <nav class="toc">
+        <strong>목차</strong>
+        <ol>
+          <li><a href="#overview">앱 소개</a></li>
+          <li><a href="#screen">화면 구성</a></li>
+          <li><a href="#controls">조작 방법</a></li>
+          <li><a href="#modes">게임 모드</a></li>
+          <li><a href="#trainer">템플릿 (트레이너)</a></li>
+          <li><a href="#edit">편집 모드</a></li>
+          <li><a href="#menu">메뉴와 표시 설정</a></li>
+          <li><a href="#sharing">공유 · 저장 · 분석</a></li>
+          <li><a href="#native">PWA / 네이티브 앱</a></li>
+          <li><a href="#glossary">용어</a></li>
+        </ol>
+      </nav>
+
+      <h2 id="overview">앱 소개</h2>
+      <p>
+        GTR 트레이닝(저장소명 <code>puyo-simulator</code>)은 뿌요 계열 낙하 퍼즐의 대표적인 정형 연쇄인 <strong>GTR</strong>과 <strong>계단</strong>을 AI 추천과 함께 연습하는 웹 애플리케이션입니다.
+      </p>
+      <ul>
+        <li>AI는 <a href="https://github.com/citrus610/ama">ama</a>(MIT, citrus610 제작)를 WebAssembly / 네이티브로 내장합니다.</li>
+        <li>웹 기반 PWA — 설치 후 오프라인 실행 가능.</li>
+        <li>템플릿은 AI의 가중치를 조정하여 GTR 또는 계단 형태에 맞게 추천합니다.</li>
+        <li>세 가지 모드: 자유 연습, ama 점수 대결, 점수 어택.</li>
+      </ul>
+
+      <h2 id="screen">화면 구성</h2>
+      <figure>
+        <img src="../assets/screenshots/free-en.png" alt="자유 모드 기본 화면" />
+        <figcaption>자유 모드 시작 화면. 보드 · NEXT · 컨트롤 · AI 후보가 함께 표시됩니다.</figcaption>
+      </figure>
+      <table>
+        <thead><tr><th style="width: 28%">영역</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr><td>헤더</td><td>앱 이름 · 빌드 SHA · 모드 셀렉터 · 편집 토글 · 햄버거 메뉴</td></tr>
+          <tr><td>점수 행</td><td><strong>Score</strong>(현재 연쇄 점수)·<strong>Chain</strong>(현재 연쇄 수)·<strong>Max</strong>(최대 연쇄)·<strong>Total</strong>(누계)</td></tr>
+          <tr><td>보드</td><td>6열 × 12행. 맨 윗줄은 천장(질식 라인). 빨간 테두리는 <strong>축 뿌요</strong>의 낙하 예정 열.</td></tr>
+          <tr><td>NEXT 큐</td><td>보드 오른쪽의 두 쌍 — 다음에 떨어지는 뿌요.</td></tr>
+          <tr><td>AI 후보</td><td>ama가 산출한 상위 5수를 평가 % 와 함께 표시. <kbd>Go</kbd> 버튼으로 즉시 실행.</td></tr>
+          <tr><td>컨트롤</td><td>← / Down / → · CW · Drop · AI Best · Undo · Reset. 키보드와 터치 모두 지원.</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="controls">조작 방법</h2>
+      <h3>키보드</h3>
+      <table>
+        <thead><tr><th>키</th><th>동작</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>한 칸 이동</td></tr>
+          <tr><td><kbd>↓</kbd></td><td>소프트 드롭(한 칸 아래)</td></tr>
+          <tr><td><kbd>X</kbd></td><td>시계 방향 회전</td></tr>
+          <tr><td><kbd>Z</kbd></td><td>반시계 방향 회전</td></tr>
+          <tr><td><kbd>↑</kbd> / <kbd>Space</kbd></td><td>확정(현재 열·회전으로 낙하)</td></tr>
+          <tr><td><kbd>U</kbd> 또는 <kbd>Ctrl/⌘ + Z</kbd></td><td>한 수 되돌리기</td></tr>
+        </tbody>
+      </table>
+
+      <h3>터치(모바일)</h3>
+      <ul>
+        <li>보드를 좌우로 스와이프 → 좌우 이동</li>
+        <li>보드를 아래로 스와이프 → 소프트 드롭</li>
+        <li>보드를 탭 → 회전(탭 위치에 따라 CW / CCW)</li>
+        <li>화면 하단 버튼으로도 동일 조작 가능</li>
+      </ul>
+
+      <h3>화면 하단 버튼</h3>
+      <ul>
+        <li><strong>Drop(↓)</strong> — 현재 열·회전으로 확정.</li>
+        <li><strong>★ AI Best</strong> — ama의 최선수를 즉시 실행. 반복 누르면 AI 자동 진행.</li>
+        <li><strong>Undo(↶)</strong> — 한 수 되돌리기(매치 중에는 자기 쪽만).</li>
+        <li><strong>Reset</strong> — 보드와 시드 리셋. 확인 다이얼로그 표시.</li>
+      </ul>
+
+      <h2 id="modes">게임 모드</h2>
+      <p>헤더 좌측 <strong>모드 셀렉터</strong>로 세 가지 모드를 전환합니다.</p>
+
+      <h3>1. 자유(Free)</h3>
+      <p>
+        무제한 연습 모드. AI 후보가 보입니다. 후보를 보고 수를 고르고, 가끔 <strong>AI Best</strong>로 정답을 확인하고, 맞지 않으면 Undo로 다른 수를 시도하는 식의 반복 연습에 적합합니다.
+      </p>
+
+      <h3>2. ama 점수 대결(Score vs ama)</h3>
+      <figure>
+        <img src="../assets/screenshots/match-en.png" alt="대전 모드" />
+        <figcaption>ama 점수 대결. 정해진 수 안에 누계 점수가 높은 쪽이 승리.</figcaption>
+      </figure>
+      <p>
+        양쪽이 <strong>같은 시드</strong>(동일한 NEXT)로 정해진 수(30 / 50 / 100)를 두며 누계 점수가 높은 쪽이 이깁니다. AI 후보는 표시되지 않아 순수한 수읽기 대결이 됩니다.
+      </p>
+      <ul>
+        <li>오른쪽 Resign 버튼으로 도중 종료 가능.</li>
+        <li>매치 종료 후 메뉴의 「저장된 매치」에 보관할 수 있습니다.</li>
+      </ul>
+
+      <h3>3. 점수 어택(Score attack)</h3>
+      <figure>
+        <img src="../assets/screenshots/score-en.png" alt="점수 어택 모드" />
+        <figcaption>점수 어택. 30 / 50 / 100 / 200 / 무제한 중 선택.</figcaption>
+      </figure>
+      <p>
+        상대 없는 단독 모드. 서버에 업로드하면 짧은 URL로 리플레이를 공유 가능(<code>?score=&lt;id&gt;</code>로 로드).
+      </p>
+
+      <h2 id="trainer">템플릿(트레이너)</h2>
+      <figure>
+        <img src="../assets/screenshots/menu-en.png" alt="햄버거 메뉴" />
+        <figcaption>메뉴의 「Template」 셀렉터: 없음 / GTR / 계단.</figcaption>
+      </figure>
+      <ul>
+        <li><strong>없음</strong> — 기본 빔 서치(<code>build</code> 프리셋).</li>
+        <li><strong>GTR</strong> — GTR의 키와 접는 부분에 가중치를 부여하여 GTR 형태로 유도.</li>
+        <li><strong>계단</strong> — 계단 연쇄의 토대를 우선시.</li>
+      </ul>
+      <p>
+        템플릿 변경은 자유 모드의 후보와 대전 시 ama의 플레이 스타일에 함께 반영됩니다.
+      </p>
+
+      <h2 id="edit">편집 모드</h2>
+      <figure>
+        <img src="../assets/screenshots/edit-en.png" alt="편집 모드" />
+        <figcaption>편집 모드에서 보드 · 현재 페어 · NEXT를 자유롭게 수정.</figcaption>
+      </figure>
+      <ul>
+        <li>헤더의 「Edit」 버튼으로 진입(대전 중이면 종료 확인 다이얼로그가 나옵니다).</li>
+        <li>하단 팔레트의 <strong>R / P / B / Y</strong>에서 색을 고르고 셀을 탭해 배치.</li>
+        <li><strong>○</strong>는 지우기, <strong>✕</strong>는 방해 뿌요 배치.</li>
+        <li>오른쪽 Current / NEXT / NEXT 2 카드를 탭하면 현재·다음 페어를 편집할 수 있습니다.</li>
+        <li><strong>Apply</strong> 적용, <strong>Cancel</strong> 취소, <strong>Clear</strong> 보드 전부 지우기.</li>
+      </ul>
+      <div class="callout">
+        편집한 보드는 메뉴의 <strong>공유</strong> 기능으로 URL에 인코딩하여 다른 사람에게 보낼 수 있어 연쇄 퍼즐 출제에 편리합니다.
+      </div>
+
+      <h2 id="menu">메뉴와 표시 설정</h2>
+      <ul>
+        <li><strong>Ghost(고스트)</strong> — 현재 페어가 떨어질 위치를 흐리게 미리보기.</li>
+        <li><strong>Ceiling(천장)</strong> — 윗줄 질식 라인 표시 토글.</li>
+        <li><strong>Template(템플릿)</strong> — AI 가중치(위 참고).</li>
+        <li><strong>Language(언어)</strong> — UI 언어를 한국어 / 일본어 / 영어 / 중국어로 전환. 매뉴얼도 함께 적용됩니다.</li>
+        <li><strong>Share(공유)</strong> — 현재 보드를 URL에 인코딩.</li>
+        <li><strong>Saved matches(저장된 매치)</strong> — 저장된 리플레이 목록.</li>
+        <li><strong>매뉴얼</strong> — 이 매뉴얼을 새 탭에서 엽니다.</li>
+        <li><strong>Analyze(분석)</strong> — 자유 / 종료된 매치의 자기 수를 ama가 재평가하여 일치율과 평가값(%)을 산출.</li>
+      </ul>
+
+      <h2 id="sharing">공유 · 저장 · 분석</h2>
+
+      <h3>보드 공유</h3>
+      <figure>
+        <img src="../assets/screenshots/share-en.png" alt="공유 다이얼로그" />
+        <figcaption>보드 + 현재 페어 + NEXT 2쌍을 URL로 인코딩.</figcaption>
+      </figure>
+      <p>
+        URL을 다른 기기에서 열면 같은 보드가 재현됩니다. 점수와 히스토리는 전달되지 않습니다.
+      </p>
+
+      <h3>리플레이 공유</h3>
+      <p>
+        점수 어택 / 매치 종료 후의 「Share replay」는 <strong>시드와 수순</strong>을 URL에 인코딩합니다. 서버 업로드 후 짧은 ID URL을 받을 수도 있습니다(<code>?score=&lt;id&gt;</code>로 로드).
+      </p>
+
+      <h3>저장된 매치</h3>
+      <figure>
+        <img src="../assets/screenshots/records-en.png" alt="저장된 매치 다이얼로그" />
+        <figcaption>매치 종료 후 「저장」을 누르면 이 목록에서 다시 리플레이할 수 있습니다.</figcaption>
+      </figure>
+      <p>시드와 수순만 저장되므로 용량은 매우 작습니다. 리플레이 중에는 턴 단위로 이동하며 연쇄 애니메이션을 다시 볼 수 있습니다.</p>
+
+      <h3>분석(Analyze)</h3>
+      <ul>
+        <li><strong>AI 일치율</strong> — 자기 수가 ama의 최선수와 일치한 비율(AI Best 버튼으로 둔 수는 제외).</li>
+        <li><strong>AI 평가값</strong> — 자기 수의 점수가 ama 최선수 대비 몇 %인지 평균(ama 상위 5수 안에 든 수만 집계).</li>
+      </ul>
+
+      <h2 id="native">PWA / 네이티브 앱</h2>
+      <p>이 앱은 PWA로 동작합니다. Chrome / Safari에서 "홈 화면에 추가"하면 앱처럼 사용하고 오프라인 실행도 가능합니다.</p>
+      <p>
+        macOS / Android에는 <strong>Tauri 네이티브 빌드</strong>도 있습니다. ama를 Rust FFI를 통해 C++ 정적 라이브러리로 호출하므로 AI 응답이 Intel Mac에서 p99 200ms 이내까지 단축됩니다.
+      </p>
+
+      <h2 id="glossary">용어</h2>
+      <table>
+        <tbody>
+          <tr><td><strong>축 뿌요</strong></td><td>페어 회전의 중심이 되는 뿌요. 보드에서 빨간 테두리로 표시됩니다.</td></tr>
+          <tr><td><strong>연쇄</strong></td><td>같은 색 4개 이상이 사라지면서 위 뿌요가 떨어져 다시 사라지는 반응.</td></tr>
+          <tr><td><strong>GTR</strong></td><td>뿌요뿌요 통 계열의 대표 정형. L자 키 + 접는 형태.</td></tr>
+          <tr><td><strong>계단</strong></td><td>색을 계단 모양으로 배치해 만드는 연쇄 정형.</td></tr>
+          <tr><td><strong>질식</strong></td><td>13행 이상에 뿌요가 놓여 게임 오버되는 상태.</td></tr>
+          <tr><td><strong>seed</strong></td><td>NEXT를 생성하는 난수 시드. 공유하면 같은 순서를 재현 가능.</td></tr>
+          <tr><td><strong>ama</strong></td><td>본 앱에 내장된 AI(citrus610 제작, MIT). 빔 서치 + 휴리스틱.</td></tr>
+        </tbody>
+      </table>
+
+      <footer>
+        <p>
+          「ぷよ / Puyo」는 SEGA / Compile의 등록 상표입니다. 본 앱은 연습용 시뮬레이터이며 상업 배포 전에는 리브랜드가 필요합니다. 자세한 내용은 저장소 <code>README.md</code> 참고.
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>

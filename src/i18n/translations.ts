@@ -134,6 +134,7 @@ export interface Dict {
   'candidates.collapse': string;
   'candidates.expand': string;
   'board.chain': string;
+  'menu.manual': string;
 }
 
 export const translations: Record<Lang, Dict> = {
@@ -262,6 +263,7 @@ export const translations: Record<Lang, Dict> = {
     'candidates.collapse': '候補を折りたたむ',
     'candidates.expand': '候補を展開',
     'board.chain': '{n}れんさ!',
+    'menu.manual': 'マニュアル',
   },
   en: {
     'app.title': 'GTR Training',
@@ -388,6 +390,7 @@ export const translations: Record<Lang, Dict> = {
     'candidates.collapse': 'Collapse candidates',
     'candidates.expand': 'Expand candidates',
     'board.chain': '{n} chain!',
+    'menu.manual': 'Manual',
   },
   zh: {
     'app.title': 'GTR 训练',
@@ -514,6 +517,7 @@ export const translations: Record<Lang, Dict> = {
     'candidates.collapse': '折叠候选',
     'candidates.expand': '展开候选',
     'board.chain': '{n}连锁!',
+    'menu.manual': '使用手册',
   },
   ko: {
     'app.title': 'GTR 트레이닝',
@@ -640,5 +644,6 @@ export const translations: Record<Lang, Dict> = {
     'candidates.collapse': '후보 접기',
     'candidates.expand': '후보 펴기',
     'board.chain': '{n}연쇄!',
+    'menu.manual': '매뉴얼',
   },
 };

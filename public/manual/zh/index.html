@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GTR 训练 — 使用手册</title>
+    <meta name="description" content="GTR 训练(魔法气泡式连锁模拟器)的使用手册:游戏模式、模板、编辑、分享、解析功能介绍。" />
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <h1>GTR 训练 — 使用手册</h1>
+        <nav>
+          <div class="lang-picker">
+            <a href="../ja/">日本語</a>
+            <a href="../en/">English</a>
+            <a href="../zh/" class="active">中文</a>
+            <a href="../ko/">한국어</a>
+          </div>
+          <a class="btn primary" href="../../">← 返回应用</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="layout">
+      <h1>GTR 训练 使用手册</h1>
+      <p class="lead">
+        与 AI(ama)一起练习 GTR、阶梯等经典连锁形的魔法气泡式模拟器使用指南。
+      </p>
+
+      <nav class="toc">
+        <strong>目录</strong>
+        <ol>
+          <li><a href="#overview">应用简介</a></li>
+          <li><a href="#screen">界面说明</a></li>
+          <li><a href="#controls">操作方式</a></li>
+          <li><a href="#modes">游戏模式</a></li>
+          <li><a href="#trainer">模板(训练器)</a></li>
+          <li><a href="#edit">编辑模式</a></li>
+          <li><a href="#menu">菜单与显示设置</a></li>
+          <li><a href="#sharing">分享 / 保存 / 解析</a></li>
+          <li><a href="#native">PWA / 原生版</a></li>
+          <li><a href="#glossary">术语表</a></li>
+        </ol>
+      </nav>
+
+      <h2 id="overview">应用简介</h2>
+      <p>
+        GTR 训练(仓库名 <code>puyo-simulator</code>)是一款练习
+        <strong>GTR</strong> 与 <strong>阶梯</strong> 等经典连锁形的网页应用,
+        AI 顾问每回合给出最优手与前 5 候选。
+      </p>
+      <ul>
+        <li>AI 引擎为 <a href="https://github.com/citrus610/ama">ama</a>(MIT 协议,作者 citrus610),通过 WebAssembly / 原生静态库加载。</li>
+        <li>纯网页应用,可作为 PWA 安装并离线启动。</li>
+        <li>模板会调整 AI 权重,使建议偏向 GTR 或阶梯的组形。</li>
+        <li>三种游玩模式:自由练习、对 ama 计分、计分挑战。</li>
+      </ul>
+
+      <h2 id="screen">界面说明</h2>
+      <figure>
+        <img src="../assets/screenshots/free-en.png" alt="自由模式默认界面" />
+        <figcaption>自由模式启动界面。盘面、NEXT、操作按钮、AI 候选并排显示。</figcaption>
+      </figure>
+      <table>
+        <thead><tr><th style="width: 28%">区域</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td>顶栏</td><td>应用名 / 版本(短 SHA)/ 模式选择 / 编辑按钮 / 汉堡菜单</td></tr>
+          <tr><td>分数行</td><td><strong>Score</strong>(本次连锁分)·<strong>Chain</strong>(当前连锁数)·<strong>Max</strong>(最大连锁)·<strong>Total</strong>(累计)</td></tr>
+          <tr><td>盘面</td><td>6 列 ×12 行,顶部 1 行为窒息线。红框为<strong>轴气泡</strong>的预定落下列。</td></tr>
+          <tr><td>NEXT 队列</td><td>盘面右侧的 2 组下一对气泡。</td></tr>
+          <tr><td>AI 候选</td><td>ama 给出的前 5 手以百分比表示评分,可点击 <kbd>Go</kbd> 直接执行。</td></tr>
+          <tr><td>操作按钮</td><td>← / Down / → · CW · Drop · AI Best · Undo · Reset。键盘和触屏均可操作。</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="controls">操作方式</h2>
+      <h3>键盘</h3>
+      <table>
+        <thead><tr><th>按键</th><th>动作</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>左右移动一列</td></tr>
+          <tr><td><kbd>↓</kbd></td><td>软降一格</td></tr>
+          <tr><td><kbd>X</kbd></td><td>顺时针旋转</td></tr>
+          <tr><td><kbd>Z</kbd></td><td>逆时针旋转</td></tr>
+          <tr><td><kbd>↑</kbd> / <kbd>Space</kbd></td><td>确认落下(在当前列与朝向)</td></tr>
+          <tr><td><kbd>U</kbd> 或 <kbd>Ctrl/⌘ + Z</kbd></td><td>撤销一步</td></tr>
+        </tbody>
+      </table>
+
+      <h3>触屏(手机)</h3>
+      <ul>
+        <li>在盘面上左右滑动 → 左右移动</li>
+        <li>向下滑 → 软降</li>
+        <li>点击盘面 → 旋转(根据点击位置 CW 或 CCW)</li>
+        <li>底部按钮区可执行所有上述操作</li>
+      </ul>
+
+      <h3>底部按钮</h3>
+      <ul>
+        <li><strong>Drop(↓)</strong> — 在当前列与朝向落下。</li>
+        <li><strong>★ AI Best</strong> — 立即执行 ama 推荐手,反复点击则 AI 自走。</li>
+        <li><strong>Undo(↶)</strong> — 撤销一步(对战中仅作用于自方)。</li>
+        <li><strong>Reset</strong> — 重置盘面与随机种子,会出现确认对话框。</li>
+      </ul>
+
+      <h2 id="modes">游戏模式</h2>
+      <p>顶栏左侧的<strong>模式选择器</strong>切换三种模式。</p>
+
+      <h3>1. 自由(Free)</h3>
+      <p>
+        无手数限制、显示 AI 候选,适合学习与摸索。看着候选选择手,偶尔参考 <strong>AI Best</strong>,不合适就 Undo 重来。
+      </p>
+
+      <h3>2. 对 ama 计分对决(Score vs ama)</h3>
+      <figure>
+        <img src="../assets/screenshots/match-en.png" alt="对战模式" />
+        <figcaption>对 ama 计分模式。指定手数内累计分数高者获胜。</figcaption>
+      </figure>
+      <p>
+        双方使用<strong>相同种子</strong>(NEXT 完全一致),在固定手数(30 / 50 / 100)内打完累计分数高者获胜。
+        AI 候选不显示 — 完全比较手势选择能力。
+      </p>
+      <ul>
+        <li>右上的 Resign(投降)按钮可中途结束。</li>
+        <li>对战结束后从菜单的「保存对战」可保留回放。</li>
+      </ul>
+
+      <h3>3. 计分挑战(Score attack)</h3>
+      <figure>
+        <img src="../assets/screenshots/score-en.png" alt="计分挑战模式" />
+        <figcaption>计分挑战。手数可选 30 / 50 / 100 / 200 / 无限制。</figcaption>
+      </figure>
+      <p>
+        无对手的单人模式,可上传到分数服务器获取短链接(用 <code>?score=&lt;id&gt;</code> 加载回放)。
+      </p>
+
+      <h2 id="trainer">模板(训练器)</h2>
+      <figure>
+        <img src="../assets/screenshots/menu-en.png" alt="汉堡菜单" />
+        <figcaption>菜单中的「模板(Template)」选择器:无 / GTR / 阶梯。</figcaption>
+      </figure>
+      <ul>
+        <li><strong>无</strong> — 默认 beam search(<code>build</code> 预设)。</li>
+        <li><strong>GTR</strong> — 调高 GTR 钥匙与折返列的权重,使建议偏向 GTR。</li>
+        <li><strong>阶梯</strong> — 优先阶梯连锁底盘的权重。</li>
+      </ul>
+      <p>
+        切换模板会同时影响自由模式的 AI 候选与对 ama 模式中 ama 自身的下法。
+      </p>
+
+      <h2 id="edit">编辑模式</h2>
+      <figure>
+        <img src="../assets/screenshots/edit-en.png" alt="编辑模式" />
+        <figcaption>编辑模式可任意修改盘面、当前对、NEXT 与 NEXT2。</figcaption>
+      </figure>
+      <ul>
+        <li>顶栏的「Edit」按钮进入编辑(对战中会先确认中断对战)。</li>
+        <li>底部 <strong>R / P / B / Y</strong> 选颜色,点击格子放置。</li>
+        <li><strong>○</strong> 清除(变空格),<strong>✕</strong> 放置干扰气泡。</li>
+        <li>右侧 Current / NEXT / NEXT 2 卡片可点击修改当前对与下两对。</li>
+        <li><strong>Apply</strong> 提交,<strong>Cancel</strong> 取消,<strong>Clear</strong> 全部清空。</li>
+      </ul>
+      <div class="callout">
+        编辑后的盘面可通过菜单的<strong>分享</strong>编码成 URL,适合发布连锁谜题。
+      </div>
+
+      <h2 id="menu">菜单与显示设置</h2>
+      <ul>
+        <li><strong>Ghost(幽灵预览)</strong> — 显示当前对将落下的虚影。</li>
+        <li><strong>Ceiling(顶部)</strong> — 切换窒息线一行的视觉显示。</li>
+        <li><strong>Template(模板)</strong> — AI 权重(见上文)。</li>
+        <li><strong>Language(语言)</strong> — 切换 UI 语言:日本語 / English / 中文 / 한국어。本手册随之联动。</li>
+        <li><strong>Share(分享)</strong> — 把当前盘面编码到 URL。</li>
+        <li><strong>Saved matches(保存的对战)</strong> — 已保存的对战回放列表。</li>
+        <li><strong>使用手册</strong> — 在新标签页打开本手册。</li>
+        <li><strong>Analyze(解析)</strong> — 让 ama 重新评估自由 / 已结束对战的每一手,给出 AI 一致率与 AI 评估值。</li>
+      </ul>
+
+      <h2 id="sharing">分享 / 保存 / 解析</h2>
+
+      <h3>盘面分享</h3>
+      <figure>
+        <img src="../assets/screenshots/share-en.png" alt="分享对话框" />
+        <figcaption>把盘面 + 当前对 + 2 组 NEXT 编码到 URL。</figcaption>
+      </figure>
+      <p>对方打开此 URL 可复现相同盘面。分数与历史不会带过去。</p>
+
+      <h3>回放分享</h3>
+      <p>
+        计分挑战 / 对战结束后的「Share replay」会把 <strong>种子与手序</strong> 编码到 URL。
+        也可上传到服务器换取短链接,通过 <code>?score=&lt;id&gt;</code> 直接加载。
+      </p>
+
+      <h3>已保存对战</h3>
+      <figure>
+        <img src="../assets/screenshots/records-en.png" alt="已保存对战对话框" />
+        <figcaption>对战结束后点「保存」,之后可在此列表回放。</figcaption>
+      </figure>
+      <p>仅保存种子与手序,体积极小。回放时可逐回合切换、复看连锁动画。</p>
+
+      <h3>解析</h3>
+      <ul>
+        <li><strong>AI 一致率</strong> — 自手与 ama 最优手一致的比例(通过 AI Best 按钮打的不计入)。</li>
+        <li><strong>AI 评估</strong> — 自手得分相对 ama 最优手的百分比平均(仅计入进入 ama 前 5 候选的手)。</li>
+      </ul>
+
+      <h2 id="native">PWA / 原生版</h2>
+      <p>本应用是 PWA,在 Chrome / Safari 中可「添加到主屏幕」并离线启动。</p>
+      <p>
+        macOS / Android 还提供 <strong>Tauri 原生版本</strong>,通过 Rust FFI 调用 C++ 静态库形式的 ama,
+        在 Intel Mac 上 AI 思考 p99 可控制在 200ms 以内。
+      </p>
+
+      <h2 id="glossary">术语表</h2>
+      <table>
+        <tbody>
+          <tr><td><strong>轴气泡</strong></td><td>对中作为旋转中心的气泡,在盘面上以红框标记。</td></tr>
+          <tr><td><strong>连锁</strong></td><td>消除导致上方掉落,继续连续消除的反应。</td></tr>
+          <tr><td><strong>GTR</strong></td><td>魔法气泡通系列代表性的定型,L 形钥匙 + 折返。</td></tr>
+          <tr><td><strong>阶梯</strong></td><td>颜色按阶梯排列形成的连锁定型。</td></tr>
+          <tr><td><strong>窒息</strong></td><td>气泡到达第 13 行游戏结束。</td></tr>
+          <tr><td><strong>seed(种子)</strong></td><td>生成 NEXT 序列的随机数种子,共享后可还原相同序列。</td></tr>
+          <tr><td><strong>ama</strong></td><td>本应用内置的 AI(citrus610 制,MIT),beam search + 启发式。</td></tr>
+        </tbody>
+      </table>
+
+      <footer>
+        <p>
+          「魔法气泡 / ぷよ / Puyo」是 SEGA / Compile 的注册商标。本应用为练习用模拟器,商用前请改名。详情见仓库 <code>README.md</code>。
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>

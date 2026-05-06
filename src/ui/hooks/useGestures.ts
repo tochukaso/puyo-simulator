@@ -93,13 +93,22 @@ export function useGestures(targetRef: RefObject<HTMLElement | null>) {
       if (col === null) return;
       setPreviewMove({ axisCol: col, rotation: game.current.rotation });
       // For drag mode, also treat downward pull as repeated softDrop dispatches.
+      // Coalesced pointer events on mobile can deliver dy spanning multiple
+      // thresholds in one move, so dispatch one softDrop per crossed threshold
+      // and advance start.y by the consumed multiple (preserving the partial
+      // remainder so the next event keeps the pixel budget honest).
       if (getControlMode() === 'drag' && pressStart.current) {
         const dy = e.clientY - pressStart.current.y;
         const flickPx = getControlTuning().flickColPx;
         if (dy > flickPx) {
-          // Reset start.y so subsequent dy increments require another full px.
-          pressStart.current = { ...pressStart.current, y: e.clientY };
-          useGameStore.getState().dispatch({ type: 'softDrop' });
+          const rows = Math.floor(dy / flickPx);
+          pressStart.current = {
+            ...pressStart.current,
+            y: pressStart.current.y + rows * flickPx,
+          };
+          for (let i = 0; i < rows; i++) {
+            useGameStore.getState().dispatch({ type: 'softDrop' });
+          }
         }
       }
     };
@@ -114,7 +123,11 @@ export function useGestures(targetRef: RefObject<HTMLElement | null>) {
 
       const mode = getControlMode();
 
-      if (mode === 'tap-to-drop' || (mode === 'drag' && wasDragging)) {
+      // Only commit when this gesture actually started a preview (=press
+      // landed inside the board). Without this guard a press that begins
+      // outside the board and slides in would still trigger a commit on
+      // release in tap-to-drop mode.
+      if (wasDragging && (mode === 'tap-to-drop' || mode === 'drag')) {
         const insideBoard = isInsideBoard(e.clientX, e.clientY);
         const game = useGameStore.getState().game;
         if (insideBoard && game.current) {

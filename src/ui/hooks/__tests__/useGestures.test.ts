@@ -86,4 +86,20 @@ describe('useGestures', () => {
     expect(getPreviewMove()).toBeNull();
     expect(useGameStore.getState().game.current).toBe(startCurrent);
   });
+
+  it('tap-to-drop: pointerdown outside board then release inside does NOT commit', () => {
+    setControlMode('tap-to-drop');
+    const { el, ref } = mountTarget();
+    renderHook(() => useGestures(ref));
+    const startCurrent = useGameStore.getState().game.current;
+    act(() => {
+      fire(el, 'pointerdown', 100, 50);  // y=50 outside (above) board
+      fire(el, 'pointermove', 100, 200); // y=200 inside board now
+      fire(el, 'pointerup', 100, 200);
+    });
+    // Press never started a preview (bounds guard), so release should not
+    // trigger a commit even though the release coords are inside the board.
+    expect(getPreviewMove()).toBeNull();
+    expect(useGameStore.getState().game.current).toBe(startCurrent);
+  });
 });

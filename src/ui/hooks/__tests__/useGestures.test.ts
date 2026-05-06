@@ -102,4 +102,62 @@ describe('useGestures', () => {
     expect(getPreviewMove()).toBeNull();
     expect(useGameStore.getState().game.current).toBe(startCurrent);
   });
+
+  // ---- Drag mode coverage ----
+  // Board: 192px / 6 cols = 32px/col. Spawn axisCol=2 → x=[64, 96).
+  // ±1 range = cols 1..3 → x=[32, 128). Outside ±1 = cols 0, 4, 5.
+
+  it('drag: pointerdown within ±1 column starts preview', () => {
+    setControlMode('drag');
+    const { el, ref } = mountTarget();
+    renderHook(() => useGestures(ref));
+    act(() => {
+      // x=80 → col 2 (= axisCol). Within ±1 range, preview starts.
+      fire(el, 'pointerdown', 80, 200);
+    });
+    expect(getPreviewMove()).not.toBeNull();
+    expect(getPreviewMove()!.axisCol).toBe(2);
+    act(() => {
+      fire(el, 'pointerup', 80, 50); // release outside → no commit
+    });
+    expect(getPreviewMove()).toBeNull();
+  });
+
+  it('drag: large pointermove dy dispatches multiple softDrop steps', () => {
+    setControlMode('drag');
+    // flickColPx default = 32. dy must cross multiple thresholds.
+    const { el, ref } = mountTarget();
+    renderHook(() => useGestures(ref));
+    const startRow = useGameStore.getState().game.current!.axisRow;
+    act(() => {
+      fire(el, 'pointerdown', 80, 200); // start drag
+      fire(el, 'pointermove', 80, 296); // dy=96 → 3 softDrop steps (96/32)
+    });
+    // Each softDrop advances axisRow by 1 unless blocked. Three soft-drops on
+    // an empty board from a high spawn row land it 3 rows lower.
+    const newRow = useGameStore.getState().game.current!.axisRow;
+    expect(newRow - startRow).toBe(3);
+    act(() => {
+      fire(el, 'pointerup', 80, 296);
+    });
+  });
+
+  it('drag: tap outside ±1 column rotates instead of committing', () => {
+    setControlMode('drag');
+    const { el, ref } = mountTarget();
+    renderHook(() => useGestures(ref));
+    const startRotation = useGameStore.getState().game.current!.rotation;
+    const startAxisCol = useGameStore.getState().game.current!.axisCol;
+    // x=20 → col 0. axisCol=2, so |0-2|=2 > 1 → outside ±1, drag refused.
+    // Quick tap → tap-rotate. window.innerWidth=1024, x=20 is in left half
+    // → CCW rotation. Rotation cycles 0 → 3.
+    act(() => {
+      fire(el, 'pointerdown', 20, 200);
+      fire(el, 'pointerup', 20, 200);
+    });
+    const cur = useGameStore.getState().game.current!;
+    expect(cur.rotation).not.toBe(startRotation);
+    expect(cur.axisCol).toBe(startAxisCol); // not committed/moved
+    expect(getPreviewMove()).toBeNull();
+  });
 });

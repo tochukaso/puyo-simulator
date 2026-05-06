@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GTR Training - Manual</title>
+    <link rel="stylesheet" href="./assets/style.css" />
+    <script>
+      // Pick the language stored by the app, falling back to navigator.language
+      // and finally English. Then redirect to /manual/<lang>/.
+      (function () {
+        var supported = ['ja', 'en', 'zh', 'ko'];
+        var lang = null;
+        try {
+          var v = localStorage.getItem('puyo.ui.lang');
+          if (v && supported.indexOf(v) >= 0) lang = v;
+        } catch (e) {}
+        if (!lang) {
+          var nav = (navigator.language || 'en').slice(0, 2).toLowerCase();
+          lang = supported.indexOf(nav) >= 0 ? nav : 'en';
+        }
+        // Replace history entry so Back doesn't bounce on this picker.
+        location.replace('./' + lang + '/');
+      })();
+    </script>
+  </head>
+  <body>
+    <div class="layout">
+      <p>
+        Loading manual…
+        <a href="./en/">English</a> ·
+        <a href="./ja/">日本語</a> ·
+        <a href="./zh/">中文</a> ·
+        <a href="./ko/">한국어</a>
+      </p>
+    </div>
+  </body>
+</html>

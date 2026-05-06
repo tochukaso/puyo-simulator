@@ -31,7 +31,9 @@
     "tauri:build": "tauri build",
     "tauri:build:android": "tauri android build",
     "licenses:collect": "bash scripts/collect-licenses.sh",
-    "licenses:check": "license-checker --production --failOn 'GPL;AGPL;LGPL'"
+    "licenses:check": "license-checker --production --failOn 'GPL;AGPL;LGPL'",
+    "manual:capture": "tsx scripts/capture-manual-screenshots.ts",
+    "manual:export": "node scripts/export-manual.mjs"
   },
   "dependencies": {
     "@tensorflow/tfjs": "^4.22.0",

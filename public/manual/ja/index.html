@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GTR トレーニング — マニュアル</title>
+    <meta name="description" content="GTR トレーニング(ぷよシミュレータ)の操作マニュアル。ゲームモード、テンプレ、編集、共有、解析の使い方をまとめています。" />
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <h1>GTR トレーニング — マニュアル</h1>
+        <nav>
+          <div class="lang-picker">
+            <a href="../ja/" class="active">日本語</a>
+            <a href="../en/">English</a>
+            <a href="../zh/">中文</a>
+            <a href="../ko/">한국어</a>
+          </div>
+          <a class="btn primary" href="../../">← アプリに戻る</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="layout">
+      <h1>GTR トレーニング マニュアル</h1>
+      <p class="lead">
+        AI(ama) と一緒に GTR / 階段などの定形連鎖を練習できる、ぷよシミュレータの使い方ガイドです。
+      </p>
+
+      <nav class="toc">
+        <strong>目次</strong>
+        <ol>
+          <li><a href="#overview">アプリの目的</a></li>
+          <li><a href="#screen">画面の見方</a></li>
+          <li><a href="#controls">操作方法</a></li>
+          <li><a href="#modes">ゲームモード</a></li>
+          <li><a href="#trainer">テンプレ機能</a></li>
+          <li><a href="#edit">編集モード</a></li>
+          <li><a href="#menu">メニューと表示設定</a></li>
+          <li><a href="#sharing">共有・保存・解析</a></li>
+          <li><a href="#native">PWA / ネイティブ版</a></li>
+          <li><a href="#glossary">用語</a></li>
+        </ol>
+      </nav>
+
+      <h2 id="overview">アプリの目的</h2>
+      <p>
+        GTR トレーニング(リポジトリ名: <code>puyo-simulator</code>)は、
+        ぷよ系落ちものパズルの代表的な定形連鎖である <strong>GTR</strong> や <strong>階段</strong> を、
+        AI のヒントとともに反復練習するためのウェブアプリです。
+      </p>
+      <ul>
+        <li>AI には <a href="https://github.com/citrus610/ama">ama</a>(MIT ライセンス)を WebAssembly / ネイティブで組み込み、毎手の最善手と上位 5 候補を出します。</li>
+        <li>ブラウザだけで動く PWA。インストールするとオフライン起動できます。</li>
+        <li>テンプレ機能は GTR / 階段の完成度を AI に重み付けさせて、組み筋に沿った提案を返します。</li>
+        <li>対戦(対 ama)、スコアアタック、フリーモードの 3 種類の遊び方があります。</li>
+      </ul>
+
+      <h2 id="screen">画面の見方</h2>
+      <figure>
+        <img src="../assets/screenshots/free-ja.png" alt="フリーモードの基本画面" />
+        <figcaption>フリーモード(初期状態)。盤面・NEXT・コントロール・AI 候補が同時に並びます。</figcaption>
+      </figure>
+      <p>主要なエリアは次の通りです。</p>
+      <table>
+        <thead><tr><th style="width: 28%">エリア</th><th>役割</th></tr></thead>
+        <tbody>
+          <tr><td>ヘッダー</td><td>アプリ名 / バージョン(短い SHA)/ モード切替 / 編集ボタン / ハンバーガーメニュー</td></tr>
+          <tr><td>スコア表示</td><td><strong>Score</strong>(連鎖の得点)・<strong>Chain</strong>(現在の連鎖数)・<strong>Max</strong>(最大連鎖)・<strong>Total</strong>(累積)</td></tr>
+          <tr><td>盤面(Board)</td><td>6 列 ×12 段。上 1 段は天井(ぷよが入ると窒息ライン)。赤枠は<strong>軸ぷよ</strong>のドロップ予定列。</td></tr>
+          <tr><td>NEXT</td><td>盤面右に積まれている 2 組のペア。次に来るぷよを先読みする情報源です。</td></tr>
+          <tr><td>AI 候補(AI candidates)</td><td>ama が上位 5 手を %(評価値)で表示。<kbd>Go</kbd> ボタンでその手を実行できます。</td></tr>
+          <tr><td>コントロール</td><td>← / Down / → / CW(回転)/ Drop / AI Best / Undo / Reset。タッチ操作と物理キーの両方で動きます。</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="controls">操作方法</h2>
+      <h3>キーボード</h3>
+      <table>
+        <thead><tr><th>キー</th><th>動作</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>左右に 1 列移動</td></tr>
+          <tr><td><kbd>↓</kbd></td><td>ソフトドロップ(1 段下)</td></tr>
+          <tr><td><kbd>X</kbd></td><td>右回転(CW)</td></tr>
+          <tr><td><kbd>Z</kbd></td><td>左回転(CCW)</td></tr>
+          <tr><td><kbd>↑</kbd> / <kbd>Space</kbd></td><td>確定(現在の列・回転で着地させる)</td></tr>
+          <tr><td><kbd>U</kbd> または <kbd>Ctrl/⌘ + Z</kbd></td><td>1 手戻る</td></tr>
+        </tbody>
+      </table>
+
+      <h3>タッチ操作(スマホ)</h3>
+      <ul>
+        <li>盤面を左右にスワイプ:左右移動</li>
+        <li>盤面を下スワイプ:ソフトドロップ</li>
+        <li>盤面をタップ:回転(タップした側に応じて CW / CCW)</li>
+        <li>画面下のボタン群でも同じ操作が可能</li>
+      </ul>
+
+      <h3>画面下のボタン</h3>
+      <ul>
+        <li><strong>Drop(↓)</strong> — 現在の軸列・回転で確定して落とす。</li>
+        <li><strong>★ AI Best</strong> — ama の最善手を即実行。連続押しで AI 自走。</li>
+        <li><strong>Undo(↶)</strong> — 1 手戻る。マッチ中も使えます(ama 側は取り消されません)。</li>
+        <li><strong>Reset</strong> — 盤面と種(seed)をリセット。確認ダイアログが出ます。</li>
+      </ul>
+
+      <h2 id="modes">ゲームモード</h2>
+      <p>ヘッダー左の<strong>モードセレクタ</strong>で 3 種を切り替えます。</p>
+
+      <h3>1. フリー(Free)</h3>
+      <p>
+        手数制限なし、AI 候補表示あり。学習・探索向けの基本モードです。
+        AI 候補を見ながら自分の手を選び、たまに <strong>AI Best</strong> で最善を確認、
+        合わなければ Undo して別の手を試す、といった反復練習に向いています。
+      </p>
+
+      <h3>2. 対 ama スコア勝負(Score vs ama)</h3>
+      <figure>
+        <img src="../assets/screenshots/match-en.png" alt="マッチモード" />
+        <figcaption>対 ama スコア勝負。指定手数を消化してスコアの高い方が勝ち。</figcaption>
+      </figure>
+      <p>
+        固定手数(30 / 50 / 100)を消化し、累計スコアの高い側が勝ちです。<strong>同じ seed</strong> で同じ盤面・同じ NEXT を進行するので、純粋に手の選択力で勝負できます。AI 候補は表示されません。
+      </p>
+      <ul>
+        <li>右の Resign(投了)ボタンで途中終了できます。</li>
+        <li>マッチ終了後にメニューから「保存した対戦」に保存できます(後でリプレイ可能)。</li>
+      </ul>
+
+      <h3>3. スコアアタック(Score attack)</h3>
+      <figure>
+        <img src="../assets/screenshots/score-en.png" alt="スコアアタックモード" />
+        <figcaption>スコアアタック。手数 30 / 50 / 100 / 200 / 無制限から選べます。</figcaption>
+      </figure>
+      <p>
+        AI と勝負しない一発勝負モード。スコアサーバに送信して短縮 URL でリプレイ共有可能。手数は 200・無制限まで選択できます。
+      </p>
+
+      <h2 id="trainer">テンプレ機能(Trainer)</h2>
+      <figure>
+        <img src="../assets/screenshots/menu-ja.png" alt="ハンバーガーメニュー" />
+        <figcaption>メニュー内の「テンプレ」セレクタ。なし / GTR / 階段 から選べます。</figcaption>
+      </figure>
+      <p>
+        ハンバーガーメニュー →「テンプレ」で AI の重み付け(preset)を切替えます。
+      </p>
+      <ul>
+        <li><strong>なし</strong> — 標準のビーム探索(<code>build</code> プリセット)。</li>
+        <li><strong>GTR</strong> — GTR の鍵・折り返しを高得点化した重み。提案手が GTR の組み筋に沿いやすくなります。</li>
+        <li><strong>階段</strong> — 階段積みの土台を優先する重み。</li>
+      </ul>
+      <p>
+        テンプレを変えると、フリーモードの AI 候補表示と、対 ama 戦の ama 自身の打ち方が連動して変わります。
+      </p>
+
+      <h2 id="edit">編集モード</h2>
+      <figure>
+        <img src="../assets/screenshots/edit-en.png" alt="編集モード" />
+        <figcaption>編集モード。盤面・現在ぷよ・NEXT を任意に書き換えできます。</figcaption>
+      </figure>
+      <p>
+        ヘッダーの「編集」を押すと編集モードに入ります(マッチ中の場合は確認ダイアログで中断確認)。
+      </p>
+      <ul>
+        <li>パレット下段の <strong>R / P / B / Y</strong> から色を選び、盤面のセルをタップして配置します。</li>
+        <li><strong>○</strong>(消去)で空セルに戻す、<strong>×</strong>(おじゃま)でおじゃまぷよを置けます。</li>
+        <li>右側の Current / NEXT / NEXT2 をタップして、現在ペア・先読み 2 組を編集できます。</li>
+        <li><strong>Apply</strong> で編集確定、<strong>Cancel</strong> で破棄、<strong>Clear</strong> で盤面をすべて空に。</li>
+      </ul>
+      <div class="callout">
+        編集モードで作った盤面は、メニューの <strong>共有</strong> から URL にエンコードして他の人に渡せます。連鎖タネの問題を出題するのに便利です。
+      </div>
+
+      <h2 id="menu">メニューと表示設定</h2>
+      <figure>
+        <img src="../assets/screenshots/menu-en.png" alt="ハンバーガーメニュー(英語表示)" />
+        <figcaption>右上 ☰ ボタンを押すとメニューが開きます。</figcaption>
+      </figure>
+      <ul>
+        <li><strong>ゴースト(Ghost)</strong> — 現在ぷよの落下予定位置をうっすら表示。練習向け。</li>
+        <li><strong>天井(Ceiling)</strong> — 12 段目より上(窒息ライン)の枠表示の ON/OFF。</li>
+        <li><strong>テンプレ</strong> — 上述の AI 重み(GTR / 階段)。</li>
+        <li><strong>言語</strong> — UI 表示を 日本語 / English / 中文 / 한국어 に切替(本マニュアルとも連動)。</li>
+        <li><strong>共有</strong> — 現在の盤面を URL にエンコード。</li>
+        <li><strong>保存した対戦</strong> — マッチ後に保存したリプレイ一覧。</li>
+        <li><strong>マニュアル</strong> — 別タブでこのマニュアルを開きます。</li>
+        <li><strong>解析</strong> — フリー / 終了済みマッチの自分の手を ama に再評価させ、AI 一致率と AI 評価値(%)を出します。</li>
+      </ul>
+
+      <h2 id="sharing">共有・保存・解析</h2>
+
+      <h3>盤面共有(Share)</h3>
+      <figure>
+        <img src="../assets/screenshots/share-en.png" alt="共有ダイアログ" />
+        <figcaption>盤面 + 現在ペア + NEXT 2 組を URL にエンコードします。</figcaption>
+      </figure>
+      <p>
+        メニューの「共有」で表示される URL を開くと、相手側で同じ盤面が再現されます。スコア・履歴は引き継がれません。
+      </p>
+
+      <h3>リプレイ共有</h3>
+      <p>
+        スコアアタック / マッチ終了画面の「リプレイを共有」では、<strong>seed と着手列</strong> をエンコードした URL を作れます。サーバ送信して短縮 URL に変換することも可能です(<code>?score=&lt;id&gt;</code> でロード)。
+      </p>
+
+      <h3>保存した対戦(Records)</h3>
+      <figure>
+        <img src="../assets/screenshots/records-en.png" alt="保存した対戦ダイアログ" />
+        <figcaption>マッチ終了後に「保存」しておくと、後からこの一覧でリプレイ再生できます。</figcaption>
+      </figure>
+      <p>
+        対戦の seed と着手列だけ保持しているので、ストレージはごく軽量。再生中はターンごとにステップして連鎖アニメーションを見返せます。
+      </p>
+
+      <h3>解析(Analyze)</h3>
+      <p>
+        フリーで打ち終わった、またはマッチが終了した状態でメニューの「解析」を押すと、各手を ama に再評価させ次の指標を出します。
+      </p>
+      <ul>
+        <li><strong>AI 一致率</strong> — 自分の手が ama の最善手と一致した割合(AI Best ボタンで打った手は除外)。</li>
+        <li><strong>AI 評価値(%)</strong> — 自分の手が ama の最善手スコアの何 % だったかの平均(ama 上位 5 候補に入った手のみ)。</li>
+      </ul>
+
+      <h2 id="native">PWA / ネイティブ版</h2>
+      <p>
+        本アプリは PWA に対応しており、Chrome / Safari の「ホーム画面に追加」でアプリ風に常駐させられます。オフライン起動も可。
+      </p>
+      <p>
+        macOS / Android では <strong>Tauri ネイティブ版</strong> も提供されており、ama を C++ ネイティブライブラリ(Rust FFI)で呼び出すため、AI 思考が p99 で 200ms 以内になります(Intel Mac 実測)。
+      </p>
+
+      <h2 id="glossary">用語</h2>
+      <table>
+        <tbody>
+          <tr><td><strong>軸ぷよ</strong></td><td>ペアの中心となるぷよ。回転の中心。盤面では赤枠で示されます。</td></tr>
+          <tr><td><strong>連鎖</strong></td><td>同色 4 つ以上を消したことで上のぷよが落ち、それが再び消える反応。</td></tr>
+          <tr><td><strong>GTR</strong></td><td>ぷよぷよ通系の代表的な定形。L 字の鍵 + 折り返し。</td></tr>
+          <tr><td><strong>階段</strong></td><td>左から右に階段状に色を並べて連鎖を組む定形。</td></tr>
+          <tr><td><strong>窒息</strong></td><td>盤面 13 段目以上にぷよが置かれゲームオーバーになること。</td></tr>
+          <tr><td><strong>seed</strong></td><td>NEXT 列を生成する乱数のシード。共有時はこれを伝えると同じ並びを再現できます。</td></tr>
+          <tr><td><strong>ama</strong></td><td>本アプリ同梱の AI(citrus610 製、MIT)。ビームサーチ + ヒューリスティクス。</td></tr>
+        </tbody>
+      </table>
+
+      <footer>
+        <p>
+          ぷよ / Puyo はセガ・コンパイルの登録商標です。本アプリは練習用シミュレータであり、商用配布前にはリブランドが必要です。詳細は
+          <a href="../../">アプリ</a>のリポジトリ <code>README.md</code> を参照してください。
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>

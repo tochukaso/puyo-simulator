@@ -170,6 +170,16 @@ export function HamburgerMenu() {
               {t('records.button')}
             </button>
 
+            <a
+              href={`/manual/${lang}/`}
+              target="_blank"
+              rel="noopener"
+              onClick={() => setOpen(false)}
+              className="px-3 py-1.5 rounded text-sm border bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 text-center"
+            >
+              {t('menu.manual')}
+            </a>
+
             <button
               type="button"
               disabled={!canAnalyze}

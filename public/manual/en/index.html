@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GTR Training — Manual</title>
+    <meta name="description" content="User manual for the GTR Training puyo simulator: game modes, templates, edit mode, sharing, and analysis." />
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <h1>GTR Training — Manual</h1>
+        <nav>
+          <div class="lang-picker">
+            <a href="../ja/">日本語</a>
+            <a href="../en/" class="active">English</a>
+            <a href="../zh/">中文</a>
+            <a href="../ko/">한국어</a>
+          </div>
+          <a class="btn primary" href="../../">← Back to app</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="layout">
+      <h1>GTR Training Manual</h1>
+      <p class="lead">
+        A user guide for the puyo-style training simulator that pairs you with an AI advisor (ama) to drill GTR, staircase, and other classic chain templates.
+      </p>
+
+      <nav class="toc">
+        <strong>Contents</strong>
+        <ol>
+          <li><a href="#overview">What this app is for</a></li>
+          <li><a href="#screen">Reading the screen</a></li>
+          <li><a href="#controls">Controls</a></li>
+          <li><a href="#modes">Game modes</a></li>
+          <li><a href="#trainer">Templates (Trainer)</a></li>
+          <li><a href="#edit">Edit mode</a></li>
+          <li><a href="#menu">Menu &amp; display preferences</a></li>
+          <li><a href="#sharing">Sharing, saving, analysis</a></li>
+          <li><a href="#native">PWA / native app</a></li>
+          <li><a href="#glossary">Glossary</a></li>
+        </ol>
+      </nav>
+
+      <h2 id="overview">What this app is for</h2>
+      <p>
+        GTR Training (repo name <code>puyo-simulator</code>) is a web app that lets you practice classic puyo-style chain templates such as <strong>GTR</strong> and <strong>Staircase</strong>, with a built-in AI advisor providing the best move and the top 5 candidates each turn.
+      </p>
+      <ul>
+        <li>The AI is <a href="https://github.com/citrus610/ama">ama</a> (MIT, by citrus610), bundled as WebAssembly (and as a native static library inside the Tauri build).</li>
+        <li>Pure web: a PWA you can install for offline launch.</li>
+        <li>Templates re-weight the AI to bias suggestions toward GTR or staircase shapes.</li>
+        <li>Three play modes: free practice, score-vs-ama duel, and score attack.</li>
+      </ul>
+
+      <h2 id="screen">Reading the screen</h2>
+      <figure>
+        <img src="../assets/screenshots/free-en.png" alt="Free mode default screen" />
+        <figcaption>Free mode at startup. Board, NEXT queue, controls, and AI candidates are all on screen.</figcaption>
+      </figure>
+      <table>
+        <thead><tr><th style="width: 28%">Area</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td>Header</td><td>App name &amp; build SHA · mode selector · Edit toggle · hamburger menu</td></tr>
+          <tr><td>Score row</td><td><strong>Score</strong> (current chain points), <strong>Chain</strong>, <strong>Max</strong>, <strong>Total</strong></td></tr>
+          <tr><td>Board</td><td>6 × 12 with one ceiling row above (game-over zone). The red outline is the axis puyo's drop column.</td></tr>
+          <tr><td>NEXT queue</td><td>Two upcoming pairs to the right of the board.</td></tr>
+          <tr><td>AI candidates</td><td>The top 5 ama suggestions with eval %, each with a <kbd>Go</kbd> button.</td></tr>
+          <tr><td>Controls</td><td>← / Down / → · CW · Drop · AI Best · Undo · Reset. Touch and keyboard both work.</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="controls">Controls</h2>
+      <h3>Keyboard</h3>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>Move one column</td></tr>
+          <tr><td><kbd>↓</kbd></td><td>Soft drop one row</td></tr>
+          <tr><td><kbd>X</kbd></td><td>Rotate clockwise</td></tr>
+          <tr><td><kbd>Z</kbd></td><td>Rotate counter-clockwise</td></tr>
+          <tr><td><kbd>↑</kbd> / <kbd>Space</kbd></td><td>Commit (drop at the current column &amp; rotation)</td></tr>
+          <tr><td><kbd>U</kbd> or <kbd>Ctrl/⌘ + Z</kbd></td><td>Undo one move</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Touch (mobile)</h3>
+      <ul>
+        <li>Swipe left/right on the board → move</li>
+        <li>Swipe down → soft drop</li>
+        <li>Tap the board → rotate (CW / CCW depending on tap side)</li>
+        <li>The on-screen buttons mirror every action above</li>
+      </ul>
+
+      <h3>On-screen buttons</h3>
+      <ul>
+        <li><strong>Drop (↓)</strong> — commit at the current column.</li>
+        <li><strong>★ AI Best</strong> — instantly play ama's best move. Repeated taps make ama auto-play.</li>
+        <li><strong>Undo (↶)</strong> — step back one move (your side only during a match).</li>
+        <li><strong>Reset</strong> — reset the board and reseed. A confirm dialog will appear.</li>
+      </ul>
+
+      <h2 id="modes">Game modes</h2>
+      <p>The mode selector at the top-left switches between three modes.</p>
+
+      <h3>1. Free</h3>
+      <p>
+        Untimed practice with AI candidates visible. The default mode for learning. Look at the candidates, pick a move, occasionally peek at <strong>AI Best</strong>, and Undo when something doesn't fit.
+      </p>
+
+      <h3>2. Score vs ama</h3>
+      <figure>
+        <img src="../assets/screenshots/match-en.png" alt="Score vs ama mode" />
+        <figcaption>Score vs ama. A fixed-turn duel — highest cumulative score wins.</figcaption>
+      </figure>
+      <p>
+        Both sides play the <strong>same seed</strong> (identical NEXT queue) for a fixed number of turns (30 / 50 / 100). The higher cumulative score wins. AI candidates are hidden — you're competing on move selection alone.
+      </p>
+      <ul>
+        <li>The Resign button (top-right of the score row) ends the match in your loss.</li>
+        <li>After the match ends, save it from the menu — it lands in <em>Saved matches</em> for replay.</li>
+      </ul>
+
+      <h3>3. Score attack</h3>
+      <figure>
+        <img src="../assets/screenshots/score-en.png" alt="Score attack mode" />
+        <figcaption>Score attack. Choose 30 / 50 / 100 / 200 / unlimited turns.</figcaption>
+      </figure>
+      <p>
+        Solo run, no opponent. You can submit the run to the score server and get a short URL that replays it (loaded by <code>?score=&lt;id&gt;</code>).
+      </p>
+
+      <h2 id="trainer">Templates (Trainer)</h2>
+      <figure>
+        <img src="../assets/screenshots/menu-en.png" alt="Hamburger menu open" />
+        <figcaption>Open the hamburger menu — the <em>Template</em> selector switches the AI weighting.</figcaption>
+      </figure>
+      <ul>
+        <li><strong>None</strong> — the default beam search (<code>build</code> preset).</li>
+        <li><strong>GTR</strong> — heavier weights on the GTR key/turn shape, biasing suggestions toward GTR builds.</li>
+        <li><strong>Staircase</strong> — prioritises the staircase chain layout.</li>
+      </ul>
+      <p>
+        Switching templates affects both the candidate list shown in Free mode and ama's own play in score-vs-ama matches.
+      </p>
+
+      <h2 id="edit">Edit mode</h2>
+      <figure>
+        <img src="../assets/screenshots/edit-en.png" alt="Edit mode" />
+        <figcaption>Edit mode lets you set up arbitrary boards and the upcoming pairs.</figcaption>
+      </figure>
+      <p>
+        Tap <strong>Edit</strong> in the header to enter edit mode. (If you're mid-match, you'll be asked to confirm exiting it first.)
+      </p>
+      <ul>
+        <li>Pick a colour from <strong>R / P / B / Y</strong> at the bottom, then tap a cell to place it.</li>
+        <li><strong>○</strong> erases (returns to empty); <strong>✕</strong> places a garbage puyo.</li>
+        <li>Tap the right-hand <em>Current / NEXT / NEXT 2</em> cards to edit the current pair and the two upcoming ones.</li>
+        <li><strong>Apply</strong> commits, <strong>Cancel</strong> discards, <strong>Clear</strong> empties the board.</li>
+      </ul>
+      <div class="callout">
+        Boards built in edit mode can be encoded into a URL via the <strong>Share</strong> menu — handy for posting chain puzzles.
+      </div>
+
+      <h2 id="menu">Menu &amp; display preferences</h2>
+      <ul>
+        <li><strong>Ghost</strong> — show a faint preview of where the current pair will land.</li>
+        <li><strong>Ceiling</strong> — toggle the visual ceiling row (the game-over line).</li>
+        <li><strong>Template</strong> — AI weighting (see above).</li>
+        <li><strong>Language</strong> — switch the UI between Japanese / English / Chinese / Korean. This manual follows the same setting.</li>
+        <li><strong>Share</strong> — encode the current board into a URL.</li>
+        <li><strong>Saved matches</strong> — list of replays you previously saved.</li>
+        <li><strong>Manual</strong> — opens this manual in a new tab.</li>
+        <li><strong>Analyze</strong> — re-evaluate every move you played in Free or in a finished match. Returns AI match% and AI eval%.</li>
+      </ul>
+
+      <h2 id="sharing">Sharing, saving, analysis</h2>
+
+      <h3>Board share</h3>
+      <figure>
+        <img src="../assets/screenshots/share-en.png" alt="Share dialog" />
+        <figcaption>The current board, current pair, and 2 NEXT pairs encoded into a URL.</figcaption>
+      </figure>
+      <p>
+        Open the URL on another device to recreate the same board. Score and history aren't carried over.
+      </p>
+
+      <h3>Replay share</h3>
+      <p>
+        At the end of a score attack or match, <em>Share replay</em> encodes the seed plus your move list into a URL. You can also upload it to the score server to obtain a short ID URL (loaded back via <code>?score=&lt;id&gt;</code>).
+      </p>
+
+      <h3>Saved matches</h3>
+      <figure>
+        <img src="../assets/screenshots/records-en.png" alt="Saved matches dialog" />
+        <figcaption>Save a match after it ends, then replay it later from this list.</figcaption>
+      </figure>
+      <p>
+        Saved matches store only seed + move list, so storage is very lightweight. During replay you can step turn-by-turn and rewatch chain animations.
+      </p>
+
+      <h3>Analyze</h3>
+      <ul>
+        <li><strong>AI match</strong> — % of moves that matched ama's best (moves played via the AI Best button are excluded).</li>
+        <li><strong>AI eval</strong> — average of your move's score vs ama's best, only counting moves that fell inside ama's top 5.</li>
+      </ul>
+
+      <h2 id="native">PWA / native app</h2>
+      <p>
+        The app is a PWA — Chrome &amp; Safari let you "Add to Home Screen" for an installed-app feel and offline launches.
+      </p>
+      <p>
+        On macOS and Android there's also a <strong>Tauri native build</strong> that links ama as a C++ static library (via Rust FFI). This brings AI suggestions to under 200 ms p99 on Intel Mac.
+      </p>
+
+      <h2 id="glossary">Glossary</h2>
+      <table>
+        <tbody>
+          <tr><td><strong>Axis puyo</strong></td><td>The pair member rotation pivots around. Marked with the red outline on the board.</td></tr>
+          <tr><td><strong>Chain</strong></td><td>A pop that drops puyos which then pop again — the engine repeats until nothing pops.</td></tr>
+          <tr><td><strong>GTR</strong></td><td>A canonical chain template (L-shaped key + folding-back column).</td></tr>
+          <tr><td><strong>Staircase</strong></td><td>A chain template where colours form a staircase from one side to the other.</td></tr>
+          <tr><td><strong>Death / suffocation</strong></td><td>Game-over from puyos reaching row 13.</td></tr>
+          <tr><td><strong>Seed</strong></td><td>RNG seed driving the NEXT queue. Sharing it reproduces the same sequence.</td></tr>
+          <tr><td><strong>ama</strong></td><td>The bundled AI by citrus610 (MIT). Beam search plus heuristics.</td></tr>
+        </tbody>
+      </table>
+
+      <footer>
+        <p>
+          "Puyo / ぷよ" is a registered trademark of Sega/Compile. This app is a practice simulator; rebrand before any commercial distribution. See the repository <code>README.md</code> for details.
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>

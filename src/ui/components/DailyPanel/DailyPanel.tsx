@@ -49,6 +49,15 @@ export function DailyPanel() {
   const [nickname, setNickname] = useState<string>(() => readSavedNickname());
   const [submitState, setSubmitState] = useState<SubmitState>({ kind: 'idle' });
   const [viewDate, setViewDate] = useState<ViewDate>('today');
+
+  // 同じ日に何度でも挑戦できる仕様 (PR #53 review)。 startDaily / rematch で
+  // 新しい run が始まると matchEnded が false に戻るので、 そのタイミングで
+  // submitState を idle にリセット。 これをやらないと前回の "submitted" が
+  // 残ったままで送信 UI が出ず、 2 回目以降のスコアをサーバに上げられない。
+  // (matchSeed は同日内なら同値なので依存に入れても発火しない。)
+  useEffect(() => {
+    if (!matchEnded) setSubmitState({ kind: 'idle' });
+  }, [matchEnded, currentDailyDate]);
   const [leaderboard, setLeaderboard] = useState<DailyLeaderboardEntry[] | null>(
     null,
   );

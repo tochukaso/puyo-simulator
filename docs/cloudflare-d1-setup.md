@@ -61,7 +61,7 @@ npm run dev
 
 `score_records` に以下を追加:
 
-- `daily_date TEXT` — `YYYY-MM-DD` (JST)。 `mode='daily'` の行でのみ詰まる。
+- `daily_date TEXT` — `YYYY-MM-DD` (JST)。 `mode='daily'` の行でのみ設定される (それ以外は NULL)。
 - `player_name TEXT` — リーダーボード表示名。空欄可 (匿名)。
 - `idx_score_records_daily` — `(daily_date, player_score DESC)` 複合インデックス。
 
@@ -82,7 +82,7 @@ npm run dev
 
 | メソッド | パス | 用途 |
 | --- | --- | --- |
-| POST | `/api/scores` | スコアレコードを保存。 ID を発番して返す。 `mode='daily'` の場合は `dailyDate` 必須 + `seed === dailySeedFor(dailyDate)` を検証。 |
+| POST | `/api/scores` | スコアレコードを保存。 ID を発番して返す。 `mode='daily'` の場合は `dailyDate` 必須 + `seed === dailySeedFor(dailyDate)` + `turnLimit === 50` + `dailyDate === todayDateJst()` (今日の JST 日付) を検証。 |
 | GET | `/api/scores/:id` | 保存済みレコードを取得。 |
 | GET | `/api/daily/leaderboard?date=YYYY-MM-DD&limit=N` | 指定日のデイリーチャレンジ上位 N (デフォルト 20、最大 100)。 各エントリは `id` のみ持ち、リプレイは `/api/scores/:id` で改めて取得する。 |
 

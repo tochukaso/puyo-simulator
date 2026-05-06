@@ -5,7 +5,7 @@
 // 依存: wrangler.jsonc に `main` と `d1_databases[ {binding="DB"} ]` バインドが必要。
 
 import { simulateAndValidate } from './validateMoves';
-import { dailySeedFor, isValidDailyDate } from '../src/game/dailySeed';
+import { dailySeedFor, isValidDailyDate, todayDateJst } from '../src/game/dailySeed';
 
 interface Env {
   ASSETS: Fetcher;
@@ -167,12 +167,23 @@ async function saveScore(request: Request, env: Env): Promise<Response> {
 
   // デイリーモード固有の追加検証。
   // (1) dailyDate は必須 (どの日のチャレンジか書かれていないと leaderboard に
-  //     並べられない)。 (2) seed が dailySeedFor(dailyDate) と一致するか。
-  // 一致しなければ「自分で seed を選んで楽な譜面を回した」可能性があるので弾く。
-  // (3) turnLimit は仕様で 50 固定。 50 以外は不正。
+  //     並べられない)。 (2) dailyDate がサーバ側から見た「今日 (JST)」と一致
+  // するか。 過去や未来の日付で送ってこられると leaderboard が汚れるので拒否
+  // する (PR #53 CodeRabbit 指摘)。 (3) seed が dailySeedFor(dailyDate) と
+  // 一致するか。 一致しなければ「自分で seed を選んで楽な譜面を回した」可能性
+  // があるので弾く。 (4) turnLimit は仕様で 50 固定。 50 以外は不正。
   if (validated.mode === 'daily') {
     if (!validated.dailyDate) {
       return badRequest('daily mode requires dailyDate');
+    }
+    const today = todayDateJst();
+    if (validated.dailyDate !== today) {
+      // クライアントの時計ズレで境界跨ぎした際の救済として、 当日 ± 1 日まで
+      // は許容する余地もあるが、 まずは厳密一致でリーダーボード整合性を優先。
+      // 必要であれば後日 grace を入れる。
+      return badRequest(
+        `dailyDate must match today's JST date (server today=${today}, got=${validated.dailyDate})`,
+      );
     }
     const expected = dailySeedFor(validated.dailyDate);
     if (validated.seed !== expected) {

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterAll, beforeAll, describe, it, expect, vi } from 'vitest';
 import worker from '../index';
 import { createInitialState, spawnNext } from '../../src/game/state';
 import { lockActive } from '../../src/game/landing';
@@ -297,6 +297,18 @@ describe('worker /api/scores', () => {
 });
 
 describe('worker daily mode', () => {
+  // 「今日 (JST)」を 2026-05-06 に固定する。 worker/index.ts の daily 検証は
+  // dailyDate === todayDateJst() を要求するので、 テスト中の Date.now が動くと
+  // 試験結果が不安定になる。
+  beforeAll(() => {
+    // 2026-05-06 12:00 UTC = 2026-05-06 21:00 JST (= todayDateJst が "2026-05-06").
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(Date.UTC(2026, 4, 6, 12, 0, 0)));
+  });
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
   it('rejects daily POST without dailyDate', async () => {
     const inserted: FakeRow[] = [];
     const env = { DB: makeFakeDb({ insertedRows: inserted }), ASSETS: fakeAssets };
@@ -322,6 +334,38 @@ describe('worker daily mode', () => {
     expect(inserted.length).toBe(0);
     const body = (await res.json()) as { reason: string };
     expect(body.reason).toMatch(/dailyDate/);
+  });
+
+  it('rejects daily POST when dailyDate is not today (JST)', async () => {
+    const inserted: FakeRow[] = [];
+    const env = { DB: makeFakeDb({ insertedRows: inserted }), ASSETS: fakeAssets };
+    // 1 日前の日付で、 (一致するはずの) 正しい seed を載せても拒否されるか。
+    const { dailySeedFor } = await import('../../src/game/dailySeed');
+    const yesterday = '2026-05-05';
+    const seed = dailySeedFor(yesterday);
+    const payload = {
+      mode: 'daily',
+      turnLimit: 50,
+      seed,
+      playerScore: 0,
+      aiScore: 0,
+      winner: 'player',
+      playerMoves: [],
+      aiMoves: [],
+      dailyDate: yesterday,
+    };
+    const res = await worker.fetch(
+      new Request('http://localhost/api/scores', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+    expect(inserted.length).toBe(0);
+    const body = (await res.json()) as { reason: string };
+    expect(body.reason).toMatch(/dailyDate must match today/);
   });
 
   it('rejects daily POST when seed does not match the date', async () => {

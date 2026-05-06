@@ -93,6 +93,13 @@ export default function App() {
     if (st.mode === 'match' && !st.aiGame) {
       st.startMatch({ turnLimit: st.matchTurnLimit });
     }
+    // 同様に daily モードで reload された場合、 persisted mode='daily' は
+    // 残るが matchSeed / currentDailyDate が初期化されないので、 「Daily ラベルだが
+    // 実体は今日のシードに紐付いていない」状態になる。 これを避けるため、 起動時に
+    // 今日 (JST) の seed で startDaily し直す (PR #53 review 対応)。
+    if (st.mode === 'daily' && (!st.matchSeed || !st.currentDailyDate)) {
+      st.startDaily();
+    }
   }, []);
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col">

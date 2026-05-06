@@ -3,7 +3,7 @@ import type { RefObject } from 'react';
 import { useGameStore } from '../store';
 import { getControlMode, getControlTuning } from './useControlPrefs';
 import { getBoardRect } from './useBoardRect';
-import { setPreviewMove } from './useAiPreview';
+import { setPreviewMove, getPreviewMove } from './useAiPreview';
 import { COLS } from '../../game/constants';
 
 const TAP_MAX_MS = 200;
@@ -120,19 +120,19 @@ export function useGestures(targetRef: RefObject<HTMLElement | null>) {
 
       const mode = getControlMode();
 
-      // tap-to-drop: 押下中に縦スライドで回転発火。
+      // tap-to-drop: 押下中の縦スライドで回転発火。
       //   - 上 (dy < 0) → CW、下 (dy > 0) → CCW
-      //   - 縦の動きが横より十分大きい時だけ発火 (誤動作抑制)
       //   - dy が ROT_PX を複数倍跨ぐ場合は跨いだ回数ぶんループ発火
-      // 横方向は引き続き列追従に使う。drag は softDrop に下方向を使うので適用外。
+      //   - 横方向の動きとは独立して判定する。以前の「dy > dx*1.5」支配軸
+      //     チェックは斜めや「列移動 + 回転」の混在ジェスチャーで発火を
+      //     塞いでしまい、ユーザーから「回転ジェスチャーが効かない」と
+      //     報告された。横移動 (列追従) は ROT_PX 未満の dy では発火しない
+      //     ので誤動作リスクは限定的。
+      // drag は softDrop に下方向を使うので適用外。
       const ROT_PX = 24;
       if (mode === 'tap-to-drop' && pressStart.current) {
         const dy = e.clientY - pressStart.current.y;
-        const dx = e.clientX - pressStart.current.x;
-        if (
-          Math.abs(dy) > ROT_PX &&
-          Math.abs(dy) > Math.abs(dx) * 1.5
-        ) {
+        if (Math.abs(dy) >= ROT_PX) {
           const steps = Math.floor(Math.abs(dy) / ROT_PX);
           const dir = dy < 0 ? 'rotateCW' : 'rotateCCW';
           pressStart.current = {
@@ -268,11 +268,32 @@ export function useGestures(targetRef: RefObject<HTMLElement | null>) {
     el.addEventListener('pointermove', onMove);
     el.addEventListener('pointerup', onUp);
     el.addEventListener('pointercancel', onCancel);
+
+    // ドラッグ中に CW/CCW ボタン (= 外部 dispatch) で active pair の
+    // rotation が変わった場合、ゴーストプレビューも追従して回るように
+    // store を購読する。プレビューの rotation はキャッシュ値なので、
+    // 外部 dispatch で active pair が回っても、何もしないと「ボタン押した
+    // のにゴーストが回らない」体感バグになる。
+    // 加えて新しい rotation で axisCol を再 clamp する (rotation=1/3 の
+    // 端にいた場合に内側スナップ)。
+    let lastRotation = useGameStore.getState().game.current?.rotation;
+    const unsubscribe = useGameStore.subscribe((st) => {
+      const newRotation = st.game.current?.rotation;
+      if (newRotation === lastRotation) return;
+      lastRotation = newRotation;
+      if (!draggingRef.current) return;
+      const previewing = getPreviewMove();
+      if (!previewing || newRotation === undefined) return;
+      const reClamped = clampAxisColForRotation(previewing.axisCol, newRotation);
+      setPreviewMove({ axisCol: reClamped, rotation: newRotation });
+    });
+
     return () => {
       el.removeEventListener('pointerdown', onDown);
       el.removeEventListener('pointermove', onMove);
       el.removeEventListener('pointerup', onUp);
       el.removeEventListener('pointercancel', onCancel);
+      unsubscribe();
     };
   }, [targetRef]);
 }

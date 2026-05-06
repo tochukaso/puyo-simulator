@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
 // 操作プリセットと細かいチューニングをまとめた singleton。useUiPrefs と同じ
 // listener + localStorage 流儀。複数コンポーネント (Controls / useGestures /
@@ -72,31 +72,39 @@ function writeTuning(t: ControlTuning): void {
 }
 
 let mode: ControlMode = readMode();
-const modeListeners = new Set<(v: ControlMode) => void>();
+const modeListeners = new Set<() => void>();
 let tuning: ControlTuning = readTuning();
-const tuningListeners = new Set<(v: ControlTuning) => void>();
+const tuningListeners = new Set<() => void>();
 
 export function setControlMode(v: ControlMode): void {
   if (mode === v) return;
   mode = v;
   writeMode(v);
-  for (const h of modeListeners) h(v);
+  for (const h of modeListeners) h();
 }
 
 export function getControlMode(): ControlMode {
   return mode;
 }
 
+// useSyncExternalStore で singleton を購読する。useState + listener で
+// 自前管理していた以前の実装は、コンポーネント mount → effect run の
+// 時間差中に setControlMode が呼ばれると stale 値を返すレースが残った
+// (実機で「タップトゥドロップを選択しているのに Dialog で classic が
+// チェックされる」現象として観測された)。
+// useSyncExternalStore は subscribe 直後に getSnapshot を強制呼び出して
+// 同期保証してくれる。
 export function useControlMode(): ControlMode {
-  const [v, setV] = useState(mode);
-  useEffect(() => {
-    modeListeners.add(setV);
-    if (v !== mode) setV(mode);
-    return () => {
-      modeListeners.delete(setV);
-    };
-  }, [v]);
-  return v;
+  return useSyncExternalStore(
+    (cb) => {
+      modeListeners.add(cb);
+      return () => {
+        modeListeners.delete(cb);
+      };
+    },
+    () => mode,
+    () => mode,
+  );
 }
 
 export function setControlTuning(patch: Partial<ControlTuning>): void {
@@ -111,7 +119,7 @@ export function setControlTuning(patch: Partial<ControlTuning>): void {
   }
   tuning = next;
   writeTuning(next);
-  for (const h of tuningListeners) h(next);
+  for (const h of tuningListeners) h();
 }
 
 export function getControlTuning(): ControlTuning {
@@ -119,13 +127,14 @@ export function getControlTuning(): ControlTuning {
 }
 
 export function useControlTuning(): ControlTuning {
-  const [v, setV] = useState(tuning);
-  useEffect(() => {
-    tuningListeners.add(setV);
-    if (v !== tuning) setV(tuning);
-    return () => {
-      tuningListeners.delete(setV);
-    };
-  }, [v]);
-  return v;
+  return useSyncExternalStore(
+    (cb) => {
+      tuningListeners.add(cb);
+      return () => {
+        tuningListeners.delete(cb);
+      };
+    },
+    () => tuning,
+    () => tuning,
+  );
 }

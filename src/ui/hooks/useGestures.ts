@@ -68,6 +68,11 @@ export function useGestures(targetRef: RefObject<HTMLElement | null>) {
 
       const game = useGameStore.getState().game;
       if (!game.current) return;
+      // clientXToCol clamps out-of-range coords, so without an explicit
+      // bounds check a press far outside the board would still seed a ghost
+      // preview at column 0 / COLS-1. Refuse to start preview unless the
+      // press actually landed on the board.
+      if (!isInsideBoard(e.clientX, e.clientY)) return;
       const col = clientXToCol(e.clientX);
       if (col === null) return;
 

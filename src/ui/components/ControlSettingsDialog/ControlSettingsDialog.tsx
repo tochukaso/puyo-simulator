@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useT } from '../../../i18n';
 import {
   useControlMode,
@@ -19,6 +20,15 @@ export function ControlSettingsDialog({ onClose }: Props) {
   const t = useT();
   const mode = useControlMode();
   const tuning = useControlTuning();
+
+  // Escape キーで閉じる。modal の標準動作で a11y 的にも期待される。
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
 
   const presets: Array<{ value: ControlMode; label: string; desc: string }> = [
     {

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   setControlMode,
   getControlMode,
@@ -28,10 +28,15 @@ describe('useControlPrefs singleton', () => {
     expect(localStorage.getItem('puyo.control.mode')).toBe('tap-to-drop');
   });
 
-  it('mode falls back to classic for unknown localStorage values', () => {
+  it('mode falls back to classic when localStorage holds an unknown value at module init', async () => {
+    // モジュール初期化のフォールバックを実際に exercise するには、
+    // localStorage に不明値を入れた状態で「再 import」しないといけない。
+    // 既に load 済みのモジュールは singleton なので setItem しても初期化は
+    // 走らない。`vi.resetModules()` + dynamic import で fresh load する。
     localStorage.setItem('puyo.control.mode', 'bogus');
-    setControlMode('classic');
-    expect(getControlMode()).toBe('classic');
+    vi.resetModules();
+    const reloaded = await import('../useControlPrefs');
+    expect(reloaded.getControlMode()).toBe('classic');
   });
 
   it('tuning patch merges only the provided keys', () => {

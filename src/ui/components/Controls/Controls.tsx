@@ -83,12 +83,19 @@ export function Controls() {
   return (
     <div className="flex flex-col gap-2 w-full">
       <div className="grid grid-cols-3 gap-2 w-full">
+        {/* onClick は keyboard 起動 (Enter/Space) 用フォールバック。
+            pointer 起動の click は onPointerDown が既に発火しているため、
+            e.detail === 0 (=keyboard 由来) のときだけ dispatch する。
+            こうしないと指タップで 2 度発火する。 */}
         <button
           className={`${cellBase} bg-slate-700 hover:bg-slate-600 active:bg-slate-500`}
           onPointerDown={repeatLeft.onPointerDown}
           onPointerUp={repeatLeft.onPointerUp}
           onPointerCancel={repeatLeft.onPointerCancel}
           onPointerLeave={repeatLeft.onPointerLeave}
+          onClick={(e) => {
+            if (e.detail === 0) dispatch({ type: 'moveLeft' });
+          }}
           aria-label={t('controls.moveLeft')}
         >
           {t('controls.moveLeft')}
@@ -99,6 +106,9 @@ export function Controls() {
           onPointerUp={repeatDrop.onPointerUp}
           onPointerCancel={repeatDrop.onPointerCancel}
           onPointerLeave={repeatDrop.onPointerLeave}
+          onClick={(e) => {
+            if (e.detail === 0) dispatch({ type: 'softDrop' });
+          }}
           aria-label={t('controls.softDrop')}
         >
           {t('controls.softDrop')}
@@ -109,6 +119,9 @@ export function Controls() {
           onPointerUp={repeatRight.onPointerUp}
           onPointerCancel={repeatRight.onPointerCancel}
           onPointerLeave={repeatRight.onPointerLeave}
+          onClick={(e) => {
+            if (e.detail === 0) dispatch({ type: 'moveRight' });
+          }}
           aria-label={t('controls.moveRight')}
         >
           {t('controls.moveRight')}

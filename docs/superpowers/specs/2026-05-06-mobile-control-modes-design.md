@@ -172,7 +172,7 @@
 
 ### データフロー
 
-```
+```text
 [Hamburger ⚙] → ControlSettingsDialog
                     │
                     ├── setControlMode('tap-to-drop')      ──┐

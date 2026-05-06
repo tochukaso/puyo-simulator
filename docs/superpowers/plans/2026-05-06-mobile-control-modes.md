@@ -1635,7 +1635,7 @@ git commit -m "feat(app): wire useHaptics for vibration feedback"
 
 ## Task 12: Manual browser verification
 
-This is non-code. The user has confirmed brower verification is acceptable in lieu of an e2e flow.
+This is non-code. The user has confirmed browser verification is acceptable in lieu of an e2e flow.
 
 - [ ] **Step 1: Start the dev server**
 

@@ -17,9 +17,11 @@ export interface MatchRecord {
   /**
    * 'match' = ama とのスコア勝負 (aiScore / aiMoves が意味を持つ)。
    * 'score' = 一人用スコアモード (ama 関連は 0 / 空)。
+   * 'daily' = デイリーシードチャレンジ (seed / turnLimit が日付固定。サーバ側で
+   *   leaderboard 集計する)。
    * 古いレコードには無いので optional。読み込み時に欠損なら 'match' とみなす。
    */
-  mode?: 'match' | 'score';
+  mode?: 'match' | 'score' | 'daily';
   /**
    * 規定手数。score モードの「無制限」は `0` をセンチネルとして使う
    * (JSON で Infinity が表現できないため。`turnLimit === 0` は読み込み時に
@@ -35,8 +37,13 @@ export interface MatchRecord {
   winner: 'player' | 'ai' | 'draw';
   /** プレイヤー側が各ターンに置いた手。手順順。 */
   playerMoves: Move[];
-  /** ama 側が各ターンに置いた手。手順順。score モードでは空配列。 */
+  /** ama 側が各ターンに置いた手。手順順。score / daily モードでは空配列。 */
   aiMoves: Move[];
+  /** 'daily' モード時のみ意味あり: そのレコードがどの日のデイリーチャレンジか
+   *  (YYYY-MM-DD JST)。リーダーボードのキー。 */
+  dailyDate?: string;
+  /** デイリーリーダーボードに表示するニックネーム。空欄可 (= 匿名)。 */
+  playerName?: string;
 }
 
 const DB_NAME = 'puyo-match';

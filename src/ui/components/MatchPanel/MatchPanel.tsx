@@ -33,6 +33,8 @@ export function MatchPanel() {
   const historyAnim = useGameStore((s) => s.historyAnim);
   const startMatch = useGameStore((s) => s.startMatch);
   const startScore = useGameStore((s) => s.startScore);
+  const startDaily = useGameStore((s) => s.startDaily);
+  const currentDailyDate = useGameStore((s) => s.currentDailyDate);
   const setGameMode = useGameStore((s) => s.setGameMode);
   const reset = useGameStore((s) => s.reset);
   const loadedRecordId = useGameStore((s) => s.loadedRecordId);
@@ -51,9 +53,11 @@ export function MatchPanel() {
     setSavedThisMatch(false);
   }, [matchSeed]);
 
-  if (mode !== 'match' && mode !== 'score') return null;
+  if (mode !== 'match' && mode !== 'score' && mode !== 'daily') return null;
 
-  const isScore = mode === 'score';
+  // score / daily は ama 不在の 1 人プレイなので UI 上は同じ分岐で扱う。
+  // (daily は更にリーダーボードを下に出すが、この panel では扱わない。)
+  const isScore = mode === 'score' || mode === 'daily';
   const aiScore = aiGame?.score ?? 0;
   const turnLimitN = turnLimitToNumber(matchTurnLimit);
   // 'unlimited' (Infinity) のときは「残り」表示は意味がないので空に。
@@ -348,10 +352,14 @@ export function MatchPanel() {
                   // しうるので、unhandled rejection にせず保存済みフラグを
                   // 立てないことでユーザーが再試行できる状態に留める。
                   try {
+                    // mode を厳密に分ける: daily は dailyDate も一緒に持って
+                    // おかないと、後で IndexedDB から見返したときに「どの日の
+                    // チャレンジか」が再現できない。
+                    const isDaily = mode === 'daily';
                     await saveRecord({
                       // turnLimit は数値 (or 'unlimited' センチネル 0) で永続化する。
                       // 'unlimited' は MatchRecord 仕様上 0 で表すので変換。
-                      mode: isScore ? 'score' : 'match',
+                      mode: isDaily ? 'daily' : isScore ? 'score' : 'match',
                       turnLimit:
                         matchTurnLimit === 'unlimited' ? 0 : matchTurnLimit,
                       preset: matchPreset,
@@ -361,6 +369,11 @@ export function MatchPanel() {
                       winner: matchResult.winner,
                       playerMoves: matchPlayerMoves,
                       aiMoves: matchAiMoves,
+                      // exactOptionalPropertyTypes が有効なので undefined を
+                      // 直接渡せない (= キー自体を出さないようにする)。
+                      ...(isDaily && currentDailyDate
+                        ? { dailyDate: currentDailyDate }
+                        : {}),
                     });
                     setSavedThisMatch(true);
                   } catch {
@@ -390,7 +403,8 @@ export function MatchPanel() {
           <button
             type="button"
             onClick={() => {
-              if (isScore) startScore({ turnLimit: matchTurnLimit });
+              if (mode === 'daily') startDaily();
+              else if (isScore) startScore({ turnLimit: matchTurnLimit });
               else startMatch({ turnLimit: matchTurnLimit });
             }}
             className="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 rounded text-xs"

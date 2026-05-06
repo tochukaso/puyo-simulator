@@ -57,6 +57,16 @@ npm run dev
 `migrations/0002_*.sql` のように連番で SQL ファイルを追加する。
 `npm run db:migrate:local` / `npm run db:migrate:remote` で適用される。
 
+### 0002_daily.sql (デイリーシード機能)
+
+`score_records` に以下を追加:
+
+- `daily_date TEXT` — `YYYY-MM-DD` (JST)。 `mode='daily'` の行でのみ設定される (それ以外は NULL)。
+- `player_name TEXT` — リーダーボード表示名。空欄可 (匿名)。
+- `idx_score_records_daily` — `(daily_date, player_score DESC)` 複合インデックス。
+
+リモート / ローカルともに `npm run db:migrate:*` で 0001 + 0002 が連続適用される。
+
 ## トラブルシューティング
 
 - **Deploy 後に `/api/scores` が 500**: `D1_DATABASE_ID` Secret が未設定で
@@ -72,10 +82,20 @@ npm run dev
 
 | メソッド | パス | 用途 |
 | --- | --- | --- |
-| POST | `/api/scores` | スコアレコードを保存。ID を発番して返す。 |
+| POST | `/api/scores` | スコアレコードを保存。 ID を発番して返す。 `mode='daily'` の場合は `dailyDate` 必須 + `seed === dailySeedFor(dailyDate)` + `turnLimit === 50` + `dailyDate === todayDateJst()` (今日の JST 日付) を検証。 |
 | GET | `/api/scores/:id` | 保存済みレコードを取得。 |
+| GET | `/api/daily/leaderboard?date=YYYY-MM-DD&limit=N` | 指定日のデイリーチャレンジ上位 N (デフォルト 20、最大 100)。 各エントリは `{id, createdAt, playerName, playerScore, rank}` を返す (リスト表示に必要な分はレスポンスだけで完結)。 リプレイの手順 (playerMoves) まで欲しい場合は `/api/scores/:id` を別途叩く。 |
 
-リクエスト/レスポンス形式は `worker/index.ts` と `src/api/scoresClient.ts` を参照。
+リクエスト/レスポンス形式は `worker/index.ts` と `src/api/scoresClient.ts` / `src/api/dailyClient.ts` を参照。
+
+## デイリーチャレンジの seed 計算
+
+クライアント (`startDaily`) と Worker (`saveScore` の検証) の両方で
+`src/game/dailySeed.ts` の `dailySeedFor(date)` を使う。 関数は FNV-1a で
+`"daily/${YYYY-MM-DD}"` を 31bit 正の整数に写像する純関数。 同じ日付なら
+同じ seed が返るため、 Worker は「クライアントが送ってきた seed が
+今日の seed と一致するか」を見るだけで「自分で楽な seed を選んでデイリー扱い
+で投げる」改造を弾ける。
 
 ## 改造防止 (server-side replay validation)
 

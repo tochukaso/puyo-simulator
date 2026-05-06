@@ -21,8 +21,31 @@ export interface Dict {
   'header.modeFree': string;
   'header.modeMatch': string;
   'header.modeScore': string;
+  'header.modeDaily': string;
   'header.turnLimit': string;
   'header.turnUnlimited': string;
+  'daily.title': string;
+  'daily.fixedTurns': string;
+  'daily.todayBadge': string;
+  'daily.yesterdayBadge': string;
+  'daily.nicknameLabel': string;
+  'daily.nicknamePlaceholder': string;
+  'daily.submit': string;
+  'daily.submitting': string;
+  'daily.submitted': string;
+  'daily.submitFailed': string;
+  'daily.leaderboardTitle': string;
+  'daily.leaderboardLoading': string;
+  'daily.leaderboardEmpty': string;
+  'daily.leaderboardError': string;
+  'daily.viewToday': string;
+  'daily.viewYesterday': string;
+  'daily.anonymous': string;
+  'daily.rank': string;
+  'daily.replayThis': string;
+  'daily.shareX': string;
+  'daily.shareXText': string;
+  'daily.youAreHere': string;
   'controls.rotateCcw': string;
   'match.quit': string;
   'match.quitConfirm': string;
@@ -150,8 +173,31 @@ export const translations: Record<Lang, Dict> = {
     'header.modeFree': 'フリー',
     'header.modeMatch': '対amaスコア勝負',
     'header.modeScore': 'スコアアタック',
+    'header.modeDaily': 'デイリー',
     'header.turnLimit': '手数',
     'header.turnUnlimited': '無制限',
+    'daily.title': 'デイリーチャレンジ',
+    'daily.fixedTurns': '{n} 手固定',
+    'daily.todayBadge': '今日',
+    'daily.yesterdayBadge': '昨日',
+    'daily.nicknameLabel': 'ニックネーム',
+    'daily.nicknamePlaceholder': '(空欄なら匿名)',
+    'daily.submit': 'スコアをサーバに送信',
+    'daily.submitting': '送信中…',
+    'daily.submitted': '送信済み',
+    'daily.submitFailed': '送信失敗 — もう一度試す',
+    'daily.leaderboardTitle': 'ランキング',
+    'daily.leaderboardLoading': '読み込み中…',
+    'daily.leaderboardEmpty': 'まだスコアがありません。一番乗りを目指そう!',
+    'daily.leaderboardError': '読み込みに失敗しました',
+    'daily.viewToday': '今日',
+    'daily.viewYesterday': '昨日',
+    'daily.anonymous': '匿名',
+    'daily.rank': '順位',
+    'daily.replayThis': 'このスコアをリプレイ',
+    'daily.shareX': 'X (Twitter) でシェア',
+    'daily.shareXText': 'デイリーぷよチャレンジ {date} で {score} 点出ました! #puyosim',
+    'daily.youAreHere': 'あなた',
     'controls.rotateCcw': '↺ 左回転',
     'match.quit': '終了',
     'match.quitConfirm': '本当にゲームを終了しますか? 現在のスコアで確定します。',
@@ -277,8 +323,31 @@ export const translations: Record<Lang, Dict> = {
     'header.modeFree': 'Free',
     'header.modeMatch': 'Score vs ama',
     'header.modeScore': 'Score attack',
+    'header.modeDaily': 'Daily',
     'header.turnLimit': 'Turns',
     'header.turnUnlimited': 'Unlimited',
+    'daily.title': 'Daily challenge',
+    'daily.fixedTurns': '{n}-turn fixed',
+    'daily.todayBadge': 'Today',
+    'daily.yesterdayBadge': 'Yesterday',
+    'daily.nicknameLabel': 'Nickname',
+    'daily.nicknamePlaceholder': '(blank = anonymous)',
+    'daily.submit': 'Submit score to server',
+    'daily.submitting': 'Submitting…',
+    'daily.submitted': 'Submitted',
+    'daily.submitFailed': 'Submit failed — retry',
+    'daily.leaderboardTitle': 'Leaderboard',
+    'daily.leaderboardLoading': 'Loading…',
+    'daily.leaderboardEmpty': 'No scores yet — be the first!',
+    'daily.leaderboardError': 'Failed to load',
+    'daily.viewToday': 'Today',
+    'daily.viewYesterday': 'Yesterday',
+    'daily.anonymous': 'Anonymous',
+    'daily.rank': 'Rank',
+    'daily.replayThis': 'Replay this run',
+    'daily.shareX': 'Share on X',
+    'daily.shareXText': 'Got {score} on the puyo daily challenge for {date}! #puyosim',
+    'daily.youAreHere': 'You',
     'controls.rotateCcw': '↺ CCW',
     'match.quit': 'Quit',
     'match.quitConfirm': 'End this run now? The current score will be locked in.',
@@ -404,8 +473,31 @@ export const translations: Record<Lang, Dict> = {
     'header.modeFree': '自由',
     'header.modeMatch': '与ama比分',
     'header.modeScore': '分数挑战',
+    'header.modeDaily': '每日',
     'header.turnLimit': '手数',
     'header.turnUnlimited': '无限',
+    'daily.title': '每日挑战',
+    'daily.fixedTurns': '固定 {n} 手',
+    'daily.todayBadge': '今天',
+    'daily.yesterdayBadge': '昨天',
+    'daily.nicknameLabel': '昵称',
+    'daily.nicknamePlaceholder': '(留空则为匿名)',
+    'daily.submit': '提交到服务器',
+    'daily.submitting': '提交中…',
+    'daily.submitted': '已提交',
+    'daily.submitFailed': '提交失败 — 重试',
+    'daily.leaderboardTitle': '排行榜',
+    'daily.leaderboardLoading': '加载中…',
+    'daily.leaderboardEmpty': '还没有分数 — 抢个第一吧!',
+    'daily.leaderboardError': '加载失败',
+    'daily.viewToday': '今天',
+    'daily.viewYesterday': '昨天',
+    'daily.anonymous': '匿名',
+    'daily.rank': '排名',
+    'daily.replayThis': '回放此次',
+    'daily.shareX': '在 X 上分享',
+    'daily.shareXText': '在 {date} 的每日挑战中拿到了 {score} 分!#puyosim',
+    'daily.youAreHere': '我',
     'controls.rotateCcw': '↺ 左旋',
     'match.quit': '结束',
     'match.quitConfirm': '确定要结束本局?当前分数将被锁定。',
@@ -531,8 +623,31 @@ export const translations: Record<Lang, Dict> = {
     'header.modeFree': '자유',
     'header.modeMatch': 'ama 점수 대결',
     'header.modeScore': '스코어 어택',
+    'header.modeDaily': '데일리',
     'header.turnLimit': '수',
     'header.turnUnlimited': '무제한',
+    'daily.title': '데일리 챌린지',
+    'daily.fixedTurns': '{n}수 고정',
+    'daily.todayBadge': '오늘',
+    'daily.yesterdayBadge': '어제',
+    'daily.nicknameLabel': '닉네임',
+    'daily.nicknamePlaceholder': '(비우면 익명)',
+    'daily.submit': '서버에 점수 전송',
+    'daily.submitting': '전송 중…',
+    'daily.submitted': '전송 완료',
+    'daily.submitFailed': '전송 실패 — 재시도',
+    'daily.leaderboardTitle': '순위표',
+    'daily.leaderboardLoading': '로딩 중…',
+    'daily.leaderboardEmpty': '아직 점수가 없어요. 첫 도전자가 되어보세요!',
+    'daily.leaderboardError': '로딩 실패',
+    'daily.viewToday': '오늘',
+    'daily.viewYesterday': '어제',
+    'daily.anonymous': '익명',
+    'daily.rank': '순위',
+    'daily.replayThis': '이 기록 리플레이',
+    'daily.shareX': 'X 에 공유',
+    'daily.shareXText': '{date} 데일리 푸요 챌린지에서 {score}점 달성! #puyosim',
+    'daily.youAreHere': '나',
     'controls.rotateCcw': '↺ 좌회전',
     'match.quit': '종료',
     'match.quitConfirm': '정말 종료할까요? 현재 점수로 확정됩니다.',

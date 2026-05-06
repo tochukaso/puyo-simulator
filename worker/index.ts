@@ -5,6 +5,7 @@
 // 依存: wrangler.jsonc に `main` と `d1_databases[ {binding="DB"} ]` バインドが必要。
 
 import { simulateAndValidate } from './validateMoves';
+import { dailySeedFor, isValidDailyDate, todayDateJst } from '../src/game/dailySeed';
 
 interface Env {
   ASSETS: Fetcher;
@@ -15,7 +16,7 @@ interface Env {
 // サーバ側で発番するので除外)。MatchRecord と一致させてあるが、依存解放のため
 // ここでは独立に持つ (Worker は src/* を bundle に含めない構成のほうが安全)。
 interface ClientRecordPayload {
-  mode?: 'match' | 'score';
+  mode?: 'match' | 'score' | 'daily';
   turnLimit: number;
   preset?: string;
   seed: number;
@@ -24,7 +25,19 @@ interface ClientRecordPayload {
   winner: 'player' | 'ai' | 'draw';
   playerMoves: { axisCol: number; rotation: number }[];
   aiMoves: { axisCol: number; rotation: number }[];
+  /** 'daily' モードでのみ意味を持つ。YYYY-MM-DD (JST) で、その日のチャレンジ。 */
+  dailyDate?: string;
+  /** デイリーリーダーボードに表示するニックネーム。20 文字までに丸める。 */
+  playerName?: string;
 }
+
+/** デイリーモードの固定ターン数。仕様で 50 手固定 (50 ぷよ)。 */
+const DAILY_TURN_LIMIT = 50;
+/** リーダーボードに表示する上限。多すぎると初期ロードが重く、少なすぎると
+ *  ランキングとして物足りない。20 で運用してフィードバックで調整する。 */
+const DEFAULT_LEADERBOARD_LIMIT = 20;
+/** リーダーボードのカーソル最大値。意図しない大量取得 (DB 負荷) を防ぐ。 */
+const MAX_LEADERBOARD_LIMIT = 100;
 
 // ボディサイズ上限。200 手 + meta で軽く収まる前提で、想定外の大きな payload
 // (アタッカー or バグ) を弾くため小さめに切る。
@@ -76,8 +89,13 @@ function isValidMove(m: unknown): m is { axisCol: number; rotation: number } {
 function validatePayload(body: unknown): ClientRecordPayload | string {
   if (typeof body !== 'object' || body === null) return 'body is not an object';
   const p = body as Record<string, unknown>;
-  // mode: optional; 'match' か 'score' のいずれか。
-  if (p.mode !== undefined && p.mode !== 'match' && p.mode !== 'score')
+  // mode: optional; 'match' / 'score' / 'daily' のいずれか。
+  if (
+    p.mode !== undefined &&
+    p.mode !== 'match' &&
+    p.mode !== 'score' &&
+    p.mode !== 'daily'
+  )
     return 'invalid mode';
   // turnLimit: 0 (unlimited) または正の整数。
   if (
@@ -103,8 +121,16 @@ function validatePayload(body: unknown): ClientRecordPayload | string {
     return 'too many moves';
   if (p.preset !== undefined && typeof p.preset !== 'string')
     return 'invalid preset';
+  // dailyDate / playerName: optional。書式 / 長さだけチェックして以降は
+  // バックエンド側でもう一段絞り込む (mode === 'daily' なら必須等)。
+  if (p.dailyDate !== undefined && !isValidDailyDate(p.dailyDate))
+    return 'invalid dailyDate';
+  if (p.playerName !== undefined) {
+    if (typeof p.playerName !== 'string') return 'invalid playerName';
+    if (p.playerName.length > 32) return 'playerName too long';
+  }
   return {
-    mode: (p.mode as 'match' | 'score' | undefined) ?? 'match',
+    mode: (p.mode as 'match' | 'score' | 'daily' | undefined) ?? 'match',
     turnLimit: p.turnLimit,
     preset: (p.preset as string) ?? '',
     seed: p.seed,
@@ -113,6 +139,8 @@ function validatePayload(body: unknown): ClientRecordPayload | string {
     winner: p.winner as 'player' | 'ai' | 'draw',
     playerMoves: p.playerMoves as { axisCol: number; rotation: number }[],
     aiMoves: p.aiMoves as { axisCol: number; rotation: number }[],
+    dailyDate: p.dailyDate as string | undefined,
+    playerName: p.playerName as string | undefined,
   };
 }
 
@@ -136,6 +164,37 @@ async function saveScore(request: Request, env: Env): Promise<Response> {
   if (typeof parsed === 'string') return badRequest(parsed);
   const validated = validatePayload(parsed);
   if (typeof validated === 'string') return badRequest(validated);
+
+  // デイリーモード固有の追加検証。
+  // (1) dailyDate は必須 (どの日のチャレンジか書かれていないと leaderboard に
+  //     並べられない)。 (2) dailyDate がサーバ側から見た「今日 (JST)」と一致
+  // するか。 過去や未来の日付で送ってこられると leaderboard が汚れるので拒否
+  // する (PR #53 CodeRabbit 指摘)。 (3) seed が dailySeedFor(dailyDate) と
+  // 一致するか。 一致しなければ「自分で seed を選んで楽な譜面を回した」可能性
+  // があるので弾く。 (4) turnLimit は仕様で 50 固定。 50 以外は不正。
+  if (validated.mode === 'daily') {
+    if (!validated.dailyDate) {
+      return badRequest('daily mode requires dailyDate');
+    }
+    const today = todayDateJst();
+    if (validated.dailyDate !== today) {
+      // クライアントの時計ズレで境界跨ぎした際の救済として、 当日 ± 1 日まで
+      // は許容する余地もあるが、 まずは厳密一致でリーダーボード整合性を優先。
+      // 必要であれば後日 grace を入れる。
+      return badRequest(
+        `dailyDate must match today's JST date (server today=${today}, got=${validated.dailyDate})`,
+      );
+    }
+    const expected = dailySeedFor(validated.dailyDate);
+    if (validated.seed !== expected) {
+      return badRequest(
+        `daily seed mismatch: expected ${expected} for ${validated.dailyDate}, got ${validated.seed}`,
+      );
+    }
+    if (validated.turnLimit !== DAILY_TURN_LIMIT) {
+      return badRequest(`daily turnLimit must be ${DAILY_TURN_LIMIT}`);
+    }
+  }
 
   // 改造防止: 受け取った seed + playerMoves をサーバ側で再シミュレートして、
   // 連鎖判定 / 配置可能性 / 最終スコアが一致するか検証する。一致しなければ
@@ -163,11 +222,20 @@ async function saveScore(request: Request, env: Env): Promise<Response> {
       ? ((parsed as { buildSha?: string }).buildSha ?? null)
       : null;
 
+  // playerName は前後空白除去 + 0 文字 (= 名無し) 許容。leaderboard で表示する
+  // ときは null/空 → "Anonymous" にフォールバック。
+  const playerName =
+    typeof validated.playerName === 'string'
+      ? validated.playerName.trim().slice(0, 32) || null
+      : null;
+  const dailyDate = validated.mode === 'daily' ? (validated.dailyDate ?? null) : null;
+
   await env.DB.prepare(
     `INSERT INTO score_records
       (id, created_at, build_sha, mode, turn_limit, preset, seed,
-       player_score, ai_score, winner, player_moves, ai_moves)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       player_score, ai_score, winner, player_moves, ai_moves,
+       daily_date, player_name)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
@@ -182,6 +250,8 @@ async function saveScore(request: Request, env: Env): Promise<Response> {
       validated.winner,
       JSON.stringify(validated.playerMoves),
       JSON.stringify(validated.aiMoves),
+      dailyDate,
+      playerName,
     )
     .run();
 
@@ -201,6 +271,8 @@ interface DbRow {
   winner: string;
   player_moves: string;
   ai_moves: string;
+  daily_date: string | null;
+  player_name: string | null;
 }
 
 function safeParseMoves(raw: string, id: string, field: string): unknown {
@@ -229,19 +301,81 @@ function rowToRecord(row: DbRow): unknown {
     winner: row.winner,
     playerMoves: safeParseMoves(row.player_moves, row.id, 'player_moves'),
     aiMoves: safeParseMoves(row.ai_moves, row.id, 'ai_moves'),
+    dailyDate: row.daily_date ?? null,
+    playerName: row.player_name ?? null,
   };
 }
 
 async function getScore(env: Env, id: string): Promise<Response> {
   const row = await env.DB.prepare(
     `SELECT id, created_at, build_sha, mode, turn_limit, preset, seed,
-            player_score, ai_score, winner, player_moves, ai_moves
+            player_score, ai_score, winner, player_moves, ai_moves,
+            daily_date, player_name
        FROM score_records WHERE id = ?`,
   )
     .bind(id)
     .first<DbRow>();
   if (!row) return notFound();
   return jsonResponse(rowToRecord(row));
+}
+
+interface LeaderboardRow {
+  id: string;
+  created_at: string;
+  player_name: string | null;
+  player_score: number;
+}
+
+interface LeaderboardEntry {
+  id: string;
+  createdAt: string;
+  playerName: string | null;
+  playerScore: number;
+  rank: number;
+}
+
+// デイリーリーダーボード: ある日付の上位スコアだけを軽量に返す。
+// (リプレイの手列まで返すと payload が大きくなりすぎるので、エントリは
+//  id だけ持って、ユーザーが行をクリックしたら GET /api/scores/:id で
+//  必要なときだけ完全なレコードを取りに行く構成にする。)
+async function getDailyLeaderboard(
+  env: Env,
+  url: URL,
+): Promise<Response> {
+  const date = url.searchParams.get('date');
+  if (!date || !isValidDailyDate(date)) {
+    return badRequest('invalid or missing date (expected YYYY-MM-DD)');
+  }
+  // limit はデフォルト 20、上限 100。整数化失敗 / 範囲外はデフォルトに丸める。
+  const rawLimit = url.searchParams.get('limit');
+  let limit = DEFAULT_LEADERBOARD_LIMIT;
+  if (rawLimit !== null) {
+    const n = Number(rawLimit);
+    if (Number.isInteger(n) && n >= 1 && n <= MAX_LEADERBOARD_LIMIT) {
+      limit = n;
+    }
+  }
+  // ORDER BY player_score DESC, created_at ASC でタイブレーク (= 同点なら早い人が上)。
+  // idx_score_records_daily が (daily_date, player_score DESC) なので前段は使われ、
+  // 後段の created_at は filesort になるが、limit が小さいので十分。
+  const result = await env.DB.prepare(
+    `SELECT id, created_at, player_name, player_score
+       FROM score_records
+      WHERE daily_date = ?
+      ORDER BY player_score DESC, created_at ASC
+      LIMIT ?`,
+  )
+    .bind(date, limit)
+    .all<LeaderboardRow>();
+  const rows = result.results ?? [];
+  const entries: LeaderboardEntry[] = rows.map((r, i) => ({
+    id: r.id,
+    createdAt: r.created_at,
+    playerName: r.player_name,
+    playerScore: r.player_score,
+    rank: i + 1,
+  }));
+  return jsonResponse({ date, limit, entries });
 }
 
 export default {
@@ -260,6 +394,16 @@ export default {
     const match = url.pathname.match(/^\/api\/scores\/([\w-]+)$/);
     if (request.method === 'GET' && match) {
       return getScore(env, match[1]!);
+    }
+
+    // GET /api/daily/leaderboard?date=YYYY-MM-DD → top scores for that day.
+    // (POST はしない。デイリーレコードの新規保存は通常の POST /api/scores
+    //  に mode='daily' + dailyDate を載せて投げる経路に統一している。)
+    if (
+      request.method === 'GET' &&
+      url.pathname === '/api/daily/leaderboard'
+    ) {
+      return getDailyLeaderboard(env, url);
     }
 
     // /api/* に来たがハンドラ無しの場合は静的アセットに渡さず 404 を返す

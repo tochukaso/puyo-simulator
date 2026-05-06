@@ -21,6 +21,7 @@ import { Controls } from './ui/components/Controls/Controls';
 import { CandidateList } from './ui/components/CandidateList/CandidateList';
 import { Header } from './ui/components/Header/Header';
 import { MatchPanel } from './ui/components/MatchPanel/MatchPanel';
+import { DailyPanel } from './ui/components/DailyPanel/DailyPanel';
 import { EditToolbar } from './ui/components/EditToolbar/EditToolbar';
 import { EditPairs } from './ui/components/EditPairs/EditPairs';
 
@@ -92,6 +93,13 @@ export default function App() {
     if (st.mode === 'match' && !st.aiGame) {
       st.startMatch({ turnLimit: st.matchTurnLimit });
     }
+    // 同様に daily モードで reload された場合、 persisted mode='daily' は
+    // 残るが matchSeed / currentDailyDate が初期化されないので、 「Daily ラベルだが
+    // 実体は今日のシードに紐付いていない」状態になる。 これを避けるため、 起動時に
+    // 今日 (JST) の seed で startDaily し直す (PR #53 review 対応)。
+    if (st.mode === 'daily' && (!st.matchSeed || !st.currentDailyDate)) {
+      st.startDaily();
+    }
   }, []);
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col">
@@ -108,6 +116,7 @@ export default function App() {
         <div className="flex flex-col items-center gap-3 w-full max-w-sm">
           <Stats />
           <MatchPanel />
+          <DailyPanel />
           <div className="flex gap-3 items-stretch justify-center w-full">
             <Board />
             <div className="flex flex-col gap-2 w-32 shrink-0" data-no-gesture>

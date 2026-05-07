@@ -19,8 +19,9 @@ export function Stats() {
   // Board / NextQueue と同じ side-aware 選択。リプレイ中は表示中スナップショット
   // の値を使い、それ以外は live。これで数値と盤面が食い違わない (ama 観戦中に
   // player の score が出る、を防ぐ)。
+  // 'daily' も score 同等の 1 人用ターン制限モードなので含める。
   const inReplay =
-    (mode === 'match' || mode === 'score') &&
+    (mode === 'match' || mode === 'score' || mode === 'daily') &&
     (matchEnded || liveGame.status === 'gameover');
   const aiViewIdx = aiHistoryViewIndex ?? Math.max(0, aiHistory.length - 1);
   const playerViewIdx =

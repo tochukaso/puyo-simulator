@@ -56,8 +56,10 @@ export function Board() {
   // Replay context: post-match-end, or after the player tops out. Outside of
   // this, the player is actively playing — we always show their live game and
   // ignore history view indices entirely.
+  // 'daily' は score とほぼ同じ仕様 (1 人用、 ターン上限固定) なので、
+  // 終了後は同様にスクラバーで playerHistory を反映する。
   const inReplay =
-    (mode === 'match' || mode === 'score') &&
+    (mode === 'match' || mode === 'score' || mode === 'daily') &&
     (matchEnded || playerGame.status === 'gameover');
   // History view index defaults to the latest snapshot when the user hasn't
   // explicitly scrubbed. (No live-tracking mode: there's no UI to escape back

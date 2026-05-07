@@ -26,8 +26,9 @@ export function NextQueue() {
   const matchEnded = useGameStore((s) => s.matchEnded);
   const matchTurnLimit = useGameStore((s) => s.matchTurnLimit);
   const matchTurnsPlayed = useGameStore((s) => s.matchTurnsPlayed);
+  // daily も score とほぼ同じ仕様なので、 終了後はスクラバー連動で表示する。
   const inReplay =
-    (mode === 'match' || mode === 'score') &&
+    (mode === 'match' || mode === 'score' || mode === 'daily') &&
     (matchEnded || playerGame.status === 'gameover');
   const aiViewIdx = aiHistoryViewIndex ?? Math.max(0, aiHistory.length - 1);
   const playerViewIdx =
@@ -50,11 +51,12 @@ export function NextQueue() {
     : viewing === 'ai'
       ? (aiSnapshot ? aiViewIdx + 1 : aiHistory.length)
       : (playerSnapshot ? playerViewIdx + 1 : playerHistory.length);
-  // match / score 共通でターン上限を超えるツモは隠す。'unlimited' は Infinity
-  // になるので常に false 側に倒れる。
+  // match / score / daily 共通でターン上限を超えるツモは隠す。 daily は
+  // 50 手固定なので 51 個目・ 52 個目の NEXT 表示は仕様外でユーザを混乱させる。
+  // 'unlimited' (free / 一部 score) は Infinity になるので常に false 側に倒れる。
   const limitN = turnLimitToNumber(matchTurnLimit);
   const beyondLimit = (i: number) =>
-    (mode === 'match' || mode === 'score') &&
+    (mode === 'match' || mode === 'score' || mode === 'daily') &&
     turnsPlayedAtView + 2 + i > limitN;
   const next = beyondLimit(0) ? undefined : queue[0];
   const nextNext = beyondLimit(1) ? undefined : queue[1];

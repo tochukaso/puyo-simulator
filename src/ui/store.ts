@@ -410,6 +410,19 @@ export const useGameStore = create<Store>((set, get) => ({
   editPalette: 'R',
 
   reset: (seed?: number) => {
+    // Daily モードは「シード固定」が仕様の根幹なので、 reset() は当日の
+    // dailySeedFor(currentDailyDate) で再起動する。 startDaily を委譲呼び
+    // することで matchSeed / currentDailyDate / playerHistory 等の daily
+    // 固有フィールドを atomically 揃える (Reset を押した後 leaderboard に
+    // 「別シードで稼いだスコア」が混ざらないように)。
+    // currentDailyDate が null になりうるのは legacy / 壊れたレコードを
+    // loadRecord で拾った場合のみ。 ここで未知日付を継承すると矛盾するので
+    // 当日 (JST) にフォールバック。
+    const cur = get();
+    if (cur.mode === 'daily') {
+      get().startDaily({ dailyDate: cur.currentDailyDate ?? todayDateJst() });
+      return;
+    }
     // Bump the history-replay token so any in-flight playHistoryChain aborts
     // on its next sleep boundary instead of writing stale frames into the
     // freshly reset state.

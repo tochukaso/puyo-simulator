@@ -456,8 +456,16 @@ async function getDailyScoresList(env: Env, url: URL): Promise<Response> {
     binds.push(to);
   }
   if (name !== null && name.length > 0) {
-    whereParts.push('LOWER(player_name) LIKE ?');
-    binds.push(`%${name.toLowerCase()}%`);
+    // ユーザー入力の `%` / `_` は LIKE のワイルドカードとして解釈されるので
+    // backslash でエスケープし、 SQL 側に ESCAPE '\' を明示する。 これを
+    // しないとユーザ名に `_` を含むプレイヤーが任意 1 文字一致で巻き込み
+    // ヒットする。 SQLite の LIKE はデフォルトで ESCAPE 文字を持たない仕様。
+    const escaped = name
+      .toLowerCase()
+      .replace(/\\/g, '\\\\')
+      .replace(/[%_]/g, (c) => `\\${c}`);
+    whereParts.push("LOWER(player_name) LIKE ? ESCAPE '\\'");
+    binds.push(`%${escaped}%`);
   }
   const whereSql = whereParts.join(' AND ');
 

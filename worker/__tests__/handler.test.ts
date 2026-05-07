@@ -576,6 +576,51 @@ describe('worker daily mode', () => {
     expect(res.status).toBe(400);
   });
 
+  it('GET /api/daily/scores escapes LIKE wildcards in name filter', async () => {
+    // ユーザ入力の `%` / `_` がそのまま LIKE に渡るとワイルドカード扱いに
+    // なるバグ。 escape 後の bind 値を確認するために、 prepare の挙動を
+    // 別 mock で観察する。
+    const calls: { sql: string; binds: unknown[] }[] = [];
+    const observerDb: D1Database = {
+      prepare(sql: string) {
+        const bound: unknown[] = [];
+        return {
+          bind(...vals: unknown[]) {
+            bound.push(...vals);
+            return this;
+          },
+          async run() {
+            return { success: true };
+          },
+          async first() {
+            calls.push({ sql, binds: [...bound] });
+            return { cnt: 0 };
+          },
+          async all() {
+            calls.push({ sql, binds: [...bound] });
+            return { results: [], success: true };
+          },
+        };
+      },
+    } as unknown as D1Database;
+
+    const env = { DB: observerDb, ASSETS: fakeAssets };
+    const res = await worker.fetch(
+      new Request('http://localhost/api/daily/scores?name=ad_min%25'),
+      env,
+    );
+    expect(res.status).toBe(200);
+    // SQL は ESCAPE 句を含み、 bind 値は backslash でエスケープ済みであるべき。
+    const callsWithName = calls.filter((c) =>
+      c.sql.includes("LIKE ? ESCAPE '\\'"),
+    );
+    expect(callsWithName.length).toBeGreaterThan(0);
+    const bound = callsWithName[0]!.binds.find(
+      (b): b is string => typeof b === 'string' && b.includes('ad'),
+    );
+    expect(bound).toBe('%ad\\_min\\%%');
+  });
+
   it('OPTIONS /api/daily/scores returns 204 with CORS headers (preflight)', async () => {
     const env = {
       DB: makeFakeDb({ insertedRows: [] }),

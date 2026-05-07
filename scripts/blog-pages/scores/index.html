@@ -169,12 +169,21 @@
     }[c]));
   }
 
+  // Apply/Reset を連打した時など複数 fetch が in-flight になる場合、 後着の
+  // 古いレスポンスが新しい結果を上書きすることがある。 単調増加するトークン
+  // と submit/reset ボタンの一時 disable で防ぐ。
+  let currentRequestId = 0;
+  const submitBtn = form.querySelector('button[type="submit"]');
+
   async function fetchAndRender() {
+    const requestId = ++currentRequestId;
     syncUrl();
     resultPanel.innerHTML = '<div class="loading">読み込み中…</div>';
     pagerSummary.textContent = '—';
     prevBtn.disabled = true;
     nextBtn.disabled = true;
+    if (submitBtn) submitBtn.disabled = true;
+    resetBtn.disabled = true;
 
     const sp = new URLSearchParams();
     if (state.from) sp.set('from', state.from);
@@ -186,11 +195,18 @@
 
     try {
       const res = await fetch(`${API_BASE}/api/daily/scores?${sp.toString()}`);
+      if (requestId !== currentRequestId) return; // stale, 後発に上書き禁止
       if (!res.ok) throw new Error('http ' + res.status);
       const data = await res.json();
       renderResults(data);
     } catch (err) {
+      if (requestId !== currentRequestId) return;
       resultPanel.innerHTML = '<div class="error">読み込みに失敗しました</div>';
+    } finally {
+      if (requestId === currentRequestId) {
+        if (submitBtn) submitBtn.disabled = false;
+        resetBtn.disabled = false;
+      }
     }
   }
 

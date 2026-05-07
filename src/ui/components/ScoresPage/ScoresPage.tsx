@@ -142,7 +142,7 @@ export function ScoresPage() {
     ]) {
       url.searchParams.delete(k);
     }
-    window.location.href = url.toString();
+    window.location.assign(url.toString());
   }
 
   // 行クリック → ?score=<id> でゲーム UI に戻して loadRecord 経路でリプレイ。
@@ -152,7 +152,7 @@ export function ScoresPage() {
       url.searchParams.delete(k);
     }
     url.searchParams.set('score', entry.id);
-    window.location.href = url.toString();
+    window.location.assign(url.toString());
   }
 
   const total = data?.total ?? 0;

@@ -351,4 +351,50 @@ describe('useGameStore daily mode reset', () => {
     void before;
     void after;
   });
+
+  it('restoreDailyProgress rebuilds finished match from 50-move snapshot', () => {
+    const fixedDate = '2026-05-07';
+    const expectedSeed = dailySeedFor(fixedDate);
+
+    // 50 手分の合成手順 (axisCol=0 / rotation=0 固定)。 simulateRecordSide
+    // は途中で gameover になっても history を返すので、 50 手到達か
+    // gameover で終了扱いになることを検証する。
+    const synthMoves = Array.from({ length: 50 }, () => ({
+      axisCol: 0,
+      rotation: 0,
+    }));
+
+    useGameStore.getState().restoreDailyProgress({
+      dailyDate: fixedDate,
+      matchSeed: expectedSeed,
+      matchPlayerMoves: synthMoves,
+    });
+
+    const after = useGameStore.getState();
+    expect(after.mode).toBe('daily');
+    expect(after.matchSeed).toBe(expectedSeed);
+    expect(after.currentDailyDate).toBe(fixedDate);
+    expect(after.matchPlayerMoves.length).toBeGreaterThan(0);
+    // 50 手到達 or 途中 gameover のいずれかで終了扱い。
+    expect(after.matchEnded).toBe(true);
+    expect(after.matchResult).not.toBeNull();
+    expect(after.matchResult!.playerScore).toBeGreaterThanOrEqual(0);
+  });
+
+  it('restoreDailyProgress with 0 moves leaves match unfinished', () => {
+    const fixedDate = '2026-05-07';
+    const expectedSeed = dailySeedFor(fixedDate);
+
+    useGameStore.getState().restoreDailyProgress({
+      dailyDate: fixedDate,
+      matchSeed: expectedSeed,
+      matchPlayerMoves: [],
+    });
+
+    const after = useGameStore.getState();
+    expect(after.mode).toBe('daily');
+    expect(after.matchTurnsPlayed).toBe(0);
+    expect(after.matchEnded).toBe(false);
+    expect(after.matchResult).toBeNull();
+  });
 });

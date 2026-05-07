@@ -15,6 +15,8 @@ import {
   replayDataToRecord,
 } from './share/encodeReplay';
 import { getScoreFromServer, SCORE_PARAM } from './api/scoresClient';
+import { todayDateJst } from './game/dailySeed';
+import { loadDailyProgress } from './match/dailyPersist';
 import { Board } from './ui/components/Board/Board';
 import { NextQueue } from './ui/components/NextQueue/NextQueue';
 import { Stats } from './ui/components/Stats/Stats';
@@ -96,11 +98,17 @@ export default function App() {
       st.startMatch({ turnLimit: st.matchTurnLimit });
     }
     // 同様に daily モードで reload された場合、 persisted mode='daily' は
-    // 残るが matchSeed / currentDailyDate が初期化されないので、 「Daily ラベルだが
-    // 実体は今日のシードに紐付いていない」状態になる。 これを避けるため、 起動時に
-    // 今日 (JST) の seed で startDaily し直す (PR #53 review 対応)。
+    // 残るが matchSeed / currentDailyDate / matchPlayerMoves は in-memory なので
+    // reload で消える。 まず localStorage の進行スナップショットを見に行って、
+    // 「今日のチャレンジ」だったら再シミュレートで復元する (終了済みなら
+    // submit UI が即見える)。 期限切れ or 無ければ通常通り startDaily。
     if (st.mode === 'daily' && (!st.matchSeed || !st.currentDailyDate)) {
-      st.startDaily();
+      const snap = loadDailyProgress();
+      if (snap && snap.dailyDate === todayDateJst()) {
+        st.restoreDailyProgress(snap);
+      } else {
+        st.startDaily();
+      }
     }
   }, []);
   return (

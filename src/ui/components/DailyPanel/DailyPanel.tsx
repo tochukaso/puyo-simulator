@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../../store';
 import { useT } from '../../../i18n';
 import {
@@ -15,6 +15,7 @@ import {
   rememberMyDailyId,
 } from '../../../api/dailyClient';
 import { postScoreToServer, getScoreFromServer } from '../../../api/scoresClient';
+import { clearDailyProgress } from '../../../match/dailyPersist';
 
 // デイリーモード専用のサブパネル。 MatchPanel の下に並べて表示する。
 //
@@ -57,6 +58,28 @@ export function DailyPanel() {
   // (matchSeed は同日内なら同値なので依存に入れても発火しない。)
   useEffect(() => {
     if (!matchEnded) setSubmitState({ kind: 'idle' });
+  }, [matchEnded, currentDailyDate]);
+
+  // ゲーム終了時に登録フォームを画面内に出して、 ニックネーム入力にフォーカス。
+  // ユーザから「登録 UI が出てこなかった」報告があったため、 終了タイミングで
+  // 視覚的・操作的に明示的に誘導する。
+  const submitFormRef = useRef<HTMLDivElement | null>(null);
+  const nicknameInputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (matchEnded && submitState.kind !== 'submitted') {
+      // requestAnimationFrame: render 完了後にスクロール / フォーカスする。
+      requestAnimationFrame(() => {
+        submitFormRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+        nicknameInputRef.current?.focus({ preventScroll: true });
+      });
+    }
+    // submitState は意図的に依存に入れない (送信中 / 失敗状態の遷移で再
+    // フォーカスするとユーザの操作を奪うため、 終了瞬間だけにフォーカスを
+    // 限定する)。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchEnded, currentDailyDate]);
   const [leaderboard, setLeaderboard] = useState<DailyLeaderboardEntry[] | null>(
     null,
@@ -147,6 +170,10 @@ export function DailyPanel() {
         ...(trimmed ? { playerName: trimmed } : {}),
       });
       rememberMyDailyId(currentDailyDate, id);
+      // サーバ側に確定したので localStorage の進行スナップショットは不要。
+      // 残しておくと別タブで開いたときに「未提出」扱いで submit UI が再度
+      // 出るので、 サーバ反映済みなのでクリーンアップ。
+      clearDailyProgress();
       // 送信直後に leaderboard を再取得 (useEffect の依存に submitState を
       // 含めている)。 自分の rank は新しい leaderboard 反映時に確認する。
       setSubmitState({ kind: 'submitted', id, rank: null });
@@ -199,38 +226,53 @@ export function DailyPanel() {
         </span>
       </div>
 
-      {/* 送信 UI: 終了 & 自分のプレイなら出す。 */}
+      {/* 送信 UI: 終了 & 自分のプレイなら出す。 視覚的に目立つ枠で囲んで
+          見落とされないように。 */}
       {canSubmit && submitState.kind !== 'submitted' && (
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-1">
-            <span className="text-slate-400 whitespace-nowrap">
-              {t('daily.nicknameLabel')}
+        <div
+          ref={submitFormRef}
+          className="flex flex-col gap-2 border border-emerald-500/60 bg-emerald-950/40 rounded p-3"
+        >
+          <div className="flex flex-col gap-0.5">
+            <span className="text-emerald-200 text-sm font-bold">
+              {t('daily.submitPromptHeader')}
             </span>
-            <input
-              type="text"
-              value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
-              placeholder={t('daily.nicknamePlaceholder')}
-              maxLength={32}
-              className="bg-slate-800 border border-slate-700 rounded px-2 py-0.5 text-xs text-slate-100 w-40"
-            />
-          </label>
-          <button
-            type="button"
-            disabled={submitState.kind === 'submitting'}
-            onClick={onSubmit}
-            className="px-2 py-0.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-xs"
-          >
-            {submitState.kind === 'submitting'
-              ? t('daily.submitting')
-              : submitState.kind === 'failed'
-                ? t('daily.submitFailed')
-                : t('daily.submit')}
-          </button>
+            <span className="text-slate-300 text-xs">
+              {t('daily.submitPromptDesc')}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1 flex-1 min-w-0">
+              <span className="text-slate-300 whitespace-nowrap text-sm">
+                {t('daily.nicknameLabel')}
+              </span>
+              <input
+                ref={nicknameInputRef}
+                type="text"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                placeholder={t('daily.nicknamePlaceholder')}
+                maxLength={32}
+                className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-slate-100 flex-1 min-w-0"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={submitState.kind === 'submitting'}
+              onClick={onSubmit}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-sm font-bold whitespace-nowrap"
+            >
+              {submitState.kind === 'submitting'
+                ? t('daily.submitting')
+                : submitState.kind === 'failed'
+                  ? t('daily.submitFailed')
+                  : t('daily.submit')}
+            </button>
+          </div>
         </div>
       )}
       {submitState.kind === 'submitted' && (
-        <div className="text-emerald-300">{t('daily.submitted')}</div>
+        <div className="text-emerald-300 text-sm">{t('daily.submitted')}</div>
       )}
 
       {/* X 共有: 終了後ならいつでも (送信前でも) 押せるようにする。 送信済み

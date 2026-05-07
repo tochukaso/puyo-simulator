@@ -20,6 +20,10 @@ import { suggestForState } from './hooks/useAiSuggestion';
 import { getAmaPreset } from '../ai/wasm-ama/wasm-loader';
 import type { MatchRecord } from '../match/records';
 import { dailySeedFor, todayDateJst } from '../game/dailySeed';
+import {
+  saveDailyProgress,
+  clearDailyProgress,
+} from '../match/dailyPersist';
 
 export interface PoppingCell {
   row: number;
@@ -205,6 +209,14 @@ interface Store {
   /** デイリーチャレンジを開始。 seed は JST 日付ハッシュ、 turnLimit は 50 固定。
    *  dailyDate を省略すると今日の JST 日付を使う (テスト用に固定可能)。 */
   startDaily(opts?: { dailyDate?: string }): void;
+  /** localStorage に保存された daily 進行を再シミュレートで復元する。 reload で
+   *  終了済みスコアを失わないため。 dailyDate は今日と一致する想定で、 一致
+   *  しない場合は呼び出し側でフォールバックを判断する。 */
+  restoreDailyProgress(snap: {
+    dailyDate: string;
+    matchSeed: number;
+    matchPlayerMoves: ReadonlyArray<{ axisCol: number; rotation: number }>;
+  }): void;
   /** score / daily モードのみ。ユーザーがゲームを途中で終了する (Quit ボタン)。
    *  ターン数到達と同じく matchEnded=true + matchResult をセットして、
    *  保存・共有 UI を出せる状態にする。 */
@@ -617,6 +629,21 @@ export const useGameStore = create<Store>((set, get) => ({
         playerHistory: [...st.playerHistory, st.game],
       }));
       get().finalizeMatchIfDone();
+      // Daily は reload 耐性のため毎手 localStorage に進行を書き出す。
+      // 終了済みかどうかは復元側で moves.length === turnLimit を見ればわかる
+      // ので、 ここでは matchEnded を保存しなくて良い。
+      const after = get();
+      if (
+        after.mode === 'daily' &&
+        after.matchSeed !== null &&
+        after.currentDailyDate !== null
+      ) {
+        saveDailyProgress({
+          dailyDate: after.currentDailyDate,
+          matchSeed: after.matchSeed,
+          matchPlayerMoves: after.matchPlayerMoves,
+        });
+      }
     }
     // Free-mode move log. Used by analyzeStats() to replay the game later.
     // We log both 'user' and 'ai' sources — if the user delegated to "AI Best",
@@ -883,6 +910,10 @@ export const useGameStore = create<Store>((set, get) => ({
     const turnLimit: MatchTurnLimit = 50;
     persistMode('daily');
     persistTurnLimit(turnLimit);
+    // 新しい日付のチャレンジを始めるので、 古い日の進行はクリア。 同日内で
+    // rematch 用に startDaily を呼んだ場合も「最初から」が期待挙動なので
+    // 同じ日でも一旦クリア (今手についてはこの後の commit で書き直される)。
+    clearDailyProgress();
     const playerGame = createInitialState(seed);
     set({
       mode: 'daily',
@@ -899,6 +930,66 @@ export const useGameStore = create<Store>((set, get) => ({
       matchAiMoves: [],
       matchEnded: false,
       matchResult: null,
+      loadedRecordId: null,
+      viewing: 'player',
+      aiHistoryViewIndex: null,
+      playerHistoryViewIndex: null,
+      historyAnim: null,
+      animatingSteps: [],
+      poppingCells: [],
+      chainTexts: [],
+      landedCells: [],
+      history: [],
+      aiStats: { ...EMPTY_AI_STATS },
+      analyzing: false,
+      freePlayerMoves: [],
+    });
+  },
+
+  restoreDailyProgress: (snap) => {
+    // localStorage の進行スナップショットを再シミュレートで復元する。
+    // simulateRecordSide が seed + moves から playerHistory + lastState を
+    // 組み立ててくれるので、 そのまま store に流し込む。
+    historyAnimSeq++;
+    const turnLimit: MatchTurnLimit = 50;
+    persistMode('daily');
+    persistTurnLimit(turnLimit);
+    // localStorage の生 number → Move 型に narrow。 dailyPersist.ts の
+    // バリデータで axisCol / rotation の存在は確認済み。 範囲は dailySeed
+    // の seed 検証 + simulateRecordSide 内部の canPlace で守られる。
+    const moves: Move[] = snap.matchPlayerMoves.map((m) => ({
+      axisCol: m.axisCol,
+      rotation: m.rotation as 0 | 1 | 2 | 3,
+    }));
+    const sim = simulateRecordSide(snap.matchSeed, moves, turnLimit);
+    const matchTurnsPlayed = snap.matchPlayerMoves.length;
+    // 50 手到達 or 途中で gameover していたなら終了扱い。 simulate の lastState
+    // を見れば current === null かどうかで判定できる。
+    const ended =
+      matchTurnsPlayed >= turnLimit ||
+      sim.lastState.status === 'gameover' ||
+      sim.lastState.current === null;
+    set({
+      mode: 'daily',
+      matchTurnLimit: turnLimit,
+      matchSeed: snap.matchSeed,
+      matchPreset: '',
+      currentDailyDate: snap.dailyDate,
+      game: sim.lastState,
+      aiGame: null,
+      aiHistory: [],
+      playerHistory: sim.history,
+      matchTurnsPlayed,
+      matchPlayerMoves: moves,
+      matchAiMoves: [],
+      matchEnded: ended,
+      matchResult: ended
+        ? {
+            playerScore: sim.lastState.score,
+            aiScore: 0,
+            winner: 'player',
+          }
+        : null,
       loadedRecordId: null,
       viewing: 'player',
       aiHistoryViewIndex: null,

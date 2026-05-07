@@ -143,6 +143,15 @@ describe.skipIf(!hasGlue)('reachability vs ama (full bidirectional golden)', () 
         const amaMoves = await ai.legalMoves(state);
         const ourMoves = enumerateLegalMoves(state);
 
+        // ama が 0 候補を返したら subset 比較は vacuous pass してしまう。
+        // ここで使う fixture はいずれも合法手のある盤面 (col 0 が完封の
+        // ケースでも col 1..5 で何手かは打てる) なので、 0 候補は wasm
+        // 側の regression を意味する。 先に fail させる。
+        expect(
+          amaMoves.length,
+          `ama returned no legal moves for playable fixture: ${c.name}`,
+        ).toBeGreaterThan(0);
+
         // 同色ペアの時は ama 側が UP/DOWN/LEFT/RIGHT のうち UP/RIGHT のみ
         // 返す (de-dup)。 こちらも de-dup して比較。
         const sameColor =

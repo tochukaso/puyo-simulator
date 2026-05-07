@@ -34,6 +34,8 @@ export interface Dict {
   'daily.submitting': string;
   'daily.submitted': string;
   'daily.submitFailed': string;
+  'daily.submitPromptHeader': string;
+  'daily.submitPromptDesc': string;
   'daily.leaderboardTitle': string;
   'daily.leaderboardLoading': string;
   'daily.leaderboardEmpty': string;
@@ -201,6 +203,8 @@ export const translations: Record<Lang, Dict> = {
     'daily.submitting': '送信中…',
     'daily.submitted': '送信済み',
     'daily.submitFailed': '送信失敗 — もう一度試す',
+    'daily.submitPromptHeader': '🏆 リーダーボードに登録',
+    'daily.submitPromptDesc': 'ニックネームを入れて送信するとリーダーボードに記録されます。',
     'daily.leaderboardTitle': 'ランキング',
     'daily.leaderboardLoading': '読み込み中…',
     'daily.leaderboardEmpty': 'まだスコアがありません。一番乗りを目指そう!',
@@ -366,6 +370,8 @@ export const translations: Record<Lang, Dict> = {
     'daily.submitting': 'Submitting…',
     'daily.submitted': 'Submitted',
     'daily.submitFailed': 'Submit failed — retry',
+    'daily.submitPromptHeader': '🏆 Submit to leaderboard',
+    'daily.submitPromptDesc': 'Enter a nickname and submit to record your score on the leaderboard.',
     'daily.leaderboardTitle': 'Leaderboard',
     'daily.leaderboardLoading': 'Loading…',
     'daily.leaderboardEmpty': 'No scores yet — be the first!',
@@ -531,6 +537,8 @@ export const translations: Record<Lang, Dict> = {
     'daily.submitting': '提交中…',
     'daily.submitted': '已提交',
     'daily.submitFailed': '提交失败 — 重试',
+    'daily.submitPromptHeader': '🏆 提交到排行榜',
+    'daily.submitPromptDesc': '输入昵称并提交,即可记录到排行榜。',
     'daily.leaderboardTitle': '排行榜',
     'daily.leaderboardLoading': '加载中…',
     'daily.leaderboardEmpty': '还没有分数 — 抢个第一吧!',
@@ -696,6 +704,8 @@ export const translations: Record<Lang, Dict> = {
     'daily.submitting': '전송 중…',
     'daily.submitted': '전송 완료',
     'daily.submitFailed': '전송 실패 — 재시도',
+    'daily.submitPromptHeader': '🏆 리더보드에 등록',
+    'daily.submitPromptDesc': '닉네임을 입력하고 전송하면 리더보드에 기록됩니다.',
     'daily.leaderboardTitle': '순위표',
     'daily.leaderboardLoading': '로딩 중…',
     'daily.leaderboardEmpty': '아직 점수가 없어요. 첫 도전자가 되어보세요!',

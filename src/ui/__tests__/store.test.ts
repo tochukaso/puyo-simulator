@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { useGameStore } from '../store';
-import { dailySeedFor, todayDateJst } from '../../game/dailySeed';
+import { dailySeedFor } from '../../game/dailySeed';
 
 describe('useGameStore', () => {
   beforeEach(() => {
@@ -286,13 +286,15 @@ describe('useGameStore daily mode reset', () => {
   });
 
   it('reset() in daily mode preserves the daily fixed seed', () => {
-    const today = todayDateJst();
-    const expectedSeed = dailySeedFor(today);
+    // 真夜中 (JST 0:00) を跨ぐと todayDateJst() と startDaily() の評価
+    // タイミングがズレて flake になりうるので、固定日付を明示的に渡す。
+    const fixedDate = '2026-05-07';
+    const expectedSeed = dailySeedFor(fixedDate);
 
-    useGameStore.getState().startDaily();
+    useGameStore.getState().startDaily({ dailyDate: fixedDate });
     expect(useGameStore.getState().mode).toBe('daily');
     expect(useGameStore.getState().matchSeed).toBe(expectedSeed);
-    expect(useGameStore.getState().currentDailyDate).toBe(today);
+    expect(useGameStore.getState().currentDailyDate).toBe(fixedDate);
 
     // ペア列の指紋として最初の current.pair と nextQueue[0..1] を覚えておく。
     const before = useGameStore.getState().game;
@@ -308,7 +310,7 @@ describe('useGameStore daily mode reset', () => {
     const after = useGameStore.getState();
     expect(after.mode).toBe('daily');
     expect(after.matchSeed).toBe(expectedSeed);
-    expect(after.currentDailyDate).toBe(today);
+    expect(after.currentDailyDate).toBe(fixedDate);
     const afterFingerprint = JSON.stringify({
       cur: after.game.current!.pair,
       next: after.game.nextQueue.slice(0, 2),
@@ -318,6 +320,22 @@ describe('useGameStore daily mode reset', () => {
     expect(after.matchTurnsPlayed).toBe(0);
     expect(after.matchPlayerMoves).toEqual([]);
     expect(after.matchEnded).toBe(false);
+  });
+
+  it('reset() in daily mode falls back to today JST when currentDailyDate is null (legacy record)', () => {
+    // legacy / 壊れたレコードのシミュレート: mode='daily' だけ立っていて
+    // currentDailyDate が無い状態。 reset() は当日 JST の dailySeed で
+    // 復元する (matchSeed が null のままになる旧バグの回帰防止)。
+    useGameStore.setState({
+      mode: 'daily',
+      currentDailyDate: null,
+      matchSeed: null,
+    });
+    useGameStore.getState().reset();
+    const after = useGameStore.getState();
+    expect(after.mode).toBe('daily');
+    expect(after.matchSeed).not.toBeNull();
+    expect(after.currentDailyDate).not.toBeNull();
   });
 
   it('reset() in non-daily modes still uses a fresh random seed (no regression)', () => {

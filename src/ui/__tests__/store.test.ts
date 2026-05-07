@@ -381,6 +381,53 @@ describe('useGameStore daily mode reset', () => {
     expect(after.matchResult!.playerScore).toBeGreaterThanOrEqual(0);
   });
 
+  it('canUndo() is true in daily mode after at least one move', () => {
+    useGameStore.getState().startDaily({ dailyDate: '2026-05-07' });
+    expect(useGameStore.getState().canUndo()).toBe(false);
+    // 1 手分手動で進めた状態をシミュレート (commit を完走させずに状態だけ進める)。
+    useGameStore.setState((st) => ({
+      matchTurnsPlayed: 1,
+      matchPlayerMoves: [{ axisCol: 2, rotation: 0 }],
+      playerHistory: [st.game],
+    }));
+    expect(useGameStore.getState().canUndo()).toBe(true);
+  });
+
+  it('undo() in daily mode rewinds matchPlayerMoves and matchTurnsPlayed', () => {
+    useGameStore.getState().startDaily({ dailyDate: '2026-05-07' });
+    const initialGame = useGameStore.getState().game;
+    // 2 手分仮想的に進める。
+    const fakePlayerHistory = [initialGame, initialGame];
+    useGameStore.setState({
+      matchTurnsPlayed: 2,
+      matchPlayerMoves: [
+        { axisCol: 0, rotation: 0 },
+        { axisCol: 1, rotation: 0 },
+      ],
+      playerHistory: fakePlayerHistory,
+    });
+    expect(useGameStore.getState().canUndo()).toBe(true);
+    useGameStore.getState().undo();
+    const after = useGameStore.getState();
+    expect(after.matchTurnsPlayed).toBe(1);
+    expect(after.matchPlayerMoves.length).toBe(1);
+    // 0 手まで戻すと initial state に戻る (matchSeed が保持されている)。
+    useGameStore.getState().undo();
+    expect(useGameStore.getState().matchTurnsPlayed).toBe(0);
+    expect(useGameStore.getState().matchPlayerMoves.length).toBe(0);
+  });
+
+  it('canUndo() stays false in daily mode after matchEnded', () => {
+    useGameStore.getState().startDaily({ dailyDate: '2026-05-07' });
+    useGameStore.setState({
+      matchTurnsPlayed: 1,
+      matchPlayerMoves: [{ axisCol: 0, rotation: 0 }],
+      playerHistory: [useGameStore.getState().game],
+      matchEnded: true,
+    });
+    expect(useGameStore.getState().canUndo()).toBe(false);
+  });
+
   it('restoreDailyProgress with 0 moves leaves match unfinished', () => {
     const fixedDate = '2026-05-07';
     const expectedSeed = dailySeedFor(fixedDate);

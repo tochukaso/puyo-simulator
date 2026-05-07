@@ -28,11 +28,15 @@ export function Controls() {
   const controlMode = useControlMode();
   const tuning = useControlTuning();
 
-  // free モードのみ AI Best と Undo を出す。
+  // free モードのみ AI Best を出す。
   // match モード: AI Best 隠し / Undo は出す (player-only undo)。
   // score モード: AI Best も Undo も隠し、代わりに左回転を出す。
+  // daily モード: match と同様 Undo を出す (やり直し UX)。 Reset の代わりに
+  // Stats 側の Quit ボタンを使うので Reset はここから外す。
   const showAiBest = mode === 'free';
-  const showUndo = mode === 'free' || mode === 'match';
+  const showUndo = mode === 'free' || mode === 'match' || mode === 'daily';
+  // Reset を出さないモード: daily (Quit に置き換わるため)。
+  const showReset = mode !== 'daily';
   // CCW を出す条件:
   //   - score モード: 既存仕様 (CCW + CW を並列)
   //   - tap-to-drop / drag: ジェスチャーで回転できないので CCW ボタンを表示
@@ -51,13 +55,14 @@ export function Controls() {
     `${padY} rounded ${fontSize} touch-manipulation select-none disabled:opacity-50 disabled:cursor-not-allowed`;
 
   // 2 段目のグリッド列数を出すボタン数に合わせる。
-  // 常に出る: [primary rotate, Drop, Reset] = 3
-  // option: showAiBest, showCwExtra, showUndo
+  // 常に出る: [primary rotate, Drop] = 2
+  // option: showAiBest, showCwExtra, showUndo, showReset
   const cols =
-    3 +
+    2 +
     (showAiBest ? 1 : 0) +
     (showCwExtra ? 1 : 0) +
-    (showUndo ? 1 : 0);
+    (showUndo ? 1 : 0) +
+    (showReset ? 1 : 0);
   // Tailwind が静的に解析できるようクラス名を直接マップ (string concat だと
   // JIT がクラスを発見できない)。
   const colsClass =
@@ -65,7 +70,9 @@ export function Controls() {
       ? 'grid-cols-6'
       : cols === 5
         ? 'grid-cols-5'
-        : 'grid-cols-4';
+        : cols === 4
+          ? 'grid-cols-4'
+          : 'grid-cols-3';
 
   const repeatLeft = usePressRepeat(
     () => dispatch({ type: 'moveLeft' }),
@@ -191,14 +198,16 @@ export function Controls() {
             {t('controls.undo')}
           </button>
         )}
-        <button
-          className={`${cellBase} bg-red-600 hover:bg-red-500 active:bg-red-400`}
-          onClick={async () => {
-            if (await confirmDialog(t('controls.resetConfirm'))) reset();
-          }}
-        >
-          {t('controls.reset')}
-        </button>
+        {showReset && (
+          <button
+            className={`${cellBase} bg-red-600 hover:bg-red-500 active:bg-red-400`}
+            onClick={async () => {
+              if (await confirmDialog(t('controls.resetConfirm'))) reset();
+            }}
+          >
+            {t('controls.reset')}
+          </button>
+        )}
       </div>
     </div>
   );

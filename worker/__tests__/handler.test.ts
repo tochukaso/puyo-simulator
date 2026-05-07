@@ -574,6 +574,9 @@ describe('worker daily mode', () => {
       env,
     );
     expect(res.status).toBe(400);
+    // 400 でも CORS ヘッダは維持されるべき (publicJsonResponse 経由で
+    // 返されるパスを将来別ヘルパに取り違えてもこのテストで気付ける)。
+    expect(res.headers.get('access-control-allow-origin')).toBe('*');
   });
 
   it('GET /api/daily/scores escapes LIKE wildcards in name filter', async () => {

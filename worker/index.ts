@@ -55,6 +55,9 @@ const PUBLIC_READ_HEADERS = {
   ...JSON_HEADERS,
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET, OPTIONS',
+  // Content-Type は GET では必須ではないが、 クライアントが Accept や
+  // Content-Type を明示すると preflight 対象になりうる。 保険として許可。
+  'access-control-allow-headers': 'content-type',
   'access-control-max-age': '86400',
 };
 

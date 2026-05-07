@@ -30,10 +30,16 @@ interface FilterState {
 function readInitialFilter(): FilterState {
   const params = new URLSearchParams(window.location.search);
   const order = params.get('order') === 'date' ? 'date' : 'score';
+  // URL から復元した値も applyFilter と同じ sanitization を通す。 そうしないと
+  // 不正な bookmark (例: ?from=bad-date) で初回 fetch が API 400 になり
+  // 「読み込み失敗」 表示で原因が見えない。 マウント時点で空文字に丸める
+  // ことで、 ユーザは少なくとも全件表示の状態に着地する。
+  const rawFrom = params.get('from') ?? '';
+  const rawTo = params.get('to') ?? '';
   return {
-    from: params.get('from') ?? '',
-    to: params.get('to') ?? '',
-    name: params.get('name') ?? '',
+    from: isValidDailyDate(rawFrom) ? rawFrom : '',
+    to: isValidDailyDate(rawTo) ? rawTo : '',
+    name: (params.get('name') ?? '').trim().slice(0, 32),
     order,
   };
 }
@@ -120,6 +126,11 @@ export function ScoresPage() {
       order: draftFilter.order,
     };
     setAppliedFilter(safe);
+    // appliedFilter だけ sanitize して draftFilter (= input 表示) を放置すると、
+    // ユーザ入力が " alice " (前後空白あり) や 不正日付の場合に「入力値と
+    // 実際の問い合わせ値が乖離する」 silent な ズレが起きる。 視覚的に
+    // 「補正された」 ことが分かるよう draft も同期。
+    setDraftFilter(safe);
     setOffset(0);
   }
   function resetFilter(): void {

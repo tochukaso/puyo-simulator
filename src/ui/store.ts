@@ -16,6 +16,7 @@ import { applyInput } from '../game/moves';
 import { canPlace } from '../game/pair';
 import { resolveChain } from '../game/chain';
 import { lockActive } from '../game/landing';
+import { isMoveValid } from '../game/reachability';
 import { suggestForState } from './hooks/useAiSuggestion';
 import { getAmaPreset } from '../ai/wasm-ama/wasm-loader';
 import type { MatchRecord } from '../match/records';
@@ -499,9 +500,18 @@ export const useGameStore = create<Store>((set, get) => ({
     if (!s.current) return;
     const source: CommitSource = opts?.source ?? 'user';
 
-    // Puyo Puyo Tsuu (eSport) rules: no "no-crossing" restriction. Any
-    // (axisCol, rotation) can be placed directly (equivalent to wall-kick
-    // and teleportation).
+    // 本家ぷよぷよ通の挙動: 13段目封印列・14段目 ghost wall を貫通する
+    // テレポート配置は許可しない (= ぷよぷよキャンプ wiki の「同列の 13段目に
+    // 縦置きすることができなくなる」 仕様)。 旧 eスポート ルール (no-crossing
+    // restriction) は廃止 — 「無限に捨てぷよができる」 体感バグの原因だった。
+    //
+    // isMoveValid = reachable (BFS 経路) && productive (lockActive で 1 マス以上
+    // 増える)。 productivity が必要なのは、 floor kick で row 0 col=sealed まで
+    // 軸を持って行ける場合があり、 そこで commit すると lockActive が両方を
+    // 黙って discard する (= turn だけ消費する no-op) ため。
+    if (!isMoveValid(s, move)) {
+      return;
+    }
 
     const placed = {
       ...s.current,

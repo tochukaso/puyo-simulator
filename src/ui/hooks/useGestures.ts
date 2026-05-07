@@ -1,9 +1,11 @@
 import { useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
+import type { Move } from '../../game/types';
 import { useGameStore } from '../store';
 import { getControlMode, getControlTuning } from './useControlPrefs';
 import { getBoardRect } from './useBoardRect';
 import { setPreviewMove, getPreviewMove } from './useAiPreview';
+import { isMoveValid } from '../../game/reachability';
 import { COLS } from '../../game/constants';
 
 const TAP_MAX_MS = 200;
@@ -105,8 +107,15 @@ export function useGestures(targetRef: RefObject<HTMLElement | null>) {
       // candidate (handled in onUp).
       if (mode === 'drag' && Math.abs(col - game.current.axisCol) > 1) return;
 
+      // 本家挙動 (PR #?): 14段目壁 / 13段目封印列で到達不能な (axisCol, rotation)
+      // にはプレビューを出さない。 出してしまうと release 時の commit が
+      // store 側でガードされて no-op になり、 ユーザに「効いた風で効かない」
+      // 体感が出る。 始点で reachable なら preview 開始 OK。
+      const target: Move = { axisCol: col, rotation: game.current.rotation };
+      if (!isMoveValid(useGameStore.getState().game, target)) return;
+
       draggingRef.current = true;
-      setPreviewMove({ axisCol: col, rotation: game.current.rotation });
+      setPreviewMove(target);
     };
 
     const onMove = (e: PointerEvent) => {
@@ -158,7 +167,15 @@ export function useGestures(targetRef: RefObject<HTMLElement | null>) {
         useGameStore.getState().game.current?.rotation ??
         game.current.rotation;
       const reClamped = clampAxisColForRotation(rawCol, latestRotation);
-      setPreviewMove({ axisCol: reClamped, rotation: latestRotation });
+      // 14段目壁 / 13段目封印列で到達不能な列はプレビュー非表示。 reachable
+      // でなくなった瞬間に既存プレビューも消して 「ここに置けない」 フィード
+      // バックを返す。
+      const candidate: Move = { axisCol: reClamped, rotation: latestRotation };
+      if (isMoveValid(useGameStore.getState().game, candidate)) {
+        setPreviewMove(candidate);
+      } else {
+        setPreviewMove(null);
+      }
 
       // For drag mode, also treat downward pull as repeated softDrop dispatches.
       // Coalesced pointer events on mobile can deliver dy spanning multiple

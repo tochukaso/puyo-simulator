@@ -92,6 +92,30 @@ export function DailyPanel() {
   const [leaderboardFailed, setLeaderboardFailed] = useState(false);
   const [myIds, setMyIds] = useState<readonly string[]>([]);
 
+  // リーダーボードの折り畳み状態を localStorage に永続化する。 「結果を畳んで
+  // ゲームに集中したい」というユーザ要望に応えつつ、 一度の選択を覚えておく。
+  const LEADERBOARD_EXPANDED_KEY = 'puyo.daily.leaderboardExpanded';
+  const [leaderboardExpanded, setLeaderboardExpanded] = useState<boolean>(() => {
+    try {
+      const raw = localStorage.getItem(LEADERBOARD_EXPANDED_KEY);
+      // null (未設定) は展開がデフォルト。 'false' 文字列のときだけ折り畳み。
+      return raw !== 'false';
+    } catch {
+      return true;
+    }
+  });
+  function toggleLeaderboardExpanded(): void {
+    setLeaderboardExpanded((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(LEADERBOARD_EXPANDED_KEY, String(next));
+      } catch {
+        // ignore (private mode 等)
+      }
+      return next;
+    });
+  }
+
   // viewDate に対応する日付文字列。 "today" / "yesterday" を同じ Date 起点
   // (real now) から導出して、「today タブと yesterday タブが必ず連続した
   // 2 日を指す」ようにする。 currentDailyDate を today にフォールバックすると、
@@ -289,35 +313,51 @@ export function DailyPanel() {
         </div>
       )}
 
-      {/* 今日 / 昨日タブ。 */}
-      <div className="flex gap-1 mt-1">
-        <button
-          type="button"
-          onClick={() => setViewDate('today')}
-          className={`px-2 py-0.5 rounded text-xs ${
-            viewDate === 'today'
-              ? 'bg-blue-600 text-white'
-              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-          }`}
-        >
-          {t('daily.viewToday')}
-        </button>
-        <button
-          type="button"
-          onClick={() => setViewDate('yesterday')}
-          className={`px-2 py-0.5 rounded text-xs ${
-            viewDate === 'yesterday'
-              ? 'bg-blue-600 text-white'
-              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-          }`}
-        >
-          {t('daily.viewYesterday')}
-        </button>
-        <span className="ml-auto text-slate-500 self-center">{targetDate}</span>
-      </div>
+      {/* リーダーボードセクション全体を折り畳み可能に。 ヘッダだけ常に表示
+          して、 タブ + リスト本体は expanded のときだけ描画。 */}
+      <button
+        type="button"
+        onClick={toggleLeaderboardExpanded}
+        aria-expanded={leaderboardExpanded}
+        className="flex items-center gap-2 mt-1 px-1 py-0.5 text-slate-200 text-xs hover:bg-slate-800 rounded text-left"
+      >
+        <span className="text-slate-400">
+          {leaderboardExpanded ? '▼' : '▶'}
+        </span>
+        <span className="font-bold">{t('daily.leaderboardTitle')}</span>
+      </button>
 
-      {/* リーダーボード本体。 */}
-      <div className="flex flex-col gap-0.5 max-h-60 overflow-y-auto">
+      {leaderboardExpanded && (
+        <>
+          {/* 今日 / 昨日タブ。 */}
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={() => setViewDate('today')}
+              className={`px-2 py-0.5 rounded text-xs ${
+                viewDate === 'today'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              {t('daily.viewToday')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewDate('yesterday')}
+              className={`px-2 py-0.5 rounded text-xs ${
+                viewDate === 'yesterday'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              {t('daily.viewYesterday')}
+            </button>
+            <span className="ml-auto text-slate-500 self-center">{targetDate}</span>
+          </div>
+
+          {/* リーダーボード本体。 */}
+          <div className="flex flex-col gap-0.5 max-h-60 overflow-y-auto">
         {leaderboard === null ? (
           leaderboardFailed ? (
             <div className="text-rose-300">{t('daily.leaderboardError')}</div>
@@ -362,7 +402,9 @@ export function DailyPanel() {
             );
           })
         )}
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

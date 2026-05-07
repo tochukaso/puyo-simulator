@@ -665,14 +665,16 @@ export const useGameStore = create<Store>((set, get) => ({
     const { animatingSteps, mode } = st;
     if (animatingSteps.length > 0) return;
 
-    // score / daily モードはユーザー要件で undo 不可 (一発勝負のスコアアタック前提)。
-    if (mode === 'score' || mode === 'daily') return;
+    // score モードは「一発勝負」仕様で undo 不可。 daily は当初は同じ扱いだったが、
+    // ユーザ要件で「毎手やり直しできる UX のほうが快適」と変更 (リーダーボードの
+    // 公平性はサーバ側で seed + moves を再シミュレートして検証するので、
+    // クライアント側での試行回数は制約しなくてよい)。
+    if (mode === 'score') return;
 
-    if (mode === 'match') {
-      // Match mode の undo はプレイヤー側だけを巻き戻す。ama の盤面・履歴は
-      // 触らないので、undo 後はターン数差が出る (ama は inFlight で常に進む)。
-      // 「ama の応手を見て自分の手を選び直す」が可能になる仕様だが、ユーザーが
-      // 練習や misclick リカバリ用途として明示的に選んだ動作。
+    if (mode === 'match' || mode === 'daily') {
+      // match / daily の undo はプレイヤー側だけを巻き戻す。 match は ama を
+      // 触らずターン数差が出るので「ama の応手を見て選び直す」用途。 daily は
+      // ama 不在なので単純に手順を巻き戻すだけ。
       // matchEnded 後・loadRecord ロード中 (matchEnded=true) は不可。
       if (st.matchEnded) return;
       if (st.matchSeed === null) return;
@@ -704,6 +706,15 @@ export const useGameStore = create<Store>((set, get) => ({
         aiStats: { ...EMPTY_AI_STATS },
         analyzing: false,
       });
+      // daily は localStorage 上の進行も巻き戻す。 そうしないと reload 時に
+      // 古い (= undo 前の) 手列で復元されてしまう。
+      if (mode === 'daily' && st.currentDailyDate !== null) {
+        saveDailyProgress({
+          dailyDate: st.currentDailyDate,
+          matchSeed: st.matchSeed,
+          matchPlayerMoves: newMatchPlayerMoves,
+        });
+      }
       return;
     }
 
@@ -730,9 +741,10 @@ export const useGameStore = create<Store>((set, get) => ({
   canUndo: () => {
     const st = get();
     if (st.animatingSteps.length > 0) return false;
-    // score / daily モードはユーザー要件で常時 undo 不可。
-    if (st.mode === 'score' || st.mode === 'daily') return false;
-    if (st.mode === 'match') {
+    // score モードのみ undo 不可。 daily は match と同様にプレイヤーだけ
+    // 巻き戻しが可能。
+    if (st.mode === 'score') return false;
+    if (st.mode === 'match' || st.mode === 'daily') {
       return !st.matchEnded && st.matchTurnsPlayed > 0;
     }
     return st.history.length > 0;

@@ -37,9 +37,10 @@ export function Stats() {
   // 投了ボタンは match 進行中のみ。top-out 後も matchEnded になるまでは
   // ama の完走を待たずに即終了できるよう一貫して出す。
   const showResign = mode === 'match' && !matchEnded;
-  // score モードは「Quit」(同じ位置・同じスタイル) で、ユーザー要件どおり
-  // 別ラベル / 別アクションにする。
-  const showQuit = mode === 'score' && !matchEnded;
+  // score / daily モードは「Quit」(同じ位置・同じスタイル) で、 ユーザー要件
+  // どおり別ラベル / 別アクションにする。 daily ではさらに Controls の
+  // Reset ボタンも非表示にして、 終了動作はこの Quit に集約する。
+  const showQuit = (mode === 'score' || mode === 'daily') && !matchEnded;
 
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-300 items-center">

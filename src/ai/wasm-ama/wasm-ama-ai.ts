@@ -33,8 +33,12 @@ export class WasmAmaAI implements PuyoAI {
 
   private module: AmaModule | null = null;
   private suggestFn: ((...args: unknown[]) => number) | null = null;
+  private legalMovesFn: ((...args: unknown[]) => number) | null = null;
   private fieldBuf = 0;
   private outBuf = 0;
+  // ama_legal_moves 用の独立した out buffer (= 22 候補 × 2 byte = 44 byte)。
+  // ama_suggest の outBuf (40 byte) と layout が違うので別 alloc。
+  private legalMovesBuf = 0;
   private loading: Promise<void> | null = null;
   preset: string;
 
@@ -57,8 +61,14 @@ export class WasmAmaAI implements PuyoAI {
       this.suggestFn = m.cwrap('ama_suggest', 'number', [
         'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number',
       ]);
+      // ama_legal_moves(field_chars, ca, cc, out) → number。 全 legal moves
+      // を 1 回呼びで取得 (golden test 用)。
+      this.legalMovesFn = m.cwrap('ama_legal_moves', 'number', [
+        'number', 'number', 'number', 'number',
+      ]);
       this.fieldBuf = m._malloc(FIELD_BUFFER_BYTES);
       this.outBuf = m._malloc(OUT_BUFFER_BYTES);
+      this.legalMovesBuf = m._malloc(44); // 22 * 2 byte
       this.module = m;
     })();
     try {
@@ -74,12 +84,10 @@ export class WasmAmaAI implements PuyoAI {
     if (this.module) await setAmaPreset(preset);
   }
 
-  // Encodes the state into the WASM buffers and calls ama_suggest.
-  // Returns the number of candidates the WASM produced (0 means no result).
-  private callSuggest(state: GameState): number {
+  // Encodes the field into `this.fieldBuf`. Reused by suggest and legalMoves.
+  private encodeField(state: GameState): void {
     const m = this.module!;
     const heap = m.HEAPU8;
-
     // The wasm ama binary expects a 13-row field. The game now stores 14 rows
     // (with one extra row above the old top) — drop that top row by reading
     // from r + AI_ROW_OFFSET.
@@ -96,6 +104,12 @@ export class WasmAmaAI implements PuyoAI {
         heap[this.fieldBuf + r * 6 + c] = ch;
       }
     }
+  }
+
+  // Encodes the state into the WASM buffers and calls ama_suggest.
+  // Returns the number of candidates the WASM produced (0 means no result).
+  private callSuggest(state: GameState): number {
+    this.encodeField(state);
 
     const cur = state.current!.pair;
     const n1 = state.nextQueue[0]!;
@@ -163,12 +177,59 @@ export class WasmAmaAI implements PuyoAI {
     return out;
   }
 
+  /**
+   * 本家挙動準拠の全 legal moves を ama から取得する (golden test 用)。
+   * 戻り値は (axisCol, rotation) の Move[]。 score / expectedChain は無し
+   * (= ama 内部の `move::generate` がスコア無しで全配置を返す API のため)。
+   * 同色ペア時は ama 内部で重複 (UP/DOWN, LEFT/RIGHT) を de-dup するので、
+   * 戻り値の rotation は色によって UP+RIGHT (= 14 通り) or 全 4 方向
+   * (= 22 通り) に絞られる点に注意。
+   */
+  async legalMoves(state: GameState): Promise<Move[]> {
+    await this.init();
+    if (!state.current) return [];
+    this.encodeField(state);
+    const cur = state.current.pair;
+    const code = (s: string) => s.charCodeAt(0);
+    const ret = this.legalMovesFn!(
+      this.fieldBuf,
+      code(cur.axis),
+      code(cur.child),
+      this.legalMovesBuf,
+    );
+    if (ret <= 0) return [];
+    // legalMovesBuf は 22 候補 × 2 byte = 44 byte で確保している。 wasm の
+    // 戻り値が壊れて > 22 を返した場合に OOB read しないよう clamp。
+    const n = Math.min(ret, 22);
+    const heap = this.module!.HEAPU8;
+    const moves: Move[] = [];
+    for (let i = 0; i < n; i++) {
+      const p = this.legalMovesBuf + i * 2;
+      moves.push({
+        axisCol: heap[p + 0]!,
+        rotation: heap[p + 1]! as Rotation,
+      });
+    }
+    return moves;
+  }
+
   dispose(): void {
     if (this.module) {
       if (this.fieldBuf) this.module._free(this.fieldBuf);
       if (this.outBuf) this.module._free(this.outBuf);
+      if (this.legalMovesBuf) this.module._free(this.legalMovesBuf);
+      // 全フィールドを reset することで idempotent dispose にする。
+      // 旧実装は legalMovesBuf を reset し忘れていて二度呼びで double-free
+      // のリスクがあった。 module も null 化することで、 二度目の dispose
+      // 全体を no-op にし、 dispose 後の init() も early-return ではなく
+      // ちゃんと再 alloc するようにする。
       this.fieldBuf = 0;
       this.outBuf = 0;
+      this.legalMovesBuf = 0;
+      this.suggestFn = null;
+      this.legalMovesFn = null;
+      this.module = null;
+      this.loading = null;
     }
   }
 }

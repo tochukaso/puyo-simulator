@@ -121,20 +121,23 @@ export function useGestures(targetRef: RefObject<HTMLElement | null>) {
       const mode = getControlMode();
 
       // tap-to-drop: 押下中の縦スライドで回転発火。
-      //   - 上 (dy < 0) → CW、下 (dy > 0) → CCW
+      //   - 上 (dy < 0) → CCW、下 (dy > 0) → CW
       //   - dy が ROT_PX を複数倍跨ぐ場合は跨いだ回数ぶんループ発火
       //   - 横方向の動きとは独立して判定する。以前の「dy > dx*1.5」支配軸
       //     チェックは斜めや「列移動 + 回転」の混在ジェスチャーで発火を
       //     塞いでしまい、ユーザーから「回転ジェスチャーが効かない」と
       //     報告された。横移動 (列追従) は ROT_PX 未満の dy では発火しない
       //     ので誤動作リスクは限定的。
+      //   - 方向のマッピング: 上=CCW / 下=CW (旧仕様の逆)。 上に引き上げる
+      //     ジェスチャーが軸ぷよを「左へ転がす」体感に近いというユーザ報告
+      //     にあわせて反転。
       // drag は softDrop に下方向を使うので適用外。
       const ROT_PX = 24;
       if (mode === 'tap-to-drop' && pressStart.current) {
         const dy = e.clientY - pressStart.current.y;
         if (Math.abs(dy) >= ROT_PX) {
           const steps = Math.floor(Math.abs(dy) / ROT_PX);
-          const dir = dy < 0 ? 'rotateCW' : 'rotateCCW';
+          const dir = dy < 0 ? 'rotateCCW' : 'rotateCW';
           pressStart.current = {
             ...pressStart.current,
             y:

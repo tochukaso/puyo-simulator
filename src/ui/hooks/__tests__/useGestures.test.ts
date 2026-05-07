@@ -131,18 +131,50 @@ describe('useGestures', () => {
     const startRotation = useGameStore.getState().game.current!.rotation;
     act(() => {
       fire(el, 'pointerdown', 100, 200);
-      // 縦に -50px (上方向) → ROT_PX=24 を 2 ステップ跨ぐ → CW を 2 回。
+      // 縦に -50px (上方向) → ROT_PX=24 を 2 ステップ跨ぐ → CCW を 2 回。
+      // (上=CCW、 下=CW のマッピング。 旧仕様は逆向きだった。)
       fire(el, 'pointermove', 100, 150);
     });
     const rotated = useGameStore.getState().game.current!.rotation;
     expect(rotated).not.toBe(startRotation);
-    // CW 2 回。0 → 1 → 2。
+    // CCW 2 回 (0 → 3 → 2) でも CW 2 回 (0 → 1 → 2) でも mod 4 では 2。
+    // 方向そのものは下に別アサート。
     expect((rotated - startRotation + 4) % 4).toBe(2);
     // プレビューは新しい rotation で更新される。
     const preview = getPreviewMove();
     expect(preview!.rotation).toBe(rotated);
     act(() => {
       fire(el, 'pointercancel', 100, 150);
+    });
+  });
+
+  it('tap-to-drop: upward slide rotates CCW, downward slide rotates CW', () => {
+    setControlMode('tap-to-drop');
+    const { el, ref } = mountTarget();
+    renderHook(() => useGestures(ref));
+
+    // 上方向 (dy < 0) で 1 ステップ → CCW 1 回。 0 → 3。
+    const startRot = useGameStore.getState().game.current!.rotation;
+    act(() => {
+      fire(el, 'pointerdown', 100, 200);
+      fire(el, 'pointermove', 100, 174); // dy = -26
+    });
+    const upRot = useGameStore.getState().game.current!.rotation;
+    expect((startRot - upRot + 4) % 4).toBe(1); // CCW 1 step
+    act(() => {
+      fire(el, 'pointercancel', 100, 174);
+    });
+
+    // 下方向 (dy > 0) で 1 ステップ → CW 1 回。
+    const beforeDown = useGameStore.getState().game.current!.rotation;
+    act(() => {
+      fire(el, 'pointerdown', 100, 200);
+      fire(el, 'pointermove', 100, 226); // dy = +26
+    });
+    const downRot = useGameStore.getState().game.current!.rotation;
+    expect((downRot - beforeDown + 4) % 4).toBe(1); // CW 1 step
+    act(() => {
+      fire(el, 'pointercancel', 100, 226);
     });
   });
 

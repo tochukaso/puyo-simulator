@@ -305,7 +305,11 @@ export function useGestures(targetRef: RefObject<HTMLElement | null>) {
       const previewing = getPreviewMove();
       if (!previewing || newRotation === undefined) return;
       const reClamped = clampAxisColForRotation(previewing.axisCol, newRotation);
-      setPreviewMove({ axisCol: reClamped, rotation: newRotation });
+      // pointermove の preview gate と同じく isMoveValid で検証。 そうしないと
+      // ボタンで rotation を変えた瞬間に sealed-col への古い preview が復活
+      // して「効いた風で commit 時に弾かれる」 体感バグが残る。
+      const candidate: Move = { axisCol: reClamped, rotation: newRotation };
+      setPreviewMove(isMoveValid(st.game, candidate) ? candidate : null);
     });
 
     return () => {

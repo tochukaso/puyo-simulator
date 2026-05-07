@@ -1101,6 +1101,11 @@ export const useGameStore = create<Store>((set, get) => ({
     const st = get();
     const { aiGame, mode, matchEnded } = st;
     if (mode !== 'match' || matchEnded || !aiGame || !aiGame.current) return;
+    // 本家挙動: プレイヤー commit と同じく ama 側の lock も isMoveValid で
+    // gate する。 ama wasm が万が一 sealed-column へのテレポートを返しても、
+    // ama 側だけ「両方 discard で turn 浪費」 というルール非対称が起きない
+    // ようにする (公平性)。
+    if (!isMoveValid(aiGame, move)) return;
     // Synchronous ama play: lock + resolve the chain in one step (no animation).
     // We still capture the post-spawn state so spectating uses normal puyo logic.
     const placed = {

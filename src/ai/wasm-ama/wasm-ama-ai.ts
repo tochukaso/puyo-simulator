@@ -198,9 +198,12 @@ export class WasmAmaAI implements PuyoAI {
       this.legalMovesBuf,
     );
     if (ret <= 0) return [];
+    // legalMovesBuf は 22 候補 × 2 byte = 44 byte で確保している。 wasm の
+    // 戻り値が壊れて > 22 を返した場合に OOB read しないよう clamp。
+    const n = Math.min(ret, 22);
     const heap = this.module!.HEAPU8;
     const moves: Move[] = [];
-    for (let i = 0; i < ret; i++) {
+    for (let i = 0; i < n; i++) {
       const p = this.legalMovesBuf + i * 2;
       moves.push({
         axisCol: heap[p + 0]!,
@@ -215,8 +218,18 @@ export class WasmAmaAI implements PuyoAI {
       if (this.fieldBuf) this.module._free(this.fieldBuf);
       if (this.outBuf) this.module._free(this.outBuf);
       if (this.legalMovesBuf) this.module._free(this.legalMovesBuf);
+      // 全フィールドを reset することで idempotent dispose にする。
+      // 旧実装は legalMovesBuf を reset し忘れていて二度呼びで double-free
+      // のリスクがあった。 module も null 化することで、 二度目の dispose
+      // 全体を no-op にし、 dispose 後の init() も early-return ではなく
+      // ちゃんと再 alloc するようにする。
       this.fieldBuf = 0;
       this.outBuf = 0;
+      this.legalMovesBuf = 0;
+      this.suggestFn = null;
+      this.legalMovesFn = null;
+      this.module = null;
+      this.loading = null;
     }
   }
 }

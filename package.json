@@ -33,7 +33,8 @@
     "licenses:collect": "bash scripts/collect-licenses.sh",
     "licenses:check": "license-checker --production --failOn 'GPL;AGPL;LGPL'",
     "manual:capture": "tsx scripts/capture-manual-screenshots.ts",
-    "manual:export": "node scripts/export-manual.mjs"
+    "manual:export": "node scripts/export-manual.mjs",
+    "scores:export": "node scripts/export-scores-page.mjs"
   },
   "dependencies": {
     "@tensorflow/tfjs": "^4.22.0",

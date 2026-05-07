@@ -22,11 +22,21 @@
 // 「同色ペアではこちらも de-dup した上で subset」 を取る。
 
 import { describe, it, expect, beforeAll } from 'vitest';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { WasmAmaAI } from '../wasm-ama-ai';
 import { createInitialState } from '../../../game/state';
 import { enumerateLegalMoves } from '../../../game/moves';
 import { withCell } from '../../../game/field';
 import type { GameState, Move } from '../../../game/types';
+
+// CI 環境では emscripten 由来の `_glue/ama.js` (= node 用の wasm ローダ glue)
+// を gitignore で除外してビルド時にしか生成しない。 そのため CI の `npm test`
+// では WasmAmaAI.init() がモジュール解決失敗で trap する。 既存の
+// `ama-golden.test.ts` と同じく describe.skipIf で glue 不在時はスキップ。
+// ローカルで `npm run build:ama-wasm` 実行後は通常通り走る。
+const GLUE_PATH = resolve(process.cwd(), 'src/ai/wasm-ama/_glue/ama.js');
+const hasGlue = existsSync(GLUE_PATH);
 
 function targetKey(axisCol: number, rotation: number): string {
   return `${axisCol}-${rotation}`;
@@ -78,7 +88,7 @@ function setColors(
   };
 }
 
-describe('reachability vs ama (full bidirectional golden)', () => {
+describe.skipIf(!hasGlue)('reachability vs ama (full bidirectional golden)', () => {
   const ai = new WasmAmaAI();
 
   beforeAll(async () => {

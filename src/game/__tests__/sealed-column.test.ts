@@ -65,12 +65,13 @@ describe('isMoveProductive (封印列の no-op を検出)', () => {
     expect(isMoveProductive(state, { axisCol: 0, rotation: 2 })).toBe(false);
   });
 
-  it('封印列を axis にした横置き (rot 1) は child が隣の空列に着地して productive', () => {
+  it('封印列を axis にした横置き (rot 1) も axis が discard されるので productive=false', () => {
     // col 0 を封印、 col 1 は空。 axisCol=0 rotation=1 → axis col 0 (discard),
-    // child col 1 (lands at row 13)。 1 マス追加されるので productive。
+    // child col 1 (lands)。 1 個でも discard されると 「productive」 ではない
+    // (本家 ama の move::generate と同じ厳しさ)。
     const field = sealColumn(createEmptyField(), 0);
     const state = makeState(field, spawn(2));
-    expect(isMoveProductive(state, { axisCol: 0, rotation: 1 })).toBe(true);
+    expect(isMoveProductive(state, { axisCol: 0, rotation: 1 })).toBe(false);
   });
 
   it('空盤面では全 22 配置が productive', () => {
@@ -116,13 +117,13 @@ describe('isMoveValid = reachable + productive (本家挙動の commit gate)', (
     expect(isMoveValid(state, { axisCol: 5, rotation: 0 })).toBe(false);
   });
 
-  it('封印列を「横向き軸」 で経由する横置きは valid (= 捨てぷよが許される本来挙動)', () => {
-    // col 5 を封印、 spawn col 2 から col 5 隣接 col 4 に置く。 axisCol=4
-    // rotation=1 で child は col 5 (sealed)。 child は 14段目 で discard、
-    // 軸は col 4 row 13 に着地 → 1 マス追加 = productive。
+  it('封印列に child が重なる横置きも片方 discard で valid=false (本家 ama 準拠)', () => {
+    // col 5 を封印。 axisCol=4 rotation=1 で child は col 5 (sealed)。 child
+    // discard、 軸は col 4 に着地。 ama 仕様では 「discard を含む手は illegal」
+    // なので valid=false。
     const field = sealColumn(createEmptyField(), 5);
     const state = makeState(field, spawn(2));
-    expect(isMoveValid(state, { axisCol: 4, rotation: 1 })).toBe(true);
+    expect(isMoveValid(state, { axisCol: 4, rotation: 1 })).toBe(false);
   });
 
   it('空盤面では全 22 配置 valid', () => {

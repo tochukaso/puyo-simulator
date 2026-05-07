@@ -3,7 +3,7 @@ import { COLS } from './constants';
 import { canPlace, childOffset } from './pair';
 import { tryRotate } from './rotation';
 import { lockActive } from './landing';
-import { reachableTargets } from './reachability';
+import { isMoveProductive, reachableTargets } from './reachability';
 
 export function applyInput(state: GameState, input: Input): GameState {
   if (state.status !== 'playing' || !state.current) return state;
@@ -37,9 +37,12 @@ export function applyInput(state: GameState, input: Input): GameState {
   }
 }
 
-// Returns only the (col, rotation) moves physically reachable by moving the
-// current pair. If a puyo in the ceiling row blocks the path, columns beyond
-// it are excluded from the candidate list.
+// 本家準拠の合法手列挙: (col, rotation) が
+//   reachable (= BFS で実際に辿れる経路がある) かつ
+//   productive (= lockActive で 1 マス以上ぷよが盤面に追加される)
+// な move のみを返す。 reachable 単独だと floor kick で row 0 col=sealed
+// まで届く 「届くが no-op」 なケースを許してしまい、 ama の `move::generate`
+// と diverge する (= 「捨てぷよ無限」 体感バグの原因)。
 export function enumerateLegalMoves(state: GameState): Move[] {
   if (!state.current) return [];
   const reachable = reachableTargets(state.field, state.current);
@@ -50,6 +53,7 @@ export function enumerateLegalMoves(state: GameState): Move[] {
       const childCol = col + dc;
       if (childCol < 0 || childCol >= COLS) continue;
       if (!reachable.has(`${col}-${rot}`)) continue;
+      if (!isMoveProductive(state, { axisCol: col, rotation: rot })) continue;
       out.push({ axisCol: col, rotation: rot });
     }
   }

@@ -40,6 +40,29 @@ export interface Dict {
   'daily.leaderboardLoading': string;
   'daily.leaderboardEmpty': string;
   'daily.leaderboardError': string;
+  'daily.viewAllResults': string;
+  'scores.title': string;
+  'scores.filter.from': string;
+  'scores.filter.to': string;
+  'scores.filter.name': string;
+  'scores.filter.namePlaceholder': string;
+  'scores.filter.order': string;
+  'scores.filter.orderScore': string;
+  'scores.filter.orderDate': string;
+  'scores.filter.apply': string;
+  'scores.filter.reset': string;
+  'scores.col.date': string;
+  'scores.col.name': string;
+  'scores.col.score': string;
+  'scores.col.action': string;
+  'scores.empty': string;
+  'scores.loading': string;
+  'scores.error': string;
+  'scores.replay': string;
+  'scores.pagination.prev': string;
+  'scores.pagination.next': string;
+  'scores.pagination.summary': string;
+  'scores.backToGame': string;
   'daily.viewToday': string;
   'daily.viewYesterday': string;
   'daily.anonymous': string;
@@ -209,6 +232,29 @@ export const translations: Record<Lang, Dict> = {
     'daily.leaderboardLoading': '読み込み中…',
     'daily.leaderboardEmpty': 'まだスコアがありません。一番乗りを目指そう!',
     'daily.leaderboardError': '読み込みに失敗しました',
+    'daily.viewAllResults': '過去のリザルト一覧 →',
+    'scores.title': 'デイリースコア一覧',
+    'scores.filter.from': '開始日',
+    'scores.filter.to': '終了日',
+    'scores.filter.name': 'ユーザー名',
+    'scores.filter.namePlaceholder': '部分一致で絞り込み',
+    'scores.filter.order': '並び順',
+    'scores.filter.orderScore': 'スコア順',
+    'scores.filter.orderDate': '日付順',
+    'scores.filter.apply': '適用',
+    'scores.filter.reset': 'リセット',
+    'scores.col.date': '日付',
+    'scores.col.name': 'ユーザー名',
+    'scores.col.score': 'スコア',
+    'scores.col.action': '操作',
+    'scores.empty': '該当するスコアがありません',
+    'scores.loading': '読み込み中…',
+    'scores.error': '読み込みに失敗しました',
+    'scores.replay': 'リプレイ',
+    'scores.pagination.prev': '◀ 前',
+    'scores.pagination.next': '次 ▶',
+    'scores.pagination.summary': '{from}-{to} / {total} 件',
+    'scores.backToGame': '← ゲームに戻る',
     'daily.viewToday': '今日',
     'daily.viewYesterday': '昨日',
     'daily.anonymous': '匿名',
@@ -376,6 +422,29 @@ export const translations: Record<Lang, Dict> = {
     'daily.leaderboardLoading': 'Loading…',
     'daily.leaderboardEmpty': 'No scores yet — be the first!',
     'daily.leaderboardError': 'Failed to load',
+    'daily.viewAllResults': 'Browse past results →',
+    'scores.title': 'Daily score archive',
+    'scores.filter.from': 'From',
+    'scores.filter.to': 'To',
+    'scores.filter.name': 'Player name',
+    'scores.filter.namePlaceholder': 'partial match',
+    'scores.filter.order': 'Sort',
+    'scores.filter.orderScore': 'By score',
+    'scores.filter.orderDate': 'By date',
+    'scores.filter.apply': 'Apply',
+    'scores.filter.reset': 'Reset',
+    'scores.col.date': 'Date',
+    'scores.col.name': 'Player',
+    'scores.col.score': 'Score',
+    'scores.col.action': 'Action',
+    'scores.empty': 'No scores found',
+    'scores.loading': 'Loading…',
+    'scores.error': 'Failed to load',
+    'scores.replay': 'Replay',
+    'scores.pagination.prev': '◀ Prev',
+    'scores.pagination.next': 'Next ▶',
+    'scores.pagination.summary': '{from}-{to} of {total}',
+    'scores.backToGame': '← Back to game',
     'daily.viewToday': 'Today',
     'daily.viewYesterday': 'Yesterday',
     'daily.anonymous': 'Anonymous',
@@ -543,6 +612,29 @@ export const translations: Record<Lang, Dict> = {
     'daily.leaderboardLoading': '加载中…',
     'daily.leaderboardEmpty': '还没有分数 — 抢个第一吧!',
     'daily.leaderboardError': '加载失败',
+    'daily.viewAllResults': '查看历史成绩 →',
+    'scores.title': '每日成绩列表',
+    'scores.filter.from': '开始日期',
+    'scores.filter.to': '结束日期',
+    'scores.filter.name': '玩家名',
+    'scores.filter.namePlaceholder': '部分匹配',
+    'scores.filter.order': '排序',
+    'scores.filter.orderScore': '按分数',
+    'scores.filter.orderDate': '按日期',
+    'scores.filter.apply': '应用',
+    'scores.filter.reset': '重置',
+    'scores.col.date': '日期',
+    'scores.col.name': '玩家',
+    'scores.col.score': '分数',
+    'scores.col.action': '操作',
+    'scores.empty': '没有找到匹配的成绩',
+    'scores.loading': '加载中…',
+    'scores.error': '加载失败',
+    'scores.replay': '回放',
+    'scores.pagination.prev': '◀ 上一页',
+    'scores.pagination.next': '下一页 ▶',
+    'scores.pagination.summary': '{from}-{to} / 共 {total}',
+    'scores.backToGame': '← 返回游戏',
     'daily.viewToday': '今天',
     'daily.viewYesterday': '昨天',
     'daily.anonymous': '匿名',
@@ -710,6 +802,29 @@ export const translations: Record<Lang, Dict> = {
     'daily.leaderboardLoading': '로딩 중…',
     'daily.leaderboardEmpty': '아직 점수가 없어요. 첫 도전자가 되어보세요!',
     'daily.leaderboardError': '로딩 실패',
+    'daily.viewAllResults': '과거 결과 보기 →',
+    'scores.title': '데일리 점수 목록',
+    'scores.filter.from': '시작일',
+    'scores.filter.to': '종료일',
+    'scores.filter.name': '플레이어명',
+    'scores.filter.namePlaceholder': '부분 일치',
+    'scores.filter.order': '정렬',
+    'scores.filter.orderScore': '점수순',
+    'scores.filter.orderDate': '날짜순',
+    'scores.filter.apply': '적용',
+    'scores.filter.reset': '리셋',
+    'scores.col.date': '날짜',
+    'scores.col.name': '플레이어',
+    'scores.col.score': '점수',
+    'scores.col.action': '액션',
+    'scores.empty': '일치하는 점수가 없습니다',
+    'scores.loading': '로딩 중…',
+    'scores.error': '로딩 실패',
+    'scores.replay': '리플레이',
+    'scores.pagination.prev': '◀ 이전',
+    'scores.pagination.next': '다음 ▶',
+    'scores.pagination.summary': '{from}-{to} / 전체 {total}',
+    'scores.backToGame': '← 게임으로 돌아가기',
     'daily.viewToday': '오늘',
     'daily.viewYesterday': '어제',
     'daily.anonymous': '익명',

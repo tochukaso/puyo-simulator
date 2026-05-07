@@ -313,6 +313,16 @@ export function DailyPanel() {
         </div>
       )}
 
+      {/* 過去のリザルト一覧 (フィルタ付きフルスクリーン UI) への入り口。
+          折り畳みトグルとは独立に常に表示する (折りたたんでいてもアクセス
+          できるようにするため)。 */}
+      <a
+        href="?view=scores"
+        className="text-xs text-blue-400 hover:text-blue-300 underline self-start"
+      >
+        {t('daily.viewAllResults')}
+      </a>
+
       {/* リーダーボードセクション全体を折り畳み可能に。 ヘッダだけ常に表示
           して、 タブ + リスト本体は expanded のときだけ描画。 */}
       <button

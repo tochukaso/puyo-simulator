@@ -45,12 +45,32 @@ const MAX_BODY_BYTES = 64 * 1024;
 
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
-  // クロスオリジンからの読み込みは想定していないが、誤って踏まれても害が
-  // 出ないよう同オリジンに限定する (Cloudflare Workers はデフォで CORS なし)。
+};
+
+// Public read endpoints (leaderboard / scores listing) は外部サイト
+// (puyo-blog 等) からも読める必要があるので CORS を緩める。 mutation 系
+// (POST /api/scores) は別オリジンからは想定外なので、 同オリジン限定の
+// JSON_HEADERS を引き続き使う。
+const PUBLIC_READ_HEADERS = {
+  ...JSON_HEADERS,
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET, OPTIONS',
+  'access-control-max-age': '86400',
 };
 
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: JSON_HEADERS });
+}
+
+function publicJsonResponse(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: PUBLIC_READ_HEADERS,
+  });
+}
+
+function publicBadRequest(reason: string): Response {
+  return publicJsonResponse({ error: 'bad_request', reason }, 400);
 }
 
 function notFound(): Response {
@@ -344,7 +364,7 @@ async function getDailyLeaderboard(
 ): Promise<Response> {
   const date = url.searchParams.get('date');
   if (!date || !isValidDailyDate(date)) {
-    return badRequest('invalid or missing date (expected YYYY-MM-DD)');
+    return publicBadRequest('invalid or missing date (expected YYYY-MM-DD)');
   }
   // limit はデフォルト 20、上限 100。整数化失敗 / 範囲外はデフォルトに丸める。
   const rawLimit = url.searchParams.get('limit');
@@ -375,12 +395,129 @@ async function getDailyLeaderboard(
     playerScore: r.player_score,
     rank: i + 1,
   }));
-  return jsonResponse({ date, limit, entries });
+  // 外部サイト (puyo-blog) からも GET できるよう CORS を緩める。
+  return publicJsonResponse({ date, limit, entries });
+}
+
+// 任意期間 + 名前で daily スコアを絞り込むエンドポイント。 puyo-blog 等の
+// 外部静的サイトからも参照される想定で CORS を緩める。
+//
+// クエリ:
+//   from=YYYY-MM-DD     任意 (省略すると下限なし)
+//   to=YYYY-MM-DD       任意 (省略すると上限なし)
+//   name=substring      任意 (player_name の case-insensitive 部分一致)
+//   limit=N             1..100、 default 50
+//   offset=N            >= 0、 default 0
+//   order=score|date    default score (=score DESC, created_at ASC タイブレーク)
+//
+// レスポンス: { entries: [...], total, limit, offset }
+async function getDailyScoresList(env: Env, url: URL): Promise<Response> {
+  const from = url.searchParams.get('from');
+  const to = url.searchParams.get('to');
+  const name = url.searchParams.get('name');
+  if (from !== null && !isValidDailyDate(from)) {
+    return publicBadRequest('invalid from (expected YYYY-MM-DD)');
+  }
+  if (to !== null && !isValidDailyDate(to)) {
+    return publicBadRequest('invalid to (expected YYYY-MM-DD)');
+  }
+  if (name !== null && name.length > 32) {
+    return publicBadRequest('name too long (max 32)');
+  }
+  const rawLimit = url.searchParams.get('limit');
+  let limit = 50;
+  if (rawLimit !== null) {
+    const n = Number(rawLimit);
+    if (Number.isInteger(n) && n >= 1 && n <= MAX_LEADERBOARD_LIMIT) {
+      limit = n;
+    }
+  }
+  const rawOffset = url.searchParams.get('offset');
+  let offset = 0;
+  if (rawOffset !== null) {
+    const n = Number(rawOffset);
+    if (Number.isInteger(n) && n >= 0 && n <= 10000) {
+      offset = n;
+    }
+  }
+  const order = url.searchParams.get('order') === 'date' ? 'date' : 'score';
+
+  // WHERE 句を動的に組み立てる。 すべて bind パラメータ経由で SQL injection
+  // を防ぐ (string concat は禁物)。 daily_date IS NOT NULL は「daily モードの
+  // レコードのみ」を保証する (match / score モードのレコードを混ぜない)。
+  const whereParts: string[] = ['daily_date IS NOT NULL'];
+  const binds: (string | number)[] = [];
+  if (from !== null) {
+    whereParts.push('daily_date >= ?');
+    binds.push(from);
+  }
+  if (to !== null) {
+    whereParts.push('daily_date <= ?');
+    binds.push(to);
+  }
+  if (name !== null && name.length > 0) {
+    whereParts.push('LOWER(player_name) LIKE ?');
+    binds.push(`%${name.toLowerCase()}%`);
+  }
+  const whereSql = whereParts.join(' AND ');
+
+  // 総件数 (ページング UI 用)。 別クエリで COUNT する。
+  const countResult = await env.DB.prepare(
+    `SELECT COUNT(*) AS cnt FROM score_records WHERE ${whereSql}`,
+  )
+    .bind(...binds)
+    .first<{ cnt: number }>();
+  const total = countResult?.cnt ?? 0;
+
+  const orderSql =
+    order === 'date'
+      ? 'created_at DESC, player_score DESC'
+      : 'player_score DESC, created_at ASC';
+  const result = await env.DB.prepare(
+    `SELECT id, created_at, daily_date, player_name, player_score
+       FROM score_records
+      WHERE ${whereSql}
+      ORDER BY ${orderSql}
+      LIMIT ? OFFSET ?`,
+  )
+    .bind(...binds, limit, offset)
+    .all<{
+      id: string;
+      created_at: string;
+      daily_date: string;
+      player_name: string | null;
+      player_score: number;
+    }>();
+  const rows = result.results ?? [];
+  const entries = rows.map((r) => ({
+    id: r.id,
+    createdAt: r.created_at,
+    dailyDate: r.daily_date,
+    playerName: r.player_name,
+    playerScore: r.player_score,
+  }));
+  return publicJsonResponse({
+    total,
+    limit,
+    offset,
+    order,
+    filter: { from, to, name },
+    entries,
+  });
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+
+    // CORS preflight (public read endpoints のみ)。
+    if (
+      request.method === 'OPTIONS' &&
+      (url.pathname === '/api/daily/leaderboard' ||
+        url.pathname === '/api/daily/scores')
+    ) {
+      return new Response(null, { status: 204, headers: PUBLIC_READ_HEADERS });
+    }
 
     // POST /api/scores → save
     if (
@@ -404,6 +541,15 @@ export default {
       url.pathname === '/api/daily/leaderboard'
     ) {
       return getDailyLeaderboard(env, url);
+    }
+
+    // GET /api/daily/scores?from=&to=&name=&limit=&offset=&order= → 一覧 (フィルタ可)。
+    // 外部サイト (puyo-blog) からも参照する想定で CORS を緩めている。
+    if (
+      request.method === 'GET' &&
+      url.pathname === '/api/daily/scores'
+    ) {
+      return getDailyScoresList(env, url);
     }
 
     // /api/* に来たがハンドラ無しの場合は静的アセットに渡さず 404 を返す

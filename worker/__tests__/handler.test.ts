@@ -69,10 +69,19 @@ interface LeaderboardFakeRow {
   player_score: number;
 }
 
+interface ScoresListFakeRow {
+  id: string;
+  created_at: string;
+  daily_date: string;
+  player_name: string | null;
+  player_score: number;
+}
+
 function makeFakeDb(opts: {
   insertedRows: FakeRow[];
   preloaded?: FakeRow;
   leaderboard?: LeaderboardFakeRow[];
+  scoresList?: { rows: ScoresListFakeRow[]; total: number };
 }): D1Database {
   const stmt = (sql: string) => {
     const bound: unknown[] = [];
@@ -105,12 +114,28 @@ function makeFakeDb(opts: {
         return { success: true } as unknown;
       },
       async first<T>(): Promise<T | null> {
+        // /api/daily/scores の COUNT(*) は { cnt: number } を返す。
+        if (sql.startsWith('SELECT COUNT') && opts.scoresList) {
+          return ({ cnt: opts.scoresList.total } as unknown) as T;
+        }
         if (sql.includes('SELECT') && opts.preloaded) {
           return opts.preloaded as unknown as T;
         }
         return null;
       },
       async all<T>(): Promise<{ results: T[]; success: boolean }> {
+        // /api/daily/scores の本体クエリは scoresList を返す。 SELECT id ...
+        // FROM score_records WHERE ... ORDER BY ... LIMIT ? OFFSET ? の形。
+        if (
+          sql.includes('FROM score_records') &&
+          sql.includes('OFFSET') &&
+          opts.scoresList
+        ) {
+          return {
+            results: (opts.scoresList.rows as unknown) as T[],
+            success: true,
+          };
+        }
         // GET /api/daily/leaderboard 用の SELECT。 preset した leaderboard を
         // そのまま返す (テストでは並び替えやフィルタ責務はチェックしない)。
         return {
@@ -473,5 +498,95 @@ describe('worker daily mode', () => {
       env,
     );
     expect(res.status).toBe(400);
+  });
+
+  it('GET /api/daily/scores returns filtered list with total', async () => {
+    const env = {
+      DB: makeFakeDb({
+        insertedRows: [],
+        scoresList: {
+          total: 42,
+          rows: [
+            {
+              id: 'r1',
+              created_at: '2026-05-07T03:00:00Z',
+              daily_date: '2026-05-07',
+              player_name: 'alice',
+              player_score: 9000,
+            },
+            {
+              id: 'r2',
+              created_at: '2026-05-06T01:00:00Z',
+              daily_date: '2026-05-06',
+              player_name: null,
+              player_score: 6000,
+            },
+          ],
+        },
+      }),
+      ASSETS: fakeAssets,
+    };
+    const res = await worker.fetch(
+      new Request(
+        'http://localhost/api/daily/scores?from=2026-05-01&to=2026-05-07&name=al&limit=10',
+      ),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get('access-control-allow-origin')).toBe('*');
+    const body = (await res.json()) as {
+      total: number;
+      limit: number;
+      offset: number;
+      order: string;
+      filter: { from: string | null; to: string | null; name: string | null };
+      entries: {
+        id: string;
+        dailyDate: string;
+        playerName: string | null;
+        playerScore: number;
+      }[];
+    };
+    expect(body.total).toBe(42);
+    expect(body.limit).toBe(10);
+    expect(body.offset).toBe(0);
+    expect(body.order).toBe('score');
+    expect(body.filter).toEqual({
+      from: '2026-05-01',
+      to: '2026-05-07',
+      name: 'al',
+    });
+    expect(body.entries).toHaveLength(2);
+    expect(body.entries[0]).toMatchObject({
+      id: 'r1',
+      dailyDate: '2026-05-07',
+      playerScore: 9000,
+    });
+  });
+
+  it('GET /api/daily/scores rejects invalid from date', async () => {
+    const env = {
+      DB: makeFakeDb({ insertedRows: [] }),
+      ASSETS: fakeAssets,
+    };
+    const res = await worker.fetch(
+      new Request('http://localhost/api/daily/scores?from=bogus'),
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('OPTIONS /api/daily/scores returns 204 with CORS headers (preflight)', async () => {
+    const env = {
+      DB: makeFakeDb({ insertedRows: [] }),
+      ASSETS: fakeAssets,
+    };
+    const res = await worker.fetch(
+      new Request('http://localhost/api/daily/scores', { method: 'OPTIONS' }),
+      env,
+    );
+    expect(res.status).toBe(204);
+    expect(res.headers.get('access-control-allow-origin')).toBe('*');
+    expect(res.headers.get('access-control-allow-methods')).toContain('GET');
   });
 });

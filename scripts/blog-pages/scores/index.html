@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="referrer" content="no-referrer-when-downgrade" />
+<title>デイリースコア一覧 - GTR training</title>
+<meta name="description" content="GTR training のデイリーチャレンジ過去スコア一覧。ユーザー名・日付で絞り込めます。" />
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --border: #334155;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --accent: #22c55e;
+    --link: #60a5fa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 800px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.4rem; margin: 0 0 8px; }
+  .subtle { color: var(--muted); font-size: 0.9rem; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .filters label { display: flex; flex-direction: column; gap: 4px; font-size: 0.75rem; color: var(--muted); }
+  .filters input, .filters select, .filters button {
+    background: #0b1224;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+  }
+  .filters input[type="text"] { min-width: 140px; }
+  button.primary { background: #2563eb; border-color: #2563eb; cursor: pointer; }
+  button.primary:hover { background: #3b82f6; }
+  button.secondary { background: #334155; border-color: #334155; cursor: pointer; }
+  button.secondary:hover { background: #475569; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    text-align: left;
+    font-size: 0.75rem;
+    color: var(--muted);
+    background: #0b1224;
+    padding: 8px 12px;
+    position: sticky; top: 0;
+  }
+  tbody td { padding: 8px 12px; border-top: 1px solid #1e293b; font-size: 0.9rem; }
+  tbody tr:hover { background: rgba(30, 41, 59, 0.5); }
+  td.right, th.right { text-align: right; }
+  .score { color: var(--accent); font-family: 'SF Mono', monospace; font-variant-numeric: tabular-nums; }
+  a.replay {
+    display: inline-block;
+    padding: 4px 10px;
+    background: #2563eb;
+    color: var(--text);
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 0.8rem;
+  }
+  a.replay:hover { background: #3b82f6; }
+  .pager { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: var(--muted); }
+  .pager .pager-buttons { display: flex; gap: 8px; }
+  .empty, .loading, .error { padding: 16px; text-align: center; }
+  .error { color: #fca5a5; }
+  .header-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .header-row a.back { color: var(--link); text-decoration: none; font-size: 0.85rem; }
+  .header-row a.back:hover { text-decoration: underline; }
+  .stack > * + * { margin-top: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap stack">
+  <div class="header-row">
+    <h1>デイリースコア一覧</h1>
+    <a class="back" id="back-link" href="https://puyo.tochukaso.blog/">← GTR training に戻る</a>
+  </div>
+  <p class="subtle">GTR training のデイリーチャレンジ過去スコアです。 行をクリックするとリプレイが見られます。</p>
+
+  <form class="panel filters" id="filters">
+    <label>開始日<input type="date" name="from" /></label>
+    <label>終了日<input type="date" name="to" /></label>
+    <label>ユーザー名<input type="text" name="name" maxlength="32" placeholder="部分一致" /></label>
+    <label>並び順
+      <select name="order">
+        <option value="score">スコア順</option>
+        <option value="date">日付順</option>
+      </select>
+    </label>
+    <div style="display:flex; gap:8px; margin-left:auto;">
+      <button type="submit" class="primary">適用</button>
+      <button type="button" class="secondary" id="reset-btn">リセット</button>
+    </div>
+  </form>
+
+  <div class="panel" id="result-panel">
+    <div class="loading">読み込み中…</div>
+  </div>
+
+  <div class="pager">
+    <span id="pager-summary">—</span>
+    <div class="pager-buttons">
+      <button class="secondary" id="prev-btn" disabled>◀ 前</button>
+      <button class="secondary" id="next-btn" disabled>次 ▶</button>
+    </div>
+  </div>
+
+  <p class="subtle">© <a href="https://puyo.tochukaso.blog/" style="color: var(--link);">GTR training</a> — Daily challenge は JST 0:00 で更新されます。</p>
+</div>
+
+<script>
+(() => {
+  // 同じドメイン (puyo.tochukaso.blog) でホストする想定。 別ドメインから配信
+  // するなら下記 API_BASE を絶対 URL に書き換える (CORS は worker 側で対応済み)。
+  const API_BASE = 'https://puyo.tochukaso.blog';
+  const SPA_BASE = 'https://puyo.tochukaso.blog/';
+  const PAGE_SIZE = 50;
+
+  const form = document.getElementById('filters');
+  const resultPanel = document.getElementById('result-panel');
+  const pagerSummary = document.getElementById('pager-summary');
+  const prevBtn = document.getElementById('prev-btn');
+  const nextBtn = document.getElementById('next-btn');
+  const resetBtn = document.getElementById('reset-btn');
+
+  // URL クエリ ↔ filter / offset 同期 (シェア・ブックマーク可能に)。
+  const params = new URLSearchParams(location.search);
+  let state = {
+    from: params.get('from') || '',
+    to: params.get('to') || '',
+    name: params.get('name') || '',
+    order: params.get('order') === 'date' ? 'date' : 'score',
+    offset: Number(params.get('offset') || 0) || 0,
+  };
+  form.from.value = state.from;
+  form.to.value = state.to;
+  form.name.value = state.name;
+  form.order.value = state.order;
+
+  function syncUrl() {
+    const u = new URL(location.href);
+    const setOrDel = (k, v) => {
+      if (v) u.searchParams.set(k, v);
+      else u.searchParams.delete(k);
+    };
+    setOrDel('from', state.from);
+    setOrDel('to', state.to);
+    setOrDel('name', state.name);
+    setOrDel('order', state.order === 'score' ? '' : state.order);
+    setOrDel('offset', state.offset > 0 ? String(state.offset) : '');
+    history.replaceState(null, '', u.toString());
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
+  async function fetchAndRender() {
+    syncUrl();
+    resultPanel.innerHTML = '<div class="loading">読み込み中…</div>';
+    pagerSummary.textContent = '—';
+    prevBtn.disabled = true;
+    nextBtn.disabled = true;
+
+    const sp = new URLSearchParams();
+    if (state.from) sp.set('from', state.from);
+    if (state.to) sp.set('to', state.to);
+    if (state.name) sp.set('name', state.name);
+    if (state.order) sp.set('order', state.order);
+    sp.set('limit', String(PAGE_SIZE));
+    sp.set('offset', String(state.offset));
+
+    try {
+      const res = await fetch(`${API_BASE}/api/daily/scores?${sp.toString()}`);
+      if (!res.ok) throw new Error('http ' + res.status);
+      const data = await res.json();
+      renderResults(data);
+    } catch (err) {
+      resultPanel.innerHTML = '<div class="error">読み込みに失敗しました</div>';
+    }
+  }
+
+  function renderResults(data) {
+    const total = data.total || 0;
+    const entries = data.entries || [];
+    if (entries.length === 0) {
+      resultPanel.innerHTML = '<div class="empty">該当するスコアがありません</div>';
+    } else {
+      const rows = entries.map((e) => {
+        const replayHref = `${SPA_BASE}?score=${encodeURIComponent(e.id)}`;
+        const name = (e.playerName || '').trim() || '—';
+        return `<tr>
+          <td>${escapeHtml(e.dailyDate)}</td>
+          <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(name)}</td>
+          <td class="right score">${e.playerScore.toLocaleString()}</td>
+          <td class="right"><a class="replay" href="${replayHref}">リプレイ</a></td>
+        </tr>`;
+      }).join('');
+      resultPanel.innerHTML = `<div style="overflow-x:auto;"><table>
+        <thead><tr>
+          <th>日付</th><th>ユーザー名</th><th class="right">スコア</th><th class="right">操作</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+    }
+    const from = total === 0 ? 0 : state.offset + 1;
+    const to = state.offset + entries.length;
+    pagerSummary.textContent = `${from}-${to} / ${total} 件`;
+    prevBtn.disabled = state.offset <= 0;
+    nextBtn.disabled = state.offset + entries.length >= total;
+  }
+
+  form.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    state.from = form.from.value || '';
+    state.to = form.to.value || '';
+    state.name = (form.name.value || '').trim().slice(0, 32);
+    state.order = form.order.value === 'date' ? 'date' : 'score';
+    state.offset = 0;
+    fetchAndRender();
+  });
+  resetBtn.addEventListener('click', () => {
+    state = { from: '', to: '', name: '', order: 'score', offset: 0 };
+    form.from.value = '';
+    form.to.value = '';
+    form.name.value = '';
+    form.order.value = 'score';
+    fetchAndRender();
+  });
+  prevBtn.addEventListener('click', () => {
+    state.offset = Math.max(0, state.offset - PAGE_SIZE);
+    fetchAndRender();
+  });
+  nextBtn.addEventListener('click', () => {
+    state.offset += PAGE_SIZE;
+    fetchAndRender();
+  });
+
+  fetchAndRender();
+})();
+</script>
+</body>
+</html>

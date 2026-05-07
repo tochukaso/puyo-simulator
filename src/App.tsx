@@ -27,9 +27,17 @@ import { MatchPanel } from './ui/components/MatchPanel/MatchPanel';
 import { DailyPanel } from './ui/components/DailyPanel/DailyPanel';
 import { EditToolbar } from './ui/components/EditToolbar/EditToolbar';
 import { EditPairs } from './ui/components/EditPairs/EditPairs';
+import { ScoresPage } from './ui/components/ScoresPage/ScoresPage';
 
 export default function App() {
   const gestureRef = useRef<HTMLDivElement>(null);
+  // `?view=scores` のときはゲーム UI を全部スキップして ScoresPage を出す。
+  // この判定は最初の render 時に固定し、 SPA 内ナビゲーションでは reload を
+  // 噛ませる (URL を切替えてから location.href を上書き)。 軽量実装で十分。
+  const initialView =
+    new URLSearchParams(window.location.search).get('view') === 'scores'
+      ? 'scores'
+      : 'game';
   useKeyboard();
   useGestures(gestureRef);
   useMatchDriver();
@@ -111,6 +119,13 @@ export default function App() {
       }
     }
   }, []);
+  // `?view=scores` のときはゲーム UI を全部出さずにフルスクリーンで一覧画面。
+  // (Header / Board / Controls 等を持ち込まないことで、 既存の SPA レイアウトを
+  // 不用意に共有してリーダーボード閲覧者を混乱させないよう純粋なリスト UI に
+  // 限定する。)
+  if (initialView === 'scores') {
+    return <ScoresPage />;
+  }
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col">
       <Header />

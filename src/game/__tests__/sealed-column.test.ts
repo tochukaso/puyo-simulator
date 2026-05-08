@@ -101,6 +101,47 @@ describe('isMoveProductive (封印列の no-op を検出)', () => {
       }
     }
   });
+
+  // ↓ ここから sutepuyo (片方着地) の挙動を固定するテスト群。
+  //   PR #72 で added===2 → added>=1 に緩めた変更が回帰しないよう、
+  //   よくある盤面パターンを明示的に網羅する。
+
+  it('片方着地 sutepuyo (rot 1: axis 空き列 + child 封印列) は productive=true', () => {
+    // col 5 を封印、 axisCol=4 rot=1 → axis col 4 (lands), child col 5 (sutepuyo)。
+    const field = sealColumn(createEmptyField(), 5);
+    const state = makeState(field, spawn(2));
+    expect(isMoveProductive(state, { axisCol: 4, rotation: 1 })).toBe(true);
+  });
+
+  it('片方着地 sutepuyo (rot 3: axis 空き列 + child 左の封印列) は productive=true', () => {
+    // col 0 を封印、 axisCol=1 rot=3 → axis col 1 (lands), child col 0 (sutepuyo)。
+    const field = sealColumn(createEmptyField(), 0);
+    const state = makeState(field, spawn(2));
+    expect(isMoveProductive(state, { axisCol: 1, rotation: 3 })).toBe(true);
+  });
+
+  it('片方着地 sutepuyo (rot 1: axis 封印列 + child 空き列) は productive=true', () => {
+    // col 0 を封印、 axisCol=0 rot=1 → axis col 0 (sutepuyo), child col 1 (lands)。
+    const field = sealColumn(createEmptyField(), 0);
+    const state = makeState(field, spawn(2));
+    expect(isMoveProductive(state, { axisCol: 0, rotation: 1 })).toBe(true);
+  });
+
+  it('封印列の隣に rot 0/2 縦置きすると両方着地で productive=true (封印列とは別の列)', () => {
+    // 封印列の隣 col 1 は空き、 そこに縦置きしても両方着地。 隣の封印列は無関係。
+    const field = sealColumn(createEmptyField(), 0);
+    const state = makeState(field, spawn(2));
+    expect(isMoveProductive(state, { axisCol: 1, rotation: 0 })).toBe(true);
+    expect(isMoveProductive(state, { axisCol: 1, rotation: 2 })).toBe(true);
+  });
+
+  it('5 列封印 + 1 列空きでも空き列に縦置きは productive (周囲に依存しない)', () => {
+    // col 0..4 を封印、 col 5 だけ空。 axisCol=5 rot=0 で両方 col 5 に着地。
+    let field = createEmptyField();
+    for (let c = 0; c < 5; c++) field = sealColumn(field, c);
+    const state = makeState(field, spawn(2));
+    expect(isMoveProductive(state, { axisCol: 5, rotation: 0 })).toBe(true);
+  });
 });
 
 describe('isMoveValid = reachable + productive (本家挙動の commit gate)', () => {
@@ -148,5 +189,20 @@ describe('isMoveValid = reachable + productive (本家挙動の commit gate)', (
     const field = withCell(createEmptyField(), 0, 3, 'R');
     const state = makeState(field, spawn(2));
     expect(isMoveValid(state, { axisCol: 3, rotation: 0 })).toBe(true);
+  });
+
+  // ↓ Bug #72 回帰防止: 「天井近くまで埋まった盤面で AI 提案が commit できない」
+  //   ケースを直接再現する fixture。
+
+  it('片方着地 sutepuyo の横置きは reachable + productive で valid=true', () => {
+    // 画像 (38/50 ターン) で頻出する状況: 端の列が封印列に近く、 隣の列に
+    // 横置きすると一方が discard される。 旧実装ではこれを silent reject
+    // していて AI Best も Drop も効かなかった。
+    const field = sealColumn(createEmptyField(), 0);
+    const state = makeState(field, spawn(2));
+    // axisCol=0 rot=1: axis discard, child lands → 旧: valid=false, 新: valid=true
+    expect(isMoveReachable(state, { axisCol: 0, rotation: 1 })).toBe(true);
+    expect(isMoveProductive(state, { axisCol: 0, rotation: 1 })).toBe(true);
+    expect(isMoveValid(state, { axisCol: 0, rotation: 1 })).toBe(true);
   });
 });

@@ -8,10 +8,7 @@
 // Returns true if the user accepted, false if cancelled. Treat as a
 // drop-in replacement for `confirm(message)` but with `await`.
 
-function isTauri(): boolean {
-  if (typeof window === 'undefined') return false;
-  return '__TAURI_INTERNALS__' in window;
-}
+import { isTauri } from '../../ai/native-ama/tauri-bridge';
 
 export async function confirmDialog(message: string): Promise<boolean> {
   if (isTauri()) {

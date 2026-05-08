@@ -104,10 +104,6 @@ function notFound(): Response {
   return jsonResponse({ error: 'not_found' }, 404);
 }
 
-function badRequest(reason: string): Response {
-  return jsonResponse({ error: 'bad_request', reason }, 400);
-}
-
 // クライアント発番でなくサーバ発番にするのは、クライアント時計のスキューや
 // 衝突攻撃 (同じ id で上書き) を避けるため。タイムスタンプ + ランダム接尾辞。
 function generateId(): string {

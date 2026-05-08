@@ -133,8 +133,3 @@ export async function setAmaPreset(preset: string): Promise<number> {
 export function getAmaPreset(): string {
   return currentPreset ?? DEFAULT_PRESET;
 }
-
-export function _resetAmaModuleCache(): void {
-  cached = null;
-  currentPreset = null;
-}

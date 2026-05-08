@@ -547,21 +547,20 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    // CORS preflight。
-    // - leaderboard / scores list: 外部 (puyo-blog) からの GET 想定で読み許可。
-    // - /api/scores: Tauri (Android, origin=tauri://localhost) からの POST と
-    //   GET (短縮 URL リプレイ) 想定で write/read 両方許可。
+    // CORS preflight。 各エンドポイントの実際のメソッドに合わせてヘッダを返す。
+    // - leaderboard / scores list / /api/scores/:id: GET 専用 → READ ヘッダ
+    //   (Allow-Methods: GET, OPTIONS)
+    // - /api/scores (collection): POST 専用 → WRITE ヘッダ (Allow-Methods:
+    //   POST, OPTIONS)
     if (request.method === 'OPTIONS') {
       if (
         url.pathname === '/api/daily/leaderboard' ||
-        url.pathname === '/api/daily/scores'
+        url.pathname === '/api/daily/scores' ||
+        /^\/api\/scores\/[\w-]+$/.test(url.pathname)
       ) {
         return new Response(null, { status: 204, headers: PUBLIC_READ_HEADERS });
       }
-      if (
-        url.pathname === '/api/scores' ||
-        /^\/api\/scores\/[\w-]+$/.test(url.pathname)
-      ) {
+      if (url.pathname === '/api/scores') {
         return new Response(null, { status: 204, headers: PUBLIC_WRITE_HEADERS });
       }
     }

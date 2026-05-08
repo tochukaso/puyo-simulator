@@ -181,6 +181,19 @@ export function HamburgerMenu() {
               {t('menu.manual')}
             </a>
 
+            {/* ブログ (https://tochukaso.blog) への動線。ゲーム単独ドメインから
+                記事側へ戻るルートが無かったので追加。Tauri でも有効で、外部
+                ブラウザに飛ぶ。 */}
+            <a
+              href="https://tochukaso.blog/"
+              target="_blank"
+              rel="noopener"
+              onClick={() => setOpen(false)}
+              className="px-3 py-1.5 rounded text-sm border bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 text-center"
+            >
+              {t('menu.blog')}
+            </a>
+
             <button
               type="button"
               onClick={() => {

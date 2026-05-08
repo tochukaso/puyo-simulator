@@ -25,3 +25,34 @@ export function apiUrl(path: string): string {
   if (!origin) return path;
   return `${origin}${path}`;
 }
+
+/** Response.body から `{ reason: ... }` を取り出す。 worker 側 publicBadRequest
+ *  のレスポンス形に合わせてあるので、 取得できなければ statusText に fall back。 */
+async function readErrorReason(res: Response): Promise<string> {
+  try {
+    const data = await res.json();
+    if (data && typeof data === 'object' && 'reason' in data) {
+      return String((data as { reason?: unknown }).reason ?? '');
+    }
+  } catch {
+    // body が JSON でない / 既に消費済み — ignore して statusText を使う。
+  }
+  return res.statusText || '';
+}
+
+/** API 呼び出しの共通ラッパー。 fetch → ok チェック → JSON パースを 1 行に
+ *  まとめ、 エラー時はサーバ側 reason を抽出して message に乗せる。 */
+export async function fetchJson<T>(
+  url: string,
+  init: RequestInit | undefined,
+  errorPrefix: string,
+): Promise<T> {
+  const res = await fetch(url, init);
+  if (!res.ok) {
+    const reason = await readErrorReason(res);
+    throw new Error(
+      reason ? `${errorPrefix} (${res.status}): ${reason}` : `${errorPrefix} (${res.status})`,
+    );
+  }
+  return (await res.json()) as T;
+}

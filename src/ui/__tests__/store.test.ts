@@ -1,17 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { useGameStore } from '../store';
 import { dailySeedFor } from '../../game/dailySeed';
-import { createEmptyField, withCell } from '../../game/field';
+import { createEmptyField } from '../../game/field';
 import { ROWS } from '../../game/constants';
-import type { Field, Color } from '../../game/types';
-
-function sealColumn(field: Field, col: number, color: Color = 'R'): Field {
-  let f = field;
-  for (let r = 1; r < ROWS; r++) {
-    f = withCell(f, r, col, color);
-  }
-  return f;
-}
+import { sealColumn } from '../../game/__tests__/_helpers';
 
 describe('useGameStore', () => {
   beforeEach(() => {
@@ -124,10 +116,10 @@ describe('useGameStore undo', () => {
     expect(useGameStore.getState().history.length).toBe(1);
   });
 
-  it('commit sutepuyo (axis 封印列 + child 空き列、 横置き) が成功する — PR #72 回帰防止', () => {
-    // 旧実装の isMoveProductive=== 2 では片方 discard を弾き、 commit が
-    // silent reject されていた。 added>=1 に緩和した結果、 ama 提案や手動 Drop で
-    // sutepuyo 配置できるようになるべき。
+  it('commit sutepuyo (axis 封印列 + child 空き列、 横置き) が成功する', () => {
+    // 片方 discard でも盤面に 1 ぷよ着地する手は commit gate を通る。
+    // 「ama 提案や手動 Drop が silent reject される」 退行を防ぐため、
+    // store レイヤまで含めた end-to-end で commit が成立することを確認する。
     const { loadSharedPosition, commit } = useGameStore.getState();
     const field = sealColumn(createEmptyField(), 0, 'R');
     // current は loadSharedPosition が SPAWN_COL=2 / axisRow=1 / rot=0 で
@@ -153,9 +145,9 @@ describe('useGameStore undo', () => {
     expect(after.field.cells[0]![0]!).toBeNull();
   });
 
-  it('commit pure no-op (両方 discard) は silent reject 維持', () => {
-    // PR #72 で緩めた範囲は片方 discard まで。 全列封印で両方 discard になる
-    // 配置はターン浪費の no-op なので引き続き reject されるべき。
+  it('commit pure no-op (両方 discard) は silent reject される', () => {
+    // 両方とも 14段目で discard されるとターン浪費の pure no-op。
+    // commit gate が弾いて history に積まれないことを確認。
     const { loadSharedPosition, commit } = useGameStore.getState();
     let field = createEmptyField();
     for (let c = 0; c < 6; c++) field = sealColumn(field, c, 'R');

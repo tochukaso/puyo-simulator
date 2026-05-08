@@ -1,31 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { applyInput, enumerateLegalMoves } from '../moves';
-import { createEmptyField, withCell } from '../field';
+import { createEmptyField } from '../field';
 import { ROWS } from '../constants';
-import type { GameState, ActivePair, Field, Color } from '../types';
-
-function makeState(current: ActivePair, field: Field = createEmptyField()): GameState {
-  return {
-    field,
-    current,
-    nextQueue: [],
-    score: 0,
-    chainCount: 0,
-    totalChains: 0,
-    maxChain: 0,
-    status: 'playing',
-    rngSeed: 0,
-    queueIndex: 0,
-  };
-}
-
-function sealColumn(field: Field, col: number, color: Color = 'R'): Field {
-  let f = field;
-  for (let r = 1; r < ROWS; r++) {
-    f = withCell(f, r, col, color);
-  }
-  return f;
-}
+import type { ActivePair } from '../types';
+import { makeState, sealColumn } from './_helpers';
 
 describe('applyInput move', () => {
   const current: ActivePair = {
@@ -87,9 +65,9 @@ describe('enumerateLegalMoves', () => {
   });
 
   it('片方着地 sutepuyo (axis 封印列 + child 空き列、 横置き) を candidate に含む', () => {
-    // PR #72 回帰防止: 旧実装の `added===2` は sutepuyo を弾いていたので、
-    // 「ama は legal とするのに我々は enumerate しない」 divergence が発生。
-    // 緩和後の `added>=1` ではこの手が候補に含まれるべき。
+    // 1 ぷよでも盤面に着地するなら enumerate に含める (ama も同じ判定で
+    // legal とするので、 ここで弾くと AI Best が candidate に存在しない手
+    // を返す silent failure になる)。
     const field = sealColumn(createEmptyField(), 0);
     const s = makeState(
       { pair: { axis: 'R', child: 'B' }, axisRow: 1, axisCol: 2, rotation: 0 },

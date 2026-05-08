@@ -1,6 +1,6 @@
 // `/api/daily/scores` を叩く薄いクライアント。 SPA の ScoresPage と
 // puyo-blog 側のスタンドアロン HTML から共有可能な型を提供する。
-import { apiUrl } from './baseUrl';
+import { apiUrl, fetchJson } from './baseUrl';
 
 export interface ScoresListEntry {
   id: string;
@@ -66,9 +66,5 @@ export async function getScoresList(
         return u.toString();
       })()
     : `${apiUrl('/api/daily/scores')}${qs ? `?${qs}` : ''}`;
-  const res = await fetch(requestUrl);
-  if (!res.ok) {
-    throw new Error(`scores list fetch failed (${res.status})`);
-  }
-  return (await res.json()) as ScoresListResponse;
+  return fetchJson<ScoresListResponse>(requestUrl, undefined, 'scores list fetch failed');
 }

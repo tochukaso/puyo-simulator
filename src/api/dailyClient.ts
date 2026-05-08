@@ -1,7 +1,7 @@
 // Worker の `/api/daily/leaderboard` を叩くクライアント側の薄いラッパー。
 // 通常のスコア保存は POST /api/scores 経由 (`scoresClient.ts`) で、 mode='daily'
 // と dailyDate を載せて投げるだけなので、こちらは閲覧用エンドポイントだけ。
-import { apiUrl } from './baseUrl';
+import { apiUrl, fetchJson } from './baseUrl';
 
 export interface DailyLeaderboardEntry {
   /** サーバ発番のレコード ID。GET /api/scores/:id でフルレコードを取れる。 */
@@ -31,11 +31,11 @@ export async function getDailyLeaderboard(
   const sp = new URLSearchParams();
   sp.set('date', date);
   sp.set('limit', String(limit));
-  const res = await fetch(`${apiUrl('/api/daily/leaderboard')}?${sp.toString()}`);
-  if (!res.ok) {
-    throw new Error(`leaderboard fetch failed (${res.status})`);
-  }
-  return (await res.json()) as DailyLeaderboardResponse;
+  return fetchJson<DailyLeaderboardResponse>(
+    `${apiUrl('/api/daily/leaderboard')}?${sp.toString()}`,
+    undefined,
+    'leaderboard fetch failed',
+  );
 }
 
 const NICKNAME_KEY = 'puyo.dailyNickname';

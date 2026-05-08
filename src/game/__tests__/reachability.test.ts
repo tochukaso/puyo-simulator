@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { reachableTargets, isMoveReachable } from '../reachability';
 import { createEmptyField, withCell } from '../field';
 import { ROWS } from '../constants';
-import type { ActivePair } from '../types';
+import type { ActivePair, GameState } from '../types';
 import { makeState } from './_helpers';
 
 const spawnPair = (axisRow: number, axisCol: number): ActivePair => ({

@@ -40,14 +40,18 @@ jobs:
           GITLEAKS_VERSION: 8.30.1
         run: |
           set -euo pipefail
-          curl -fsSL -o /tmp/gitleaks.tar.gz \
-            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          # checksums.txt 内のエントリは "<sha>  gitleaks_<ver>_linux_x64.tar.gz"
+          # の形なので、tarball もこの名前のまま落としておく (sha256sum -c が
+          # CWD 直下のファイル名を解決できるようにするため)。
+          TARBALL="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL -o "/tmp/${TARBALL}" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${TARBALL}"
           curl -fsSL -o /tmp/gitleaks_checksums.txt \
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
           ( cd /tmp && \
-            grep "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz$" gitleaks_checksums.txt \
+            grep "${TARBALL}\$" gitleaks_checksums.txt \
             | sha256sum -c - )
-          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          tar -xzf "/tmp/${TARBALL}" -C /tmp gitleaks
           sudo install -m 0755 /tmp/gitleaks /usr/local/bin/gitleaks
           gitleaks version
 

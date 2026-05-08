@@ -1,6 +1,7 @@
 // Worker の `/api/daily/leaderboard` を叩くクライアント側の薄いラッパー。
 // 通常のスコア保存は POST /api/scores 経由 (`scoresClient.ts`) で、 mode='daily'
 // と dailyDate を載せて投げるだけなので、こちらは閲覧用エンドポイントだけ。
+import { apiOrigin } from './baseUrl';
 
 export interface DailyLeaderboardEntry {
   /** サーバ発番のレコード ID。GET /api/scores/:id でフルレコードを取れる。 */
@@ -24,7 +25,7 @@ export async function getDailyLeaderboard(
   date: string,
   limit = 20,
 ): Promise<DailyLeaderboardResponse> {
-  const url = new URL('/api/daily/leaderboard', window.location.origin);
+  const url = new URL('/api/daily/leaderboard', apiOrigin());
   url.searchParams.set('date', date);
   url.searchParams.set('limit', String(limit));
   const res = await fetch(url.toString());

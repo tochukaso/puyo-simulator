@@ -1,5 +1,6 @@
 // `/api/daily/scores` を叩く薄いクライアント。 SPA の ScoresPage と
 // puyo-blog 側のスタンドアロン HTML から共有可能な型を提供する。
+import { apiOrigin } from './baseUrl';
 
 export interface ScoresListEntry {
   id: string;
@@ -52,7 +53,7 @@ export async function getScoresList(
   query: ScoresListQuery = {},
   baseOrigin?: string,
 ): Promise<ScoresListResponse> {
-  const origin = baseOrigin ?? window.location.origin;
+  const origin = baseOrigin ?? apiOrigin();
   const url = new URL('/api/daily/scores', origin);
   const sp = buildScoresListSearch(query);
   for (const [k, v] of sp.entries()) url.searchParams.set(k, v);

@@ -48,15 +48,26 @@ const JSON_HEADERS = {
 };
 
 // Public read endpoints (leaderboard / scores listing) は外部サイト
-// (puyo-blog 等) からも読める必要があるので CORS を緩める。 mutation 系
-// (POST /api/scores) は別オリジンからは想定外なので、 同オリジン限定の
-// JSON_HEADERS を引き続き使う。
+// (puyo-blog 等) からも読める必要があるので CORS を緩める。
 const PUBLIC_READ_HEADERS = {
   ...JSON_HEADERS,
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET, OPTIONS',
   // Content-Type は GET では必須ではないが、 クライアントが Accept や
   // Content-Type を明示すると preflight 対象になりうる。 保険として許可。
+  'access-control-allow-headers': 'content-type',
+  'access-control-max-age': '86400',
+};
+
+// POST /api/scores も Tauri (Android アプリ) ビルドからは別オリジン
+// (`tauri://localhost`) で叩かれるので CORS を緩める必要がある。 認証も
+// セッションも無く、 改造防止は server-side simulateAndValidate に集約
+// しているため、 別オリジンからの POST を許可しても新たな攻撃面は無い
+// (curl で直接叩くのと等価)。
+const PUBLIC_WRITE_HEADERS = {
+  ...JSON_HEADERS,
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'POST, OPTIONS',
   'access-control-allow-headers': 'content-type',
   'access-control-max-age': '86400',
 };
@@ -74,6 +85,19 @@ function publicJsonResponse(data: unknown, status = 200): Response {
 
 function publicBadRequest(reason: string): Response {
   return publicJsonResponse({ error: 'bad_request', reason }, 400);
+}
+
+// POST /api/scores 系の応答用。 成功時もエラー時も CORS ヘッダを乗せて返す
+// ことで、 Tauri (Android) WebView 側が response の reason を読めるようにする。
+function publicWriteJsonResponse(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: PUBLIC_WRITE_HEADERS,
+  });
+}
+
+function publicWriteBadRequest(reason: string): Response {
+  return publicWriteJsonResponse({ error: 'bad_request', reason }, 400);
 }
 
 function notFound(): Response {
@@ -184,9 +208,9 @@ async function readBodyJson(request: Request): Promise<unknown | string> {
 
 async function saveScore(request: Request, env: Env): Promise<Response> {
   const parsed = await readBodyJson(request);
-  if (typeof parsed === 'string') return badRequest(parsed);
+  if (typeof parsed === 'string') return publicWriteBadRequest(parsed);
   const validated = validatePayload(parsed);
-  if (typeof validated === 'string') return badRequest(validated);
+  if (typeof validated === 'string') return publicWriteBadRequest(validated);
 
   // デイリーモード固有の追加検証。
   // (1) dailyDate は必須 (どの日のチャレンジか書かれていないと leaderboard に
@@ -197,25 +221,25 @@ async function saveScore(request: Request, env: Env): Promise<Response> {
   // があるので弾く。 (4) turnLimit は仕様で 50 固定。 50 以外は不正。
   if (validated.mode === 'daily') {
     if (!validated.dailyDate) {
-      return badRequest('daily mode requires dailyDate');
+      return publicWriteBadRequest('daily mode requires dailyDate');
     }
     const today = todayDateJst();
     if (validated.dailyDate !== today) {
       // クライアントの時計ズレで境界跨ぎした際の救済として、 当日 ± 1 日まで
       // は許容する余地もあるが、 まずは厳密一致でリーダーボード整合性を優先。
       // 必要であれば後日 grace を入れる。
-      return badRequest(
+      return publicWriteBadRequest(
         `dailyDate must match today's JST date (server today=${today}, got=${validated.dailyDate})`,
       );
     }
     const expected = dailySeedFor(validated.dailyDate);
     if (validated.seed !== expected) {
-      return badRequest(
+      return publicWriteBadRequest(
         `daily seed mismatch: expected ${expected} for ${validated.dailyDate}, got ${validated.seed}`,
       );
     }
     if (validated.turnLimit !== DAILY_TURN_LIMIT) {
-      return badRequest(`daily turnLimit must be ${DAILY_TURN_LIMIT}`);
+      return publicWriteBadRequest(`daily turnLimit must be ${DAILY_TURN_LIMIT}`);
     }
   }
 
@@ -232,7 +256,7 @@ async function saveScore(request: Request, env: Env): Promise<Response> {
     turnLimit: validated.turnLimit,
   });
   if (!sim.ok) {
-    return badRequest(`validation failed: ${sim.reason}`);
+    return publicWriteBadRequest(`validation failed: ${sim.reason}`);
   }
 
   const id = generateId();
@@ -278,7 +302,7 @@ async function saveScore(request: Request, env: Env): Promise<Response> {
     )
     .run();
 
-  return jsonResponse({ id, createdAt }, 201);
+  return publicWriteJsonResponse({ id, createdAt }, 201);
 }
 
 interface DbRow {
@@ -338,8 +362,10 @@ async function getScore(env: Env, id: string): Promise<Response> {
   )
     .bind(id)
     .first<DbRow>();
-  if (!row) return notFound();
-  return jsonResponse(rowToRecord(row));
+  // GET は外部サイトや Tauri (別オリジン) からも参照する想定で CORS を緩める。
+  // 404 も同じ扱い (= reason を読める)。
+  if (!row) return publicJsonResponse({ error: 'not_found' }, 404);
+  return publicJsonResponse(rowToRecord(row));
 }
 
 interface LeaderboardRow {
@@ -521,13 +547,23 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    // CORS preflight (public read endpoints のみ)。
-    if (
-      request.method === 'OPTIONS' &&
-      (url.pathname === '/api/daily/leaderboard' ||
-        url.pathname === '/api/daily/scores')
-    ) {
-      return new Response(null, { status: 204, headers: PUBLIC_READ_HEADERS });
+    // CORS preflight。
+    // - leaderboard / scores list: 外部 (puyo-blog) からの GET 想定で読み許可。
+    // - /api/scores: Tauri (Android, origin=tauri://localhost) からの POST と
+    //   GET (短縮 URL リプレイ) 想定で write/read 両方許可。
+    if (request.method === 'OPTIONS') {
+      if (
+        url.pathname === '/api/daily/leaderboard' ||
+        url.pathname === '/api/daily/scores'
+      ) {
+        return new Response(null, { status: 204, headers: PUBLIC_READ_HEADERS });
+      }
+      if (
+        url.pathname === '/api/scores' ||
+        /^\/api\/scores\/[\w-]+$/.test(url.pathname)
+      ) {
+        return new Response(null, { status: 204, headers: PUBLIC_WRITE_HEADERS });
+      }
     }
 
     // POST /api/scores → save

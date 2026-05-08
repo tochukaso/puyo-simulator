@@ -129,7 +129,7 @@ export default function App() {
     return <ScoresPage />;
   }
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col">
+    <div className="min-h-full bg-slate-950 text-white flex flex-col">
       <Header />
       <div
         ref={gestureRef}

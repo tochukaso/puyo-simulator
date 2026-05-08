@@ -1,0 +1,32 @@
+# gitleaks 設定。デフォルトルール (extend.useDefault = true) を継承しつつ、
+# このリポジトリ特有の false positive を allowlist で除外する。
+# 実行: `gitleaks git` (履歴) / `gitleaks git --staged` (pre-commit) / `gitleaks dir .` (作業ツリー)
+
+title = "puyo-simulator gitleaks config"
+
+[extend]
+useDefault = true
+
+# false positive 除外用 allowlist。秘密情報そのものではなく
+# "ハッシュっぽいけど中身は WASM のコードや AI の重みなので除外していい" という
+# ファイルだけここに書く。実際の credential を許可してはいけない。
+[[allowlists]]
+description = "binary / vendored / generated assets"
+paths = [
+  '''(^|/)public/wasm/.*''',           # ama AI の WebAssembly バイナリ・ローダ
+  '''(^|/)public/manual/assets/screenshots/.*''',
+  '''(^|/)dist/.*''',
+  '''(^|/)node_modules/.*''',
+  '''(^|/)\.wrangler/.*''',
+  '''(^|/)src-tauri/target/.*''',
+  '''(^|/)src-tauri/gen/.*''',
+  '''(^|/)package-lock\.json$''',
+  '''(^|/)src-tauri/Cargo\.lock$''',
+]
+
+[[allowlists]]
+description = "高エントロピーに見える git の commit SHA / hex hash 文字列を許容"
+regexes = [
+  # 40 桁の hex (= git SHA1)。コミットメッセージや docs に頻出する。
+  '''\b[0-9a-f]{40}\b''',
+]

@@ -34,7 +34,10 @@
     "licenses:check": "license-checker --production --failOn 'GPL;AGPL;LGPL'",
     "manual:capture": "tsx scripts/capture-manual-screenshots.ts",
     "manual:export": "node scripts/export-manual.mjs",
-    "scores:export": "node scripts/export-scores-page.mjs"
+    "scores:export": "node scripts/export-scores-page.mjs",
+    "secrets:scan": "gitleaks git --redact --no-banner",
+    "secrets:scan:staged": "gitleaks git --staged --redact --no-banner",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {
     "@tensorflow/tfjs": "^4.22.0",

@@ -1,0 +1,89 @@
+name: gitleaks
+
+# push / PR で秘密情報スキャンを走らせる。fail させたくないだけの fork 用に
+# manual dispatch も用意。
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: gitleaks-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  # github/codeql-action/upload-sarif が gitleaks 結果を Security タブに
+  # 反映するために必要 (PR diff scan の場合も同じ)。
+  security-events: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      # Pin third-party actions by full commit SHA. タグ書き換えによるサプライ
+      # チェーン攻撃を避けるため、必ず SHA を使う。
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          # gitleaks は履歴を辿って scan するため fetch-depth: 0 が必須。
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        env:
+          # gitleaks/gitleaks の Linux x86_64 リリース。バージョンを上げる時は
+          # https://github.com/gitleaks/gitleaks/releases から最新の tarball を選ぶ。
+          # 同じリリースに公式 checksums.txt があるので、そこから SHA256 を
+          # 取って検証する (release artifact の改竄やネットワーク経路での
+          # 差し替えに対する supply-chain 防御)。
+          GITLEAKS_VERSION: 8.30.1
+        run: |
+          set -euo pipefail
+          # checksums.txt 内のエントリは "<sha>  gitleaks_<ver>_linux_x64.tar.gz"
+          # の形なので、tarball もこの名前のまま落としておく (sha256sum -c が
+          # CWD 直下のファイル名を解決できるようにするため)。
+          TARBALL="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL -o "/tmp/${TARBALL}" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${TARBALL}"
+          curl -fsSL -o /tmp/gitleaks_checksums.txt \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          ( cd /tmp && \
+            grep "${TARBALL}\$" gitleaks_checksums.txt \
+            | sha256sum -c - )
+          tar -xzf "/tmp/${TARBALL}" -C /tmp gitleaks
+          sudo install -m 0755 /tmp/gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      # PR では PR の差分 (base..head) のみを、push では全履歴をスキャン。
+      # 全履歴は初回のみ重いが現状 < 1 秒なのでそのまま。
+      - name: Scan (full history)
+        if: github.event_name != 'pull_request'
+        run: gitleaks git --redact --no-banner --exit-code 1 --report-format sarif --report-path gitleaks.sarif
+
+      - name: Scan (PR diff)
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          gitleaks git --redact --no-banner --exit-code 1 \
+            --log-opts="${BASE_SHA}..${HEAD_SHA}" \
+            --report-format sarif --report-path gitleaks.sarif
+
+      - name: Upload SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: gitleaks-sarif
+          path: gitleaks.sarif
+          if-no-files-found: ignore
+
+      # findings を GitHub Security タブと PR annotation に反映させる。
+      - name: Upload SARIF to Code Scanning
+        if: always() && hashFiles('gitleaks.sarif') != ''
+        uses: github/codeql-action/upload-sarif@53e96ec3b35fce51c141c0d6f0e31028a448722d # v3
+        with:
+          sarif_file: gitleaks.sarif
+          category: gitleaks

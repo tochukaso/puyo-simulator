@@ -1,0 +1,40 @@
+# gitleaks 設定。デフォルトルール (extend.useDefault = true) を継承しつつ、
+# このリポジトリ特有の false positive を allowlist で除外する。
+# 実行: `gitleaks git` (履歴) / `gitleaks git --staged` (pre-commit) / `gitleaks dir .` (作業ツリー)
+
+title = "puyo-simulator gitleaks config"
+
+[extend]
+useDefault = true
+
+# ── カスタムルール ────────────────────────────────────────────
+# gitleaks の default ruleset (v8.30 時点) には Claude Code が発行する
+# OAuth access token (sk-ant-oat01-) のルールが無いので、ここで補う。
+# Anthropic Console の API キー (sk-ant-api03-) と Admin キー
+# (sk-ant-admin01-) は default ruleset でカバーされている。
+#
+# 注: Claude Code の "session" 識別子 (sesn_...) は bearer token ではなく
+# 単なる会話 ID なのでルール対象外。
+
+[[rules]]
+id = "anthropic-oauth-access-token"
+description = "Anthropic / Claude Code OAuth access token (sk-ant-oat01-)"
+regex = '''\b(sk-ant-oat01-[a-zA-Z0-9_\-]{50,})\b'''
+keywords = ["sk-ant-oat01"]
+
+# false positive 除外用 allowlist。秘密情報そのものではなく
+# "ハッシュっぽいけど中身は WASM のコードや AI の重みなので除外していい" という
+# ファイルだけここに書く。実際の credential を許可してはいけない。
+[[allowlists]]
+description = "binary / vendored / generated assets"
+paths = [
+  '''(^|/)public/wasm/.*''',           # ama AI の WebAssembly バイナリ・ローダ
+  '''(^|/)public/manual/assets/screenshots/.*''',
+  '''(^|/)dist/.*''',
+  '''(^|/)node_modules/.*''',
+  '''(^|/)\.wrangler/.*''',
+  '''(^|/)src-tauri/target/.*''',
+  '''(^|/)src-tauri/gen/.*''',
+  '''(^|/)package-lock\.json$''',
+  '''(^|/)src-tauri/Cargo\.lock$''',
+]

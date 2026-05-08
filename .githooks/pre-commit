@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# gitleaks pre-commit hook.
+# stage された差分だけをスキャンし、秘密情報が含まれていれば commit を中断する。
+#
+# このフックは `git config core.hooksPath .githooks` 経由で有効化される
+# (npm install 時に package.json の "prepare" スクリプトが自動設定する)。
+#
+# gitleaks が未インストールの環境では警告だけ出して通す。CI 側で必ず走るので
+# ローカルで詰まらない方を優先する。
+set -euo pipefail
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  cat >&2 <<'EOF'
+[pre-commit] gitleaks not found — skipping secret scan.
+            install: `brew install gitleaks` (macOS) / see https://github.com/gitleaks/gitleaks
+EOF
+  exit 0
+fi
+
+# 緊急回避: SKIP_GITLEAKS=1 git commit ... で一時的にスキップできる。
+if [[ "${SKIP_GITLEAKS:-0}" == "1" ]]; then
+  echo "[pre-commit] SKIP_GITLEAKS=1 → secret scan skipped" >&2
+  exit 0
+fi
+
+gitleaks git --staged --redact --no-banner --exit-code 1

@@ -141,9 +141,9 @@ export default function App() {
         style={{ touchAction: 'pan-y' }}
       >
         <div className="flex flex-col items-center gap-3 w-full max-w-sm">
+          <DailyPanel />
           <Stats />
           <MatchPanel />
-          <DailyPanel />
           <div className="flex gap-3 items-stretch justify-center w-full">
             <Board />
             <div className="flex flex-col gap-2 w-32 shrink-0" data-no-gesture>

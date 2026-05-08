@@ -2,22 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { reachableTargets, isMoveReachable } from '../reachability';
 import { createEmptyField, withCell } from '../field';
 import { ROWS } from '../constants';
-import type { ActivePair, GameState } from '../types';
-
-function makeState(field = createEmptyField(), current: ActivePair): GameState {
-  return {
-    field,
-    current,
-    nextQueue: [],
-    score: 0,
-    chainCount: 0,
-    totalChains: 0,
-    maxChain: 0,
-    status: 'playing',
-    rngSeed: 0,
-    queueIndex: 0,
-  };
-}
+import type { ActivePair } from '../types';
+import { makeState } from './_helpers';
 
 const spawnPair = (axisRow: number, axisCol: number): ActivePair => ({
   pair: { axis: 'R', child: 'B' },
@@ -68,7 +54,7 @@ describe('reachableTargets', () => {
 
 describe('isMoveReachable', () => {
   it('returns true for a reachable move', () => {
-    const state = makeState(createEmptyField(), spawnPair(1, 2));
+    const state = makeState(spawnPair(1, 2));
     expect(isMoveReachable(state, { axisCol: 0, rotation: 0 })).toBe(true);
   });
 

@@ -58,25 +58,20 @@ export function isMoveReachable(state: GameState, move: Move): boolean {
 /**
  * 「その move を commit したときに 盤面に少なくとも 1 ぷよ着地するか」 を判定。
  * 両方 discard される 「turn だけ消費する pure no-op」 だけを弾き、 片方 discard
- * (= 本家ぷよぷよ通の 「捨てぷよ」 テクニック) は許可する。
+ * (= 本家ぷよぷよ通の 「捨てぷよ」 テクニック) は許可する。 ama (native / wasm)
+ * も同じ閾値で legal を判定する — ここを 「2 ぷよ全部着地必須」 に締めると
+ * ama 推奨手が enumerate に存在せず AI Best / 手動 Drop が silent fail する。
  *
- * 旧実装は 「2 ぷよ全部着地必須」 で gate していたが、 ama (native / wasm) は
- * 捨てぷよ手も legal と判定して suggest してくる。 結果、 天井近くまで
- * 埋まった盤面で ama 推奨手を AI Best / 手動 Drop どちらも commit できない
- * silent failure が発生していた。 「両方 discard」 のみ弾く形に緩めて
- * 解消する。
- *
- * 弾かれる例 (両方 discard、 added===0):
+ * 弾かれる例 (両方 discard):
  *   - 13段目封印列 (heights[col]=13) に縦置き
  *   - 全列封印盤面で任意配置
  *
- * 通る例 (片方 discard、 added===1):
+ * 通る例 (片方 discard):
  *   - 横置きで axis or child の一方が封印列に重なる (もう一方は空き列に着地)
  *   - 縦置きで child が 14段目 ghost wall を越える sutepuyo
  *
- * (関数名は歴史的に 「productive」 のまま。 意味は 「at least 1 lands」 に
- * シフト。 isMoveReachable 単独では floor kick で全 discard 位置まで届くので、
- * productivity を別軸で残しておく必要がある。)
+ * isMoveReachable 単独では floor kick で全 discard 位置まで geometric に届くので
+ * productivity を別軸で残しておく必要がある。
  */
 export function isMoveProductive(state: GameState, move: Move): boolean {
   if (!state.current) return false;
@@ -86,17 +81,16 @@ export function isMoveProductive(state: GameState, move: Move): boolean {
     rotation: move.rotation,
   };
   const after = lockActive(state.field, placed);
-  // lockActive は既存セルを消さず新規追加のみ。 ペアは 2 ぷよなので、
-  // discard が 0 なら +2、 1 個 discard なら +1、 両方 discard なら +0。
-  let added = 0;
+  // lockActive は既存セルを消さず新規追加のみ。 1 ぷよでも盤面に乗れば
+  // どこかのセルが non-null に変わる → 最初の差分を見つけた時点で確定。
   for (let r = 0; r < ROWS; r++) {
     const a = after.cells[r];
     const b = state.field.cells[r];
     for (let c = 0; c < COLS; c++) {
-      if (a![c] !== b![c]) added++;
+      if (a![c] !== b![c]) return true;
     }
   }
-  return added >= 1;
+  return false;
 }
 
 /**

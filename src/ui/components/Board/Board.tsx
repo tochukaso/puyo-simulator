@@ -9,6 +9,7 @@ import {
 } from '../../hooks/useUiPrefs';
 import { usePreviewMove } from '../../hooks/useAiPreview';
 import { setBoardRectGetter } from '../../hooks/useBoardRect';
+import { isAiAssistMode } from '../../aiAssist';
 import { useT } from '../../../i18n';
 import {
   ROWS,
@@ -111,12 +112,12 @@ export function Board() {
       ? playerChainTexts
       : EMPTY_CHAIN_TEXTS;
   const landedCells = playerLive ? playerLandedCells : EMPTY_LANDED;
-  // match モードでは候補手リスト・ゴースト・「AI 最善手」ボタンを全部隠して
-  // いるので、worker への suggest 投げそのものを止める (WASM 全幅探索は重い
-  // ので生かしっぱなしは計算資源の無駄)。
-  // free モードのみ AI 候補手 / ghost を出す。match (対人戦) と score
-  // (一発勝負) では AI ヒント無しがユーザー要件。
-  const { moves } = useAiSuggestion(5, mode === 'free');
+  // 候補手リスト・ゴースト・「AI 最善手」ボタンを隠すモード/環境では worker
+  // への suggest 投げそのものを止める (WASM 全幅探索は重いので生かしっぱなし
+  // は計算資源の無駄)。 表示可否は isAiAssistMode (free 全環境 / match / score
+  // / daily は Tauri ビルドのみ) に集約。
+  const aiAssist = isAiAssistMode(mode);
+  const { moves } = useAiSuggestion(5, aiAssist);
   const ghostEnabled = useGhostEnabled();
   const ceilingVisible = useCeilingVisible();
   const previewMove = usePreviewMove();
@@ -135,7 +136,7 @@ export function Board() {
           : (matchPlayerMoves[playerViewIdx + 1] ?? null);
     } else if (previewMove !== null && viewing === 'player') {
       bestMove = previewMove;
-    } else if (mode === 'free' && viewing === 'player') {
+    } else if (aiAssist && viewing === 'player') {
       bestMove = moves[0] ?? null;
     }
   }

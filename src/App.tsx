@@ -27,6 +27,7 @@ import { MatchPanel } from './ui/components/MatchPanel/MatchPanel';
 import { DailyPanel } from './ui/components/DailyPanel/DailyPanel';
 import { EditToolbar } from './ui/components/EditToolbar/EditToolbar';
 import { EditPairs } from './ui/components/EditPairs/EditPairs';
+import { isAiAssistMode } from './ui/aiAssist';
 import { ScoresPage } from './ui/components/ScoresPage/ScoresPage';
 
 export default function App() {
@@ -148,9 +149,10 @@ export default function App() {
               {/* 編集モード中はペア編集カードを優先表示。NextQueue はゲーム中の
                   情報源で編集と概念が違うので入れ替える方が混乱しない。 */}
               {editing ? <EditPairs /> : <NextQueue />}
-              {/* free モードのみ AI 候補手を表示する。match (対人戦の趣旨)、
-                  score (一発勝負) どちらも AI ヒント無しが要件。 */}
-              {!editing && mode === 'free' && (
+              {/* AI 候補手は free モードは常時、 match / score / daily は Tauri
+                  (Android アプリ) ビルドでのみ表示する。 web 版の対戦・スコア
+                  アタック系は従来どおり AI ヒント無し。 isAiAssistMode に集約。 */}
+              {!editing && isAiAssistMode(mode) && (
                 <div className="mt-auto">
                   <CandidateList />
                 </div>

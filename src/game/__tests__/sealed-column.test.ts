@@ -10,11 +10,12 @@
 //                (axisCol, rotation) であること
 //   ・productive: lockActive 後に盤面が 1 マス以上増えること
 //                 (= 「両方とも 14 段目で discard されて turn だけ消費」
-//                  という no-op を弾く)
+//                  という pure no-op だけを弾く。 片方 discard の捨てぷよは
+//                  本家ぷよぷよ通でも有効な技なので許可)
 //
 // reachable 単独だと floor kick で row 0 col=sealed まで辿り着くと
-// 「reachable」 と判定されるが、 commit すると lockActive で全 discard。
-// productive を併せて要求することで本家挙動 = 「封印列に縦置き不可」 を再現。
+// 「reachable」 と判定されるが、 両方 discard される配置は productive=false。
+// 片方着地する捨てぷよ (本家で頻出) は productive=true として通す。
 
 import { describe, it, expect } from 'vitest';
 import {
@@ -65,13 +66,13 @@ describe('isMoveProductive (封印列の no-op を検出)', () => {
     expect(isMoveProductive(state, { axisCol: 0, rotation: 2 })).toBe(false);
   });
 
-  it('封印列を axis にした横置き (rot 1) も axis が discard されるので productive=false', () => {
+  it('封印列を axis にした横置き (rot 1) は axis discard でも child が着地するので productive=true (捨てぷよ)', () => {
     // col 0 を封印、 col 1 は空。 axisCol=0 rotation=1 → axis col 0 (discard),
-    // child col 1 (lands)。 1 個でも discard されると 「productive」 ではない
-    // (本家 ama の move::generate と同じ厳しさ)。
+    // child col 1 (lands)。 1 ぷよでも着地するなら productive=true。 本家でも
+    // 1 個捨てる手は有効な技 (連鎖の上で目標形を作るため意図的に捨てる等)。
     const field = sealColumn(createEmptyField(), 0);
     const state = makeState(field, spawn(2));
-    expect(isMoveProductive(state, { axisCol: 0, rotation: 1 })).toBe(false);
+    expect(isMoveProductive(state, { axisCol: 0, rotation: 1 })).toBe(true);
   });
 
   it('空盤面では全 22 配置が productive', () => {
@@ -117,13 +118,13 @@ describe('isMoveValid = reachable + productive (本家挙動の commit gate)', (
     expect(isMoveValid(state, { axisCol: 5, rotation: 0 })).toBe(false);
   });
 
-  it('封印列に child が重なる横置きも片方 discard で valid=false (本家 ama 準拠)', () => {
+  it('封印列に child が重なる横置きは片方着地で valid=true (捨てぷよ)', () => {
     // col 5 を封印。 axisCol=4 rotation=1 で child は col 5 (sealed)。 child
-    // discard、 軸は col 4 に着地。 ama 仕様では 「discard を含む手は illegal」
-    // なので valid=false。
+    // discard、 軸は col 4 に着地。 1 ぷよ着地すれば valid=true。 ama も
+    // 同じ手を legal として suggest してくる (= AI Best が commit できる)。
     const field = sealColumn(createEmptyField(), 5);
     const state = makeState(field, spawn(2));
-    expect(isMoveValid(state, { axisCol: 4, rotation: 1 })).toBe(false);
+    expect(isMoveValid(state, { axisCol: 4, rotation: 1 })).toBe(true);
   });
 
   it('空盤面では全 22 配置 valid', () => {

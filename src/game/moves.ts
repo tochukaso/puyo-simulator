@@ -39,12 +39,11 @@ export function applyInput(state: GameState, input: Input): GameState {
 
 // 本家準拠の合法手列挙: (col, rotation) が
 //   reachable (= BFS で実際に辿れる経路がある) かつ
-//   productive (= lockActive で 2 マス追加され、 軸/子の両方が着地する)
+//   productive (= lockActive で 1 マス以上盤面に追加される)
 // な move のみを返す。 reachable 単独だと floor kick で row 0 col=sealed
-// まで届く 「届くが no-op」 なケースを許してしまい、 ama の `move::generate`
-// と diverge する (= 「捨てぷよ無限」 体感バグの原因)。 productive は
-// 「1 つでも discard されたら不可」 の本家挙動 (ama は `is_valid` で同等
-// 判定) に揃えてある。
+// まで届く 「届くが両方 discard」 なケースを許してしまうので、 productive
+// で pure no-op (両方 discard) のみ弾く。 片方 discard の捨てぷよ手は本家
+// で頻出する有効技なので enumerate に含める (ama の suggest にも含まれる)。
 export function enumerateLegalMoves(state: GameState): Move[] {
   if (!state.current) return [];
   const reachable = reachableTargets(state.field, state.current);

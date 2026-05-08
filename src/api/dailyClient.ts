@@ -1,6 +1,7 @@
 // Worker の `/api/daily/leaderboard` を叩くクライアント側の薄いラッパー。
 // 通常のスコア保存は POST /api/scores 経由 (`scoresClient.ts`) で、 mode='daily'
 // と dailyDate を載せて投げるだけなので、こちらは閲覧用エンドポイントだけ。
+import { apiUrl } from './baseUrl';
 
 export interface DailyLeaderboardEntry {
   /** サーバ発番のレコード ID。GET /api/scores/:id でフルレコードを取れる。 */
@@ -24,10 +25,13 @@ export async function getDailyLeaderboard(
   date: string,
   limit = 20,
 ): Promise<DailyLeaderboardResponse> {
-  const url = new URL('/api/daily/leaderboard', window.location.origin);
-  url.searchParams.set('date', date);
-  url.searchParams.set('limit', String(limit));
-  const res = await fetch(url.toString());
+  // apiUrl() は apiOrigin() が空文字 (SSR / 環境変数欠落) のときに path を
+  // そのまま返してくれるので、 new URL(path, '') で TypeError になる経路を
+  // 避けつつ、 fetch にそのまま渡せば相対 URL として処理される。
+  const sp = new URLSearchParams();
+  sp.set('date', date);
+  sp.set('limit', String(limit));
+  const res = await fetch(`${apiUrl('/api/daily/leaderboard')}?${sp.toString()}`);
   if (!res.ok) {
     throw new Error(`leaderboard fetch failed (${res.status})`);
   }

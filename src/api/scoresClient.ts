@@ -1,7 +1,9 @@
 import type { MatchRecord } from '../match/records';
+import { apiUrl } from './baseUrl';
 
 // `worker/index.ts` が公開する `/api/scores` エンドポイントへのクライアント側
-// ラッパー。同オリジンに deploy されている前提で、相対パスで叩く。
+// ラッパー。 web 版は同オリジン (= 相対パス) で叩き、 Tauri (Android アプリ)
+// 版は apiUrl() が公開 Cloudflare Workers URL に切り替える。
 //
 // 設計メモ:
 // - サーバ側で id / createdAt / build_sha は発番するので payload からは除外。
@@ -36,7 +38,7 @@ async function readErrorReason(res: Response): Promise<string> {
 export async function postScoreToServer(
   payload: SaveScorePayload,
 ): Promise<ServerSaveResponse> {
-  const res = await fetch('/api/scores', {
+  const res = await fetch(apiUrl('/api/scores'), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(payload),
@@ -50,7 +52,7 @@ export async function postScoreToServer(
 }
 
 export async function getScoreFromServer(id: string): Promise<MatchRecord> {
-  const res = await fetch(`/api/scores/${encodeURIComponent(id)}`);
+  const res = await fetch(apiUrl(`/api/scores/${encodeURIComponent(id)}`));
   if (!res.ok) {
     throw new Error(
       `score fetch failed (${res.status}): ${await readErrorReason(res)}`,

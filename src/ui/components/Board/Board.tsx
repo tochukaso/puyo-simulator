@@ -114,10 +114,11 @@ export function Board() {
   const landedCells = playerLive ? playerLandedCells : EMPTY_LANDED;
   // 候補手リスト・ゴースト・「AI 最善手」ボタンを隠すモード/環境では worker
   // への suggest 投げそのものを止める (WASM 全幅探索は重いので生かしっぱなし
-  // は計算資源の無駄)。 表示可否は isAiAssistMode (free 全環境 / match / score
-  // / daily は Tauri ビルドのみ) に集約。
-  const aiAssist = isAiAssistMode(mode);
-  const { moves } = useAiSuggestion(5, aiAssist);
+  // は計算資源の無駄)。 モード可否は isAiAssistMode (free 全環境 / match / score
+  // / daily は Tauri ビルドのみ) に集約。 さらに match で ama 観戦中
+  // (viewing === 'ai') は player の suggest 結果を出す画面が無いので止める。
+  const aiAssistActive = isAiAssistMode(mode) && viewing === 'player';
+  const { moves } = useAiSuggestion(5, aiAssistActive);
   const ghostEnabled = useGhostEnabled();
   const ceilingVisible = useCeilingVisible();
   const previewMove = usePreviewMove();
@@ -136,7 +137,7 @@ export function Board() {
           : (matchPlayerMoves[playerViewIdx + 1] ?? null);
     } else if (previewMove !== null && viewing === 'player') {
       bestMove = previewMove;
-    } else if (aiAssist && viewing === 'player') {
+    } else if (aiAssistActive) {
       bestMove = moves[0] ?? null;
     }
   }

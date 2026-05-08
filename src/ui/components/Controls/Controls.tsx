@@ -12,15 +12,18 @@ export function Controls() {
   const animating = useGameStore((s) => s.animatingSteps.length > 0);
   const undo = useGameStore((s) => s.undo);
   const mode = useGameStore((s) => s.mode);
+  const viewing = useGameStore((s) => s.viewing);
   // store の canUndo() を直接 selector として購読する。free / match / score
   // のルールが store 側に集約されているので、UI 側で再実装するとロジックが
   // 分岐して将来ドリフトしうる。selector が返すのは boolean なので不要な
   // 再レンダーは起きない (zustand は Object.is で比較)。
   const canUndo = useGameStore((s) => s.canUndo());
   // AI 最善手ボタンを隠すモード/環境では worker への suggest 投げ自体も止める
-  // (WASM 全幅探索が重いので非表示時に走らせるのは計算資源の無駄)。 表示判定は
+  // (WASM 全幅探索が重いので非表示時に走らせるのは計算資源の無駄)。 モード判定は
   // isAiAssistMode (free 全環境 / match / score / daily は Tauri のみ) に集約。
-  const showAiBest = isAiAssistMode(mode);
+  // さらに match で ama 観戦中 (viewing === 'ai') は commit がプレイヤー側に
+  // 走るので、 観戦中の AI 操作と誤解させないため AI Best も隠す。
+  const showAiBest = isAiAssistMode(mode) && viewing === 'player';
   const { moves, loading, aiReady } = useAiSuggestion(1, showAiBest);
   const t = useT();
   const aiBest = moves[0] ?? null;

@@ -45,6 +45,7 @@ export default function App() {
   useHaptics();
   const editing = useGameStore((s) => s.editing);
   const mode = useGameStore((s) => s.mode);
+  const viewing = useGameStore((s) => s.viewing);
   // 起動時 URL に `?score=<id>` (サーバ短縮)、`?replay=...` (inline リプレイ)、
   // `?share=...` (盤面共有) のいずれかが乗っていたらそれぞれをロード。
   // 共有を踏んだ場合は match を続行せず該当モードに切替える。失敗はサイレント。
@@ -151,8 +152,11 @@ export default function App() {
               {editing ? <EditPairs /> : <NextQueue />}
               {/* AI 候補手は free モードは常時、 match / score / daily は Tauri
                   (Android アプリ) ビルドでのみ表示する。 web 版の対戦・スコア
-                  アタック系は従来どおり AI ヒント無し。 isAiAssistMode に集約。 */}
-              {!editing && isAiAssistMode(mode) && (
+                  アタック系は従来どおり AI ヒント無し。 isAiAssistMode に集約。
+                  match モードで ama 観戦中 (viewing === 'ai') にプレイヤー側
+                  候補手を出すと混乱するので隠す (commit はプレイヤー側に走る
+                  ため、 観戦中の AI 操作と誤解させない)。 */}
+              {!editing && isAiAssistMode(mode) && viewing === 'player' && (
                 <div className="mt-auto">
                   <CandidateList />
                 </div>

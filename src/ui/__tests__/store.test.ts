@@ -1,6 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { useGameStore } from '../store';
 import { dailySeedFor } from '../../game/dailySeed';
+import { createEmptyField, withCell } from '../../game/field';
+import { ROWS } from '../../game/constants';
+import type { Field, Color } from '../../game/types';
+
+function sealColumn(field: Field, col: number, color: Color = 'R'): Field {
+  let f = field;
+  for (let r = 1; r < ROWS; r++) {
+    f = withCell(f, r, col, color);
+  }
+  return f;
+}
 
 describe('useGameStore', () => {
   beforeEach(() => {
@@ -111,6 +122,53 @@ describe('useGameStore undo', () => {
     // commit to silently fail.
     await commit({ axisCol: 0, rotation: 1 });
     expect(useGameStore.getState().history.length).toBe(1);
+  });
+
+  it('commit sutepuyo (axis 封印列 + child 空き列、 横置き) が成功する — PR #72 回帰防止', () => {
+    // 旧実装の isMoveProductive=== 2 では片方 discard を弾き、 commit が
+    // silent reject されていた。 added>=1 に緩和した結果、 ama 提案や手動 Drop で
+    // sutepuyo 配置できるようになるべき。
+    const { loadSharedPosition, commit } = useGameStore.getState();
+    const field = sealColumn(createEmptyField(), 0, 'R');
+    // current は loadSharedPosition が SPAWN_COL=2 / axisRow=1 / rot=0 で
+    // 自動セットアップ。 pair の色は固定 (R/B)。
+    loadSharedPosition({
+      field,
+      current: { axis: 'B', child: 'B' },
+      next1: { axis: 'R', child: 'B' },
+      next2: { axis: 'R', child: 'B' },
+    });
+    const before = useGameStore.getState().game;
+    expect(before.current).not.toBeNull();
+
+    // axisCol=0, rotation=1 → axis col 0 (sealed → discard), child col 1 (lands)。
+    void commit({ axisCol: 0, rotation: 1 });
+    const after = useGameStore.getState().game;
+    // commit が成功すれば current=null (resolving) または次の pair に進んでいる。
+    // history が 1 件積まれていることで 「silent reject されなかった」 を確認する。
+    expect(useGameStore.getState().history.length).toBe(1);
+    // 空き列 col 1 row 13 (一番下) に child の B が着地していることを確認。
+    expect(after.field.cells[ROWS - 1]![1]!).toBe('B');
+    // 封印列 col 0 row 0 (= 14段目) には何も追加されていないことも確認 (sutepuyo)。
+    expect(after.field.cells[0]![0]!).toBeNull();
+  });
+
+  it('commit pure no-op (両方 discard) は silent reject 維持', () => {
+    // PR #72 で緩めた範囲は片方 discard まで。 全列封印で両方 discard になる
+    // 配置はターン浪費の no-op なので引き続き reject されるべき。
+    const { loadSharedPosition, commit } = useGameStore.getState();
+    let field = createEmptyField();
+    for (let c = 0; c < 6; c++) field = sealColumn(field, c, 'R');
+    loadSharedPosition({
+      field,
+      current: { axis: 'B', child: 'B' },
+      next1: { axis: 'R', child: 'B' },
+      next2: { axis: 'R', child: 'B' },
+    });
+
+    // 何処に置いても全列封印で両方 discard。 history が積まれない (reject) こと。
+    void commit({ axisCol: 5, rotation: 0 });
+    expect(useGameStore.getState().history.length).toBe(0);
   });
 
   it('maxChain is 0 in the initial state', () => {

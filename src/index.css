@@ -9,14 +9,28 @@ body,
 body {
   margin: 0;
   font-family: system-ui, sans-serif;
-  /* Android の enableEdgeToEdge() / iOS のノッチで WebView がシステム UI 裏まで
-     拡張されるので、safe-area inset 分の padding を取る。viewport-fit=cover と
-     組み合わせて機能する。Web ブラウザでは env() が 0px なので無影響。 */
+  /* Android edge-to-edge / iOS ノッチで WebView がシステム UI 裏まで拡張される
+     ので、safe-area inset 分の padding を取る。viewport-fit=cover と組み合わせ
+     て機能する。Web ブラウザでは env() が 0px なので無影響。
+     背景色を入れているのは、padding 領域(= status bar / nav bar の真下)に
+     白い地が透けないようにするため。アプリの bg と同じ slate-950。 */
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
   box-sizing: border-box;
+  background: rgb(2 6 23); /* tailwind slate-950 と同色 */
+  /* document scroll を止めて、スクロールは #root 側でやる。これで body の
+     padding(= safe-area)がスクロールに乗ってしまい OS のシステムバー領域に
+     コンテンツが潜り込んで見えにくくなる現象を防ぐ。
+     副作用: モバイルブラウザの URL バー auto-hide が効かなくなるが、PWA /
+     Tauri Standalone での見栄え安定の方を優先する。 */
+  overflow: hidden;
+}
+#root {
+  overflow-y: auto;
+  /* container scroll でのバウンスや親伝播を抑える */
+  overscroll-behavior: contain;
 }
 
 /* 連鎖発生時のテキスト("Nれんさ!")。本家ぷよぷよを参考に、

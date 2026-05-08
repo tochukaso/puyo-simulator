@@ -186,7 +186,7 @@ export function ScoresPage() {
   void shareUrl; // 将来「URL コピー」ボタンを追加する余地
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white p-4 flex flex-col gap-4 max-w-3xl mx-auto">
+    <div className="min-h-full bg-slate-950 text-white p-4 flex flex-col gap-4 max-w-3xl mx-auto">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <h1 className="text-xl font-bold">{t('scores.title')}</h1>
         <button

@@ -8,22 +8,19 @@ title = "puyo-simulator gitleaks config"
 useDefault = true
 
 # ── カスタムルール ────────────────────────────────────────────
-# gitleaks の default ruleset (v8.30 時点) には Claude Code 等が発行する
-# OAuth / セッションキー (sk-ant-oat01- / sk-ant-sid01-) の専用ルールが
-# 無いので、ここで補う。Anthropic Console の API キー (sk-ant-api03-) と
-# Admin キー (sk-ant-admin01-) は default ruleset でカバーされている。
+# gitleaks の default ruleset (v8.30 時点) には Claude Code が発行する
+# OAuth access token (sk-ant-oat01-) のルールが無いので、ここで補う。
+# Anthropic Console の API キー (sk-ant-api03-) と Admin キー
+# (sk-ant-admin01-) は default ruleset でカバーされている。
+#
+# 注: Claude Code の "session" 識別子 (sesn_...) は bearer token ではなく
+# 単なる会話 ID なのでルール対象外。
 
 [[rules]]
 id = "anthropic-oauth-access-token"
 description = "Anthropic / Claude Code OAuth access token (sk-ant-oat01-)"
-regex = '''\b(sk-ant-oat\d{2}-[a-zA-Z0-9_\-]{50,})\b'''
-keywords = ["sk-ant-oat"]
-
-[[rules]]
-id = "anthropic-session-key"
-description = "Anthropic session key (sk-ant-sid01-)"
-regex = '''\b(sk-ant-sid\d{2}-[a-zA-Z0-9_\-]{50,})\b'''
-keywords = ["sk-ant-sid"]
+regex = '''\b(sk-ant-oat01-[a-zA-Z0-9_\-]{50,})\b'''
+keywords = ["sk-ant-oat01"]
 
 # false positive 除外用 allowlist。秘密情報そのものではなく
 # "ハッシュっぽいけど中身は WASM のコードや AI の重みなので除外していい" という
@@ -40,11 +37,4 @@ paths = [
   '''(^|/)src-tauri/gen/.*''',
   '''(^|/)package-lock\.json$''',
   '''(^|/)src-tauri/Cargo\.lock$''',
-]
-
-[[allowlists]]
-description = "高エントロピーに見える git の commit SHA / hex hash 文字列を許容"
-regexes = [
-  # 40 桁の hex (= git SHA1)。コミットメッセージや docs に頻出する。
-  '''\b[0-9a-f]{40}\b''',
 ]

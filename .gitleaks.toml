@@ -7,6 +7,24 @@ title = "puyo-simulator gitleaks config"
 [extend]
 useDefault = true
 
+# ── カスタムルール ────────────────────────────────────────────
+# gitleaks の default ruleset (v8.30 時点) には Claude Code 等が発行する
+# OAuth / セッションキー (sk-ant-oat01- / sk-ant-sid01-) の専用ルールが
+# 無いので、ここで補う。Anthropic Console の API キー (sk-ant-api03-) と
+# Admin キー (sk-ant-admin01-) は default ruleset でカバーされている。
+
+[[rules]]
+id = "anthropic-oauth-access-token"
+description = "Anthropic / Claude Code OAuth access token (sk-ant-oat01-)"
+regex = '''\b(sk-ant-oat\d{2}-[a-zA-Z0-9_\-]{50,})\b'''
+keywords = ["sk-ant-oat"]
+
+[[rules]]
+id = "anthropic-session-key"
+description = "Anthropic session key (sk-ant-sid01-)"
+regex = '''\b(sk-ant-sid\d{2}-[a-zA-Z0-9_\-]{50,})\b'''
+keywords = ["sk-ant-sid"]
+
 # false positive 除外用 allowlist。秘密情報そのものではなく
 # "ハッシュっぽいけど中身は WASM のコードや AI の重みなので除外していい" という
 # ファイルだけここに書く。実際の credential を許可してはいけない。

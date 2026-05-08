@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useT } from '../../../i18n';
 import { isValidDailyDate } from '../../../game/dailySeed';
 import {
   type ScoresListEntry,
   type ScoresListResponse,
-  buildScoresListSearch,
   getScoresList,
 } from '../../../api/scoresListClient';
 
@@ -172,19 +171,6 @@ export function ScoresPage() {
   const canPrev = offset > 0;
   const canNext = data ? offset + data.entries.length < total : false;
 
-  // 共有 URL を作って Twitter 等に貼りやすくする (ブックマーク URL でもある)。
-  const shareUrl = useMemo(() => {
-    const sp = buildScoresListSearch({
-      ...(appliedFilter.from ? { from: appliedFilter.from } : {}),
-      ...(appliedFilter.to ? { to: appliedFilter.to } : {}),
-      ...(appliedFilter.name ? { name: appliedFilter.name } : {}),
-      order: appliedFilter.order,
-    });
-    sp.set('view', 'scores');
-    return `${window.location.origin}${window.location.pathname}?${sp.toString()}`;
-  }, [appliedFilter]);
-  void shareUrl; // 将来「URL コピー」ボタンを追加する余地
-
   return (
     <div className="min-h-full bg-slate-950 text-white p-4 flex flex-col gap-4 max-w-3xl mx-auto">
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -272,61 +258,7 @@ export function ScoresPage() {
 
       {/* テーブル本体。 縦スクロール可、 ヘッダ sticky。 */}
       <div className="bg-slate-900 border border-slate-700 rounded">
-        {loading ? (
-          <div className="p-4 text-slate-500 text-sm">{t('scores.loading')}</div>
-        ) : failed ? (
-          <div className="p-4 text-rose-300 text-sm">{t('scores.error')}</div>
-        ) : !data || data.entries.length === 0 ? (
-          <div className="p-4 text-slate-500 text-sm">{t('scores.empty')}</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-xs text-slate-400 bg-slate-800">
-                <tr>
-                  <th className="px-3 py-2 text-left">
-                    {t('scores.col.date')}
-                  </th>
-                  <th className="px-3 py-2 text-left">
-                    {t('scores.col.name')}
-                  </th>
-                  <th className="px-3 py-2 text-right">
-                    {t('scores.col.score')}
-                  </th>
-                  <th className="px-3 py-2 text-right">
-                    {t('scores.col.action')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.entries.map((e) => (
-                  <tr
-                    key={e.id}
-                    className="border-t border-slate-800 hover:bg-slate-800/50"
-                  >
-                    <td className="px-3 py-2 tabular-nums whitespace-nowrap text-slate-300">
-                      {e.dailyDate}
-                    </td>
-                    <td className="px-3 py-2 text-slate-100 truncate max-w-[200px]">
-                      {e.playerName?.trim() || '—'}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums font-mono text-emerald-300">
-                      {e.playerScore.toLocaleString()}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <button
-                        type="button"
-                        onClick={() => onReplay(e)}
-                        className="px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs"
-                      >
-                        {t('scores.replay')}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {renderTableBody({ loading, failed, data, onReplay, t })}
       </div>
 
       {/* ページング。 件数表示 + 前後ボタン。 */}
@@ -357,6 +289,66 @@ export function ScoresPage() {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function renderTableBody(props: {
+  loading: boolean;
+  failed: boolean;
+  data: ScoresListResponse | null;
+  onReplay: (entry: ScoresListEntry) => void;
+  t: ReturnType<typeof useT>;
+}) {
+  const { loading, failed, data, onReplay, t } = props;
+  if (loading) {
+    return <div className="p-4 text-slate-500 text-sm">{t('scores.loading')}</div>;
+  }
+  if (failed) {
+    return <div className="p-4 text-rose-300 text-sm">{t('scores.error')}</div>;
+  }
+  if (!data || data.entries.length === 0) {
+    return <div className="p-4 text-slate-500 text-sm">{t('scores.empty')}</div>;
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="text-xs text-slate-400 bg-slate-800">
+          <tr>
+            <th className="px-3 py-2 text-left">{t('scores.col.date')}</th>
+            <th className="px-3 py-2 text-left">{t('scores.col.name')}</th>
+            <th className="px-3 py-2 text-right">{t('scores.col.score')}</th>
+            <th className="px-3 py-2 text-right">{t('scores.col.action')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.entries.map((e) => (
+            <tr
+              key={e.id}
+              className="border-t border-slate-800 hover:bg-slate-800/50"
+            >
+              <td className="px-3 py-2 tabular-nums whitespace-nowrap text-slate-300">
+                {e.dailyDate}
+              </td>
+              <td className="px-3 py-2 text-slate-100 truncate max-w-[200px]">
+                {e.playerName?.trim() || '—'}
+              </td>
+              <td className="px-3 py-2 text-right tabular-nums font-mono text-emerald-300">
+                {e.playerScore.toLocaleString()}
+              </td>
+              <td className="px-3 py-2 text-right">
+                <button
+                  type="button"
+                  onClick={() => onReplay(e)}
+                  className="px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs"
+                >
+                  {t('scores.replay')}
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
